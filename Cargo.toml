@@ -7,7 +7,7 @@ edition = "2018"
 
 [dependencies]
 druid-shell = { git = "https://github.com/linebender/druid", rev = "f74a712" }
-druid = { git = "https://github.com/linebender/druid", rev = "f74a712" }
+#druid = { git = "https://github.com/linebender/druid", rev = "f74a712" }
 tap = "1.0"
 log = "0.4"
 once_cell = "1.8.0"

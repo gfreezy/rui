@@ -1,5 +1,0 @@
-Item { key: Key { caller: Caller(Location { file: "src/tree.rs", line: 155, col: 20 }), seq_ix: 0 }, id: Id(0), body: Placeholder }
-  Item { key: Key { caller: Caller(Location { file: "src/tree.rs", line: 159, col: 24 }), seq_ix: 0 }, id: Id(2), body: Placeholder }
-  Item { key: Key { caller: Caller(Location { file: "src/tree.rs", line: 159, col: 24 }), seq_ix: 1 }, id: Id(10), body: Placeholder }
-  Item { key: Key { caller: Caller(Location { file: "src/tree.rs", line: 159, col: 24 }), seq_ix: 1 }, id: Id(11), body: Placeholder }
-  Item { key: Key { caller: Caller(Location { file: "src/tree.rs", line: 159, col: 24 }), seq_ix: 1 }, id: Id(12), body: Placeholder }

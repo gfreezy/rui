@@ -11,40 +11,6 @@ use std::panic::Location;
 #[derive(Clone, Copy, Debug)]
 pub struct Caller(&'static Location<'static>);
 
-#[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash, Debug)]
-pub struct Key {
-    /// The caller that originated the mutation.
-    pub(crate) caller: Caller,
-    /// The sequence index.
-    ///
-    /// At some point, we probably should accommodate user-provided
-    /// stable identities, but for now we just assume that it consists
-    /// of the caller and sequence number.
-    pub(crate) seq_ix: usize,
-}
-
-impl Key {
-    pub fn new(caller: impl Into<Caller>, seq_ix: usize) -> Key {
-        Key {
-            caller: caller.into(),
-            seq_ix,
-        }
-    }
-
-    /// A null key, which will always equal itself.
-    ///
-    /// In the future, this might be implemented differently, as Key will
-    /// possibly expand to accommodate user-provided keys and callers from
-    /// different runtimes such as scripting languages.
-    pub fn null() -> Key {
-        #[track_caller]
-        fn null_caller() -> Caller {
-            Location::caller().into()
-        }
-        Key::new(null_caller(), 0)
-    }
-}
-
 impl Caller {
     /// The pointer to the location metadata
     ///
