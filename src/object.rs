@@ -1,3 +1,7 @@
+use std::any::Any;
+
+use druid_shell::kurbo::Size;
+
 use crate::box_constraints::BoxConstraints;
 use crate::lifecycle::LifeCycle;
 use crate::{
@@ -5,8 +9,6 @@ use crate::{
     event::Event,
     tree::Children,
 };
-use druid_shell::kurbo::Size;
-use std::any::Any;
 
 pub trait Properties: Sized {
     type Object: RenderObject<Self>;
@@ -47,7 +49,7 @@ where
     }
 
     fn name(&self) -> &'static str {
-        ""
+        std::any::type_name::<Self>()
     }
 
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children) {

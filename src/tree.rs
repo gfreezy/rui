@@ -1,3 +1,12 @@
+use std::{
+    any::Any,
+    ops::{Index, IndexMut},
+};
+
+use druid_shell::kurbo::{Affine, Insets, Point, Rect, Size};
+use druid_shell::piet::{Brush, Color, LineJoin, PaintBrush, RenderContext, StrokeStyle};
+use druid_shell::TimerToken;
+
 use crate::box_constraints::BoxConstraints;
 use crate::context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx};
 use crate::event::Event;
@@ -5,13 +14,6 @@ use crate::id::ChildId;
 use crate::key::Caller;
 use crate::lifecycle::LifeCycle;
 use crate::object::AnyRenderObject;
-use druid_shell::kurbo::{Affine, Point, Rect, Size};
-use druid_shell::piet::RenderContext;
-use druid_shell::TimerToken;
-use std::{
-    any::Any,
-    ops::{Index, IndexMut},
-};
 
 #[derive(Default)]
 pub struct Children {
@@ -43,6 +45,11 @@ pub struct ChildState {
     /// The origin of the child in the parent's coordinate space; together with
     /// `size` these constitute the child's layout rect.
     pub(crate) origin: Point,
+
+    /// The insets applied to the layout rect to generate the paint rect.
+    /// In general, these will be zero; the exception is for things like
+    /// drop shadows or overflowing text.
+    pub(crate) paint_insets: Insets,
 
     /// The offset of the baseline relative to the bottom of the widget.
     ///
@@ -118,7 +125,9 @@ impl Child {
     /// [`Rect`]: struct.Rect.html
     /// [`Size`]: struct.Size.html
     /// [`LifeCycle::Size`]: enum.LifeCycle.html#variant.Size
-    pub fn set_origin(&mut self, ctx: &mut LayoutCtx, origin: Point) {}
+    pub fn set_origin(&mut self, ctx: &mut LayoutCtx, origin: Point) {
+        self.state.origin = origin;
+    }
 
     /// Returns the layout [`Rect`].
     ///
@@ -177,6 +186,7 @@ impl ChildState {
             size: size.unwrap_or_default(),
             baseline_offset: 0.,
             needs_layout: true,
+            paint_insets: Insets::ZERO,
         }
     }
 
@@ -197,7 +207,16 @@ impl ChildState {
     ///
     /// [`WidgetPod::paint_rect`]: struct.WidgetPod.html#method.paint_rect
     pub(crate) fn paint_rect(&self) -> Rect {
-        self.layout_rect()
+        self.layout_rect() + self.paint_insets
+    }
+
+    /// Update to incorporate state changes from a child.
+    ///
+    /// This will also clear some requests in the child state.
+    ///
+    /// This method is idempotent and can be called multiple times.
+    fn merge_up(&mut self, child_state: &mut ChildState) {
+        self.needs_layout |= child_state.needs_layout;
     }
 }
 
@@ -219,7 +238,7 @@ impl Child {
             Event::WindowConnected => true,
             Event::WindowSize(_) => {
                 self.state.needs_layout = true;
-                ctx.is_root
+                true
             }
             Event::MouseDown(mouse_event) => {
                 let mut mouse_event = mouse_event.clone();
@@ -258,13 +277,14 @@ impl Child {
                 context_state: ctx.context_state,
                 child_state: &mut self.state,
                 is_handled: false,
-                is_root: false,
             };
             let inner_event = modified_event.as_ref().unwrap_or(event);
 
             self.object
                 .event(&mut inner_ctx, inner_event, &mut self.children);
+            ctx.is_handled |= inner_ctx.is_handled;
         }
+        ctx.child_state.merge_up(&mut self.state)
     }
 
     pub fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle) {
@@ -277,32 +297,27 @@ impl Child {
     }
 
     pub fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints) -> Size {
-        self.state.needs_layout = false;
+        let object_name = self.object.name();
+        let span = tracing::span!(tracing::Level::DEBUG, "layout", ?bc, object_name);
+        let _h = span.enter();
 
-        let child_mouse_pos = match ctx.mouse_pos {
-            Some(pos) => Some(pos - self.layout_rect().origin().to_vec2()),
-            None => None,
-        };
-        let prev_size = self.state.size;
+        if !self.state.needs_layout {
+            tracing::debug!("skip child layout");
+            return self.state.size;
+        }
+
+        self.state.needs_layout = false;
 
         let mut child_ctx = LayoutCtx {
             context_state: ctx.context_state,
             child_state: &mut self.state,
-            mouse_pos: child_mouse_pos,
         };
 
         let new_size = self.object.layout(&mut child_ctx, bc, &mut self.children);
-        if new_size != prev_size {
-            let mut child_ctx = LifeCycleCtx {
-                child_state: child_ctx.child_state,
-                context_state: child_ctx.context_state,
-            };
-            let size_event = LifeCycle::Size(new_size);
-            self.object.lifecycle(&mut child_ctx, &size_event);
-        }
 
         self.state.size = new_size;
 
+        tracing::debug!(?new_size, ?self.state.origin);
         new_size
     }
 
@@ -329,10 +344,9 @@ impl Child {
     /// [`Widget::paint`]: trait.Widget.html#tymethod.paint
     /// [`paint`]: #method.paint
     pub fn paint_raw(&mut self, ctx: &mut PaintCtx) {
-        // we need to do this before we borrow from self
-        // if env.get(Env::DEBUG_WIDGET_ID) {
-        //     self.make_widget_id_layout_if_needed(self.state.id, ctx, env);
-        // }
+        let object_name = self.object.name();
+        let span = tracing::span!(tracing::Level::DEBUG, "paint_raw", object_name);
+        let _h = span.enter();
 
         let mut inner_ctx = PaintCtx {
             render_ctx: ctx.render_ctx,
@@ -341,5 +355,18 @@ impl Child {
             child_state: &self.state,
         };
         self.object.paint(&mut inner_ctx, &mut self.children);
+
+        let rect = inner_ctx.size().to_rect();
+
+        const STYLE: StrokeStyle = StrokeStyle::new()
+            .dash_pattern(&[4.0, 2.0])
+            .dash_offset(8.0)
+            .line_join(LineJoin::Round);
+        inner_ctx.render_ctx.stroke_styled(
+            rect,
+            &PaintBrush::Color(Color::rgb8(0, 0, 0)),
+            1.,
+            &STYLE,
+        );
     }
 }

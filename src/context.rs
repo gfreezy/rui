@@ -1,12 +1,14 @@
-use crate::id::ChildId;
-use crate::tree::ChildState;
-use druid_shell::kurbo::{Affine, Insets, Point, Size};
-use druid_shell::piet::{Piet, PietText, RenderContext};
-use druid_shell::{Region, TimerToken, WindowHandle};
 use std::{
     ops::{Deref, DerefMut},
     time::Duration,
 };
+
+use druid_shell::kurbo::{Affine, Insets, Point, Size};
+use druid_shell::piet::{Piet, PietText, RenderContext};
+use druid_shell::{Region, TimerToken, WindowHandle};
+
+use crate::id::ChildId;
+use crate::tree::ChildState;
 
 /// A macro for implementing methods on multiple contexts.
 ///
@@ -37,7 +39,6 @@ pub struct EventCtx<'a, 'b> {
     pub(crate) context_state: &'a mut ContextState<'b>,
     pub(crate) child_state: &'a mut ChildState,
     pub(crate) is_handled: bool,
-    pub(crate) is_root: bool,
 }
 
 pub struct LifeCycleCtx<'a, 'b> {
@@ -48,7 +49,6 @@ pub struct LifeCycleCtx<'a, 'b> {
 pub struct LayoutCtx<'a, 'b> {
     pub(crate) context_state: &'a mut ContextState<'b>,
     pub(crate) child_state: &'a mut ChildState,
-    pub(crate) mouse_pos: Option<Point>,
 }
 
 pub struct PaintCtx<'a, 'b, 'c> {
@@ -139,6 +139,21 @@ impl<'a> ContextState<'a> {
 }
 
 impl LayoutCtx<'_, '_> {
+    /// Set explicit paint [`Insets`] for this widget.
+    ///
+    /// You are not required to set explicit paint bounds unless you need
+    /// to paint outside of your layout bounds. In this case, the argument
+    /// should be an [`Insets`] struct that indicates where your widget
+    /// needs to overpaint, relative to its bounds.
+    ///
+    /// For more information, see [`WidgetPod::paint_insets`].
+    ///
+    /// [`Insets`]: struct.Insets.html
+    /// [`WidgetPod::paint_insets`]: struct.WidgetPod.html#method.paint_insets
+    pub fn set_paint_insets(&mut self, insets: impl Into<Insets>) {
+        self.child_state.paint_insets = insets.into().nonnegative();
+    }
+
     /// Set an explicit baseline position for this widget.
     ///
     /// The baseline position is used to align widgets that contain text,
@@ -197,14 +212,14 @@ impl PaintCtx<'_, '_, '_> {
     /// ```
     pub fn with_save(&mut self, f: impl FnOnce(&mut PaintCtx)) {
         if let Err(e) = self.render_ctx.save() {
-            log::error!("Failed to save RenderContext: '{}'", e);
+            tracing::error!("Failed to save RenderContext: '{}'", e);
             return;
         }
 
         f(self);
 
         if let Err(e) = self.render_ctx.restore() {
-            log::error!("Failed to restore RenderContext: '{}'", e);
+            tracing::error!("Failed to restore RenderContext: '{}'", e);
         }
     }
 

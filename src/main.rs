@@ -1,3 +1,9 @@
+use crate::app::App;
+use crate::ui::Ui;
+use crate::widgets::label::Label;
+use crate::widgets::padding::Padding;
+use crate::widgets::sized_box::SizedBox;
+
 pub mod app;
 pub mod box_constraints;
 pub mod context;
@@ -11,20 +17,17 @@ pub mod tree;
 pub mod ui;
 pub mod widgets;
 
-use crate::app::App;
-use crate::ui::Ui;
-use crate::widgets::label::Label;
-use druid_shell::piet::Piet;
-use druid_shell::{
-    Application, HotKey, Menu, MouseEvent, Region, SysMods, WinHandler, WindowBuilder, WindowHandle,
-};
-use std::any::Any;
-
 fn win(ui: &mut Ui) {
-    Label::new("test").build(ui);
+    Padding::new((20., 20.)).build(ui, |ui| {
+        Label::new("test").build(ui);
+    });
 }
 
 fn main() {
+    tracing_subscriber::fmt::fmt()
+        .with_max_level(tracing::Level::DEBUG)
+        .pretty()
+        .init();
     let app = App::new("test");
     app.run(win);
 }
