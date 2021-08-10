@@ -1,9 +1,3 @@
-use crate::app::App;
-use crate::ui::Ui;
-use crate::widgets::label::Label;
-use crate::widgets::padding::Padding;
-use crate::widgets::sized_box::SizedBox;
-
 pub mod app;
 pub mod box_constraints;
 pub mod context;
@@ -17,9 +11,20 @@ pub mod tree;
 pub mod ui;
 pub mod widgets;
 
+use crate::app::App;
+use crate::ui::Ui;
+use crate::widgets::button::Button;
+use crate::widgets::column::{Alignment, Column};
+use crate::widgets::label::Label;
+use crate::widgets::padding::Padding;
+
 fn win(ui: &mut Ui) {
-    Padding::new((20., 20.)).build(ui, |ui| {
-        Label::new("test").build(ui);
+    Column::new(10., Alignment::Center).build(ui, |ui| {
+        Label::new("text").build(ui);
+        Padding::new((20., 20.)).build(ui, |ui| {
+            Button::new().labeled(ui, "click me", || println!("clicked"));
+        });
+        Button::new().labeled(ui, "click me 2", || println!("clicked"));
     });
 }
 

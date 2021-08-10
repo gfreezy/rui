@@ -38,6 +38,7 @@ pub struct UpdateCtx<'a, 'b> {
 pub struct EventCtx<'a, 'b> {
     pub(crate) context_state: &'a mut ContextState<'b>,
     pub(crate) child_state: &'a mut ChildState,
+    pub(crate) is_active: bool,
     pub(crate) is_handled: bool,
 }
 
@@ -88,6 +89,38 @@ impl_context_method!(
         /// Get an object which can create text layouts.
         pub fn text(&mut self) -> &mut PietText {
             &mut self.context_state.text
+        }
+
+        /// The "hot" (aka hover) status of a widget.
+        ///
+        /// A widget is "hot" when the mouse is hovered over it. Widgets will
+        /// often change their appearance as a visual indication that they
+        /// will respond to mouse interaction.
+        ///
+        /// The hot status is computed from the widget's layout rect. In a
+        /// container hierarchy, all widgets with layout rects containing the
+        /// mouse position have hot status.
+        ///
+        /// Discussion: there is currently some confusion about whether a
+        /// widget can be considered hot when some other widget is active (for
+        /// example, when clicking to one widget and dragging to the next).
+        /// The documentation should clearly state the resolution.
+        pub fn is_hot(&self) -> bool {
+            self.child_state.is_hot
+        }
+
+        /// The active status of a widget.
+        ///
+        /// Active status generally corresponds to a mouse button down. Widgets
+        /// with behavior similar to a button will call [`set_active`] on mouse
+        /// down and then up.
+        ///
+        /// When a widget is active, it gets mouse events even when the mouse
+        /// is dragged away.
+        ///
+        /// [`set_active`]: struct.EventCtx.html#method.set_active
+        pub fn is_active(&self) -> bool {
+            self.child_state.is_active
         }
     }
 );
@@ -167,7 +200,25 @@ impl LayoutCtx<'_, '_> {
         self.child_state.baseline_offset = baseline
     }
 }
+impl EventCtx<'_, '_> {
+    /// Set the "active" state of the widget.
+    ///
+    /// See [`EventCtx::is_active`](struct.EventCtx.html#method.is_active).
+    pub fn set_active(&mut self, active: bool) {
+        self.child_state.is_active = active;
+    }
 
+    /// Set the event as "handled", which stops its propagation to other
+    /// widgets.
+    pub fn set_handled(&mut self) {
+        self.is_handled = true;
+    }
+
+    /// Determine whether the event has been handled by some other widget.
+    pub fn is_handled(&self) -> bool {
+        self.is_handled
+    }
+}
 impl<'c> Deref for PaintCtx<'_, '_, 'c> {
     type Target = Piet<'c>;
 

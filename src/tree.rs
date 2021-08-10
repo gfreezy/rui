@@ -3,12 +3,12 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-use druid_shell::kurbo::{Affine, Insets, Point, Rect, Size};
-use druid_shell::piet::{Brush, Color, LineJoin, PaintBrush, RenderContext, StrokeStyle};
+use druid_shell::kurbo::{Affine, Insets, Point, Rect, Shape, Size};
+use druid_shell::piet::{Color, LineJoin, PaintBrush, RenderContext, StrokeStyle};
 use druid_shell::TimerToken;
 
 use crate::box_constraints::BoxConstraints;
-use crate::context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx};
+use crate::context::{ContextState, EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx};
 use crate::event::Event;
 use crate::id::ChildId;
 use crate::key::Caller;
@@ -57,6 +57,16 @@ pub struct ChildState {
     /// the baseline. Widgets that contain text or controls that expect to be
     /// laid out alongside text can set this as appropriate.
     pub(crate) baseline_offset: f64,
+
+    // TODO: consider using bitflags for the booleans.
+    // hover state
+    pub(crate) is_hot: bool,
+
+    // mouse down with left key
+    pub(crate) is_active: bool,
+
+    /// Any descendant is active.
+    pub(crate) has_active: bool,
 
     pub(crate) needs_layout: bool,
 }
@@ -141,6 +151,24 @@ impl Child {
     pub fn layout_rect(&self) -> Rect {
         self.state.layout_rect()
     }
+
+    /// Returns `true` if any descendant is active.
+    pub fn has_active(&self) -> bool {
+        self.state.has_active
+    }
+
+    /// Query the "active" state of the widget.
+    pub fn is_active(&self) -> bool {
+        self.state.is_active
+    }
+
+    /// Query the "hot" state of the widget.
+    ///
+    /// See [`EventCtx::is_hot`](struct.EventCtx.html#method.is_hot) for
+    /// additional information.
+    pub fn is_hot(&self) -> bool {
+        self.state.is_hot
+    }
 }
 
 /// Allows iterating over a set of [`Children`].
@@ -185,6 +213,9 @@ impl ChildState {
             origin: Point::ORIGIN,
             size: size.unwrap_or_default(),
             baseline_offset: 0.,
+            is_hot: false,
+            is_active: false,
+            has_active: false,
             needs_layout: true,
             paint_insets: Insets::ZERO,
         }
@@ -217,6 +248,7 @@ impl ChildState {
     /// This method is idempotent and can be called multiple times.
     fn merge_up(&mut self, child_state: &mut ChildState) {
         self.needs_layout |= child_state.needs_layout;
+        self.has_active |= child_state.has_active;
     }
 }
 
@@ -229,6 +261,7 @@ impl Child {
             // from other points in the library.
             return;
         }
+        let had_active = self.state.has_active;
         let rect = self.layout_rect();
 
         // If we need to replace either the event or its data.
@@ -241,28 +274,73 @@ impl Child {
                 true
             }
             Event::MouseDown(mouse_event) => {
-                let mut mouse_event = mouse_event.clone();
-                mouse_event.pos -= rect.origin().to_vec2();
-                modified_event = Some(Event::MouseDown(mouse_event));
-                true
+                Child::set_hot_state(
+                    self.object.as_mut(),
+                    &mut self.state,
+                    ctx.context_state,
+                    rect,
+                    Some(mouse_event.pos),
+                );
+                if had_active || self.is_hot() {
+                    let mut mouse_event = mouse_event.clone();
+                    mouse_event.pos -= rect.origin().to_vec2();
+                    modified_event = Some(Event::MouseDown(mouse_event));
+                    true
+                } else {
+                    false
+                }
             }
             Event::MouseUp(mouse_event) => {
-                let mut mouse_event = mouse_event.clone();
-                mouse_event.pos -= rect.origin().to_vec2();
-                modified_event = Some(Event::MouseUp(mouse_event));
-                true
+                Child::set_hot_state(
+                    self.object.as_mut(),
+                    &mut self.state,
+                    ctx.context_state,
+                    rect,
+                    Some(mouse_event.pos),
+                );
+                if had_active || self.is_hot() {
+                    let mut mouse_event = mouse_event.clone();
+                    mouse_event.pos -= rect.origin().to_vec2();
+                    modified_event = Some(Event::MouseUp(mouse_event));
+                    true
+                } else {
+                    false
+                }
             }
             Event::MouseMove(mouse_event) => {
-                let mut mouse_event = mouse_event.clone();
-                mouse_event.pos -= rect.origin().to_vec2();
-                modified_event = Some(Event::MouseMove(mouse_event));
-                true
+                let hot_changed = Child::set_hot_state(
+                    self.object.as_mut(),
+                    &mut self.state,
+                    ctx.context_state,
+                    rect,
+                    Some(mouse_event.pos),
+                );
+                if had_active || self.is_hot() || hot_changed {
+                    let mut mouse_event = mouse_event.clone();
+                    mouse_event.pos -= rect.origin().to_vec2();
+                    modified_event = Some(Event::MouseMove(mouse_event));
+                    true
+                } else {
+                    false
+                }
             }
             Event::Wheel(mouse_event) => {
-                let mut mouse_event = mouse_event.clone();
-                mouse_event.pos -= rect.origin().to_vec2();
-                modified_event = Some(Event::Wheel(mouse_event));
-                true
+                Child::set_hot_state(
+                    self.object.as_mut(),
+                    &mut self.state,
+                    ctx.context_state,
+                    rect,
+                    Some(mouse_event.pos),
+                );
+
+                if had_active || self.is_hot() {
+                    let mut mouse_event = mouse_event.clone();
+                    mouse_event.pos -= rect.origin().to_vec2();
+                    modified_event = Some(Event::Wheel(mouse_event));
+                    true
+                } else {
+                    false
+                }
             }
             Event::AnimFrame(_) => false,
             Event::KeyDown(_) => true,
@@ -276,12 +354,16 @@ impl Child {
             let mut inner_ctx = EventCtx {
                 context_state: ctx.context_state,
                 child_state: &mut self.state,
+                is_active: false,
                 is_handled: false,
             };
             let inner_event = modified_event.as_ref().unwrap_or(event);
+            inner_ctx.child_state.has_active = false;
 
             self.object
                 .event(&mut inner_ctx, inner_event, &mut self.children);
+
+            inner_ctx.child_state.has_active |= inner_ctx.child_state.is_active;
             ctx.is_handled |= inner_ctx.is_handled;
         }
         ctx.child_state.merge_up(&mut self.state)
@@ -368,5 +450,46 @@ impl Child {
             1.,
             &STYLE,
         );
+    }
+}
+
+/// Public API for child nodes.
+impl Child {
+    pub fn size(&self) -> Size {
+        self.state.size()
+    }
+
+    /// Determines if the provided `mouse_pos` is inside `rect`
+    /// and if so updates the hot state and sends `LifeCycle::HotChanged`.
+    ///
+    /// Returns `true` if the hot state changed.
+    ///
+    /// The provided `child_state` should be merged up if this returns `true`.
+    fn set_hot_state(
+        child: &mut dyn AnyRenderObject,
+        child_state: &mut ChildState,
+        context_state: &mut ContextState,
+        rect: Rect,
+        mouse_pos: Option<Point>,
+    ) -> bool {
+        let had_hot = child_state.is_hot;
+        child_state.is_hot = match mouse_pos {
+            Some(pos) => rect.winding(pos) != 0,
+            None => false,
+        };
+        if had_hot != child_state.is_hot {
+            let hot_changed_event = LifeCycle::HotChanged(child_state.is_hot);
+            let mut child_ctx = LifeCycleCtx {
+                context_state,
+                child_state,
+            };
+            child.lifecycle(&mut child_ctx, &hot_changed_event);
+            // if hot changes and we're showing widget ids, always repaint
+            // if env.get(Env::DEBUG_WIDGET_ID) {
+            //     child_ctx.request_paint();
+            // }
+            return true;
+        }
+        false
     }
 }

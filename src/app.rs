@@ -139,6 +139,7 @@ impl AppWidget {
         let mut event_ctx = EventCtx {
             context_state: &mut context_state,
             child_state: &mut child.state,
+            is_active: false,
             is_handled: false,
         };
 
