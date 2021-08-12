@@ -147,7 +147,7 @@ impl RenderObjectInterface for SizedBox {
         }
     }
 
-    fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle) {}
+    fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, children: &mut Children) {}
 
     fn layout(
         &mut self,

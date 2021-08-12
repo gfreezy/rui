@@ -23,7 +23,7 @@ pub trait RenderObject<Props>: RenderObjectInterface {
 
 pub trait RenderObjectInterface {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children);
-    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle);
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children);
     fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, children: &mut Children)
         -> Size;
     fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children);
@@ -34,7 +34,7 @@ pub trait AnyRenderObject: Any {
     fn name(&self) -> &'static str;
 
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children);
-    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle);
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children);
     fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, children: &mut Children)
         -> Size;
     fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children);
@@ -56,8 +56,8 @@ where
         R::event(self, ctx, event, children)
     }
 
-    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle) {
-        R::lifecycle(self, ctx, event)
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children) {
+        R::lifecycle(self, ctx, event, children)
     }
 
     fn layout(

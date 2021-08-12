@@ -1,5 +1,9 @@
 use std::panic::Location;
 
+use druid_shell::kurbo::{Point, Size};
+use druid_shell::piet::{Color, PaintBrush, RenderContext};
+use druid_shell::MouseButton;
+
 use crate::box_constraints::BoxConstraints;
 use crate::lifecycle::LifeCycle;
 use crate::{
@@ -8,11 +12,8 @@ use crate::{
     object::{Properties, RenderObject, RenderObjectInterface},
     tree::Children,
     ui::Ui,
-    widgets::label::Label,
+    widgets::text::Text,
 };
-use druid_shell::kurbo::{Point, Size};
-use druid_shell::piet::{Color, PaintBrush, RenderContext};
-use druid_shell::MouseButton;
 
 pub struct Button {
     disabled: bool,
@@ -57,7 +58,7 @@ impl Button {
     pub fn labeled(self, ui: &mut Ui, label: impl Into<String>, handler: impl FnMut() + 'static) {
         let caller = Location::caller().into();
         ui.render_object(caller, self.handler(handler), |ui| {
-            Label::new(label).build(ui);
+            Text::new(label).build(ui);
         })
     }
 
@@ -107,6 +108,7 @@ impl RenderObjectInterface for ButtonObject {
             Event::MouseDown(mouse_event) => {
                 if mouse_event.button == MouseButton::Left {
                     ctx.set_active(true);
+                    ctx.set_handled();
                 }
             }
             Event::MouseUp(mouse_event) => {
@@ -126,7 +128,7 @@ impl RenderObjectInterface for ButtonObject {
         }
     }
 
-    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle) {
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children) {
         if let LifeCycle::HotChanged(_) = event {}
     }
 

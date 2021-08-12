@@ -1,3 +1,16 @@
+use std::cell::{Ref, RefCell};
+use std::rc::Rc;
+
+use druid_shell::kurbo::{Point, Size};
+
+use crate::app::App;
+use crate::ui::Ui;
+use crate::widgets::button::Button;
+use crate::widgets::hstack::{HStack, VerticalAlignment};
+use crate::widgets::scroll_view::ScrollView;
+use crate::widgets::text::Text;
+use crate::widgets::vstack::{HorizontalAlignment, VStack};
+
 pub mod app;
 pub mod box_constraints;
 pub mod context;
@@ -11,21 +24,63 @@ pub mod tree;
 pub mod ui;
 pub mod widgets;
 
-use crate::app::App;
-use crate::ui::Ui;
-use crate::widgets::button::Button;
-use crate::widgets::column::{Alignment, Column};
-use crate::widgets::label::Label;
-use crate::widgets::padding::Padding;
-
 fn win(ui: &mut Ui) {
-    Column::new(10., Alignment::Center).build(ui, |ui| {
-        Label::new("text").build(ui);
-        Padding::new((20., 20.)).build(ui, |ui| {
-            Button::new().labeled(ui, "click me", || println!("clicked"));
+    scroll_view(ui, |ui| {
+        vstack(ui, |ui| {
+            let count = ui.state_node(|| 0isize);
+
+            for _ in 0..(*count.get() as usize) {
+                let count = ui.state_node(|| 0isize);
+                text(ui, &format!("count: {}", *count.get()));
+
+                button(ui, "click to incr", {
+                    let count = count.clone();
+                    move || {
+                        count.update(|c| *c += 1);
+                    }
+                });
+            }
+
+            button(ui, "incr buttons", {
+                let count = count.clone();
+                move || {
+                    count.update(|c| *c += 1);
+                }
+            });
+            button(ui, "decr buttons", {
+                let count = count.clone();
+                move || {
+                    count.update(|c| {
+                        if *c > 0 {
+                            *c -= 1
+                        }
+                    });
+                }
+            });
         });
-        Button::new().labeled(ui, "click me 2", || println!("clicked"));
     });
+
+    // println!("{:?}", &ui.tree.renders[0].children.tracked_states);
+}
+
+fn scroll_view(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
+    ScrollView::new(Point::ZERO, Size::new(600., 400.)).build(ui, content);
+}
+
+fn vstack(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
+    VStack::new(10., HorizontalAlignment::Center).build(ui, content);
+}
+
+fn hstack(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
+    HStack::new(10., VerticalAlignment::Center).build(ui, content);
+}
+
+fn text(ui: &mut Ui, text: &str) {
+    Text::new(text).text_size(20.).build(ui);
+}
+
+fn button(ui: &mut Ui, text: &str, click: impl FnMut() + 'static) {
+    Button::new().labeled(ui, text, click);
 }
 
 fn main() {

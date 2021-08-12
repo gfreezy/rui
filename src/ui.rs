@@ -1,12 +1,14 @@
+use std::any::Any;
+use std::panic::Location;
+
 use crate::context::{ContextState, UpdateCtx};
 use crate::id::ChildCounter;
 use crate::key::Caller;
 use crate::object::{AnyRenderObject, Properties, RenderObject};
-use crate::tree::{Child, ChildState, Children, State};
-use std::any::Any;
+use crate::tree::{Child, ChildState, Children, State, StateNode};
 
 pub struct Ui<'a, 'b> {
-    tree: &'a mut Children,
+    pub(crate) tree: &'a mut Children,
     context_state: &'a mut ContextState<'b>,
     child_counter: &'a mut ChildCounter,
     state_index: usize,
@@ -26,6 +28,28 @@ impl<'a, 'b> Ui<'a, 'b> {
             state_index: 0,
             render_index: 0,
         }
+    }
+
+    #[track_caller]
+    pub fn state_node<T: 'static>(&mut self, init: impl FnOnce() -> T) -> State<T> {
+        let caller = Location::caller().into();
+        let index = match self.find_state_node(caller) {
+            None => {
+                let init_value = Box::new(State::new(init()));
+                self.insert_state_node(caller, init_value)
+            }
+            Some(index) => index,
+        };
+        for node in &mut self.tree.states[self.state_index..index] {
+            node.dead = true;
+        }
+        self.state_index = index + 1;
+
+        self.tree.states[index]
+            .state
+            .downcast_ref::<State<T>>()
+            .unwrap()
+            .clone()
     }
 
     pub fn render_object<P, R, N>(&mut self, caller: Caller, props: P, content: N) -> R::Action
@@ -70,6 +94,10 @@ impl<'a, 'b> Ui<'a, 'b> {
         object_cx.tree.renders.truncate(object_cx.render_index);
         object_cx.tree.renders.retain(|c| !c.dead);
 
+        for child in &mut node.children {
+            node.state.merge_up(&mut child.state);
+        }
+
         action
     }
 }
@@ -86,12 +114,13 @@ impl Ui<'_, '_> {
         None
     }
 
-    fn insert_state_node(&mut self, caller: Caller, state: Box<dyn Any>) {
+    fn insert_state_node(&mut self, caller: Caller, state: Box<dyn Any>) -> usize {
         let key = caller;
         let dead = false;
         self.tree
             .states
-            .insert(self.state_index, State { key, state, dead });
+            .insert(self.state_index, StateNode { key, state, dead });
+        self.state_index
     }
 
     fn find_render_object(&mut self, caller: Caller) -> Option<usize> {
@@ -117,5 +146,9 @@ impl Ui<'_, '_> {
             },
         );
         self.render_index
+    }
+
+    pub fn track_state(&mut self, state_name: String) {
+        self.tree.track_state(state_name);
     }
 }

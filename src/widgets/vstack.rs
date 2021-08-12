@@ -15,26 +15,26 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Alignment {
-    Left,
-    Right,
+pub enum HorizontalAlignment {
+    Leading,
+    Trailing,
     Center,
 }
 
 /// A widget that just adds padding around its child.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Column {
+pub struct VStack {
     spacing: f64,
-    alignment: Alignment,
+    alignment: HorizontalAlignment,
 }
 
-impl Properties for Column {
+impl Properties for VStack {
     type Object = Self;
 }
 
-impl Column {
-    pub fn new(spacing: f64, alignment: Alignment) -> Self {
-        Column { spacing, alignment }
+impl VStack {
+    pub fn new(spacing: f64, alignment: HorizontalAlignment) -> Self {
+        VStack { spacing, alignment }
     }
 
     #[track_caller]
@@ -44,24 +44,29 @@ impl Column {
     }
 }
 
-impl RenderObject<Column> for Column {
+impl RenderObject<VStack> for VStack {
     type Action = ();
 
-    fn create(props: Column) -> Self {
+    fn create(props: VStack) -> Self {
         props
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, props: Column) {}
+    fn update(&mut self, ctx: &mut UpdateCtx, props: VStack) {
+        if self != &props {
+            *self = props;
+            ctx.request_layout();
+        }
+    }
 }
 
-impl RenderObjectInterface for Column {
+impl RenderObjectInterface for VStack {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children) {
         for child in children {
             child.event(ctx, event)
         }
     }
 
-    fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle) {}
+    fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, children: &mut Children) {}
 
     fn layout(
         &mut self,
@@ -69,7 +74,7 @@ impl RenderObjectInterface for Column {
         bc: &BoxConstraints,
         children: &mut Children,
     ) -> Size {
-        bc.debug_check("Column");
+        bc.debug_check("VStack");
         let mut child_bc = bc.clone();
         let mut total_width: f64 = 0.;
         let mut total_height: f64 = 0.;
@@ -82,31 +87,19 @@ impl RenderObjectInterface for Column {
             total_width = total_width.max(size.width);
             child_bc = child_bc.shrink((0.0, total_height));
         }
-        match self.alignment {
-            Alignment::Left => {
-                let mut y = 0.;
-                for child in children.iter() {
-                    let child_size = child.size();
-                    child.set_origin(ctx, Point::new(0., y));
-                    y += self.spacing + child_size.height;
-                }
-            }
-            Alignment::Right => {
-                let mut y = 0.;
-                for child in children.iter() {
-                    let child_size = child.size();
-                    child.set_origin(ctx, Point::new(total_width - child_size.width, y));
-                    y += self.spacing + child_size.height;
-                }
-            }
-            Alignment::Center => {
-                let mut y = 0.;
-                for child in children.iter() {
-                    let child_size = child.size();
-                    child.set_origin(ctx, Point::new((total_width - child_size.width) / 2., y));
-                    y += self.spacing + child_size.height;
-                }
-            }
+
+        let mut y = 0.;
+        for child in children.iter() {
+            let child_size = child.size();
+            let x = match self.alignment {
+                HorizontalAlignment::Leading => 0.,
+                HorizontalAlignment::Center => (total_width - child_size.width) / 2.,
+                HorizontalAlignment::Trailing => total_width - child_size.width,
+            };
+
+            child.set_origin(ctx, Point::new(x, y));
+
+            y += self.spacing + child_size.height;
         }
         Size::new(total_width, total_height)
     }

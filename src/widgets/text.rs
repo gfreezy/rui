@@ -1,5 +1,10 @@
 //! A label widget.
 
+use std::panic::Location;
+
+use druid_shell::kurbo::{Point, Size};
+use druid_shell::piet::{Color, RenderContext, TextAlignment};
+
 use crate::box_constraints::BoxConstraints;
 use crate::context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx};
 use crate::event::Event;
@@ -9,9 +14,6 @@ use crate::text::font_descriptor::FontDescriptor;
 use crate::text::layout::TextLayout;
 use crate::tree::Children;
 use crate::ui::Ui;
-use druid_shell::kurbo::{Point, Size};
-use druid_shell::piet::{Color, RenderContext, TextAlignment};
-use std::panic::Location;
 
 // added padding between the edges of the widget and the text.
 const LABEL_X_PADDING: f64 = 2.0;
@@ -23,13 +25,13 @@ const LABEL_X_PADDING: f64 = 2.0;
 ///
 /// [`Label`]: struct.Label.html
 #[derive(Debug, Clone)]
-pub struct Label {
+pub struct Text {
     layout: TextLayout<String>,
     line_break_mode: LineBreaking,
 }
 
-impl Properties for Label {
-    type Object = Label;
+impl Properties for Text {
+    type Object = Text;
 }
 
 /// Options for handling lines that are too wide for the label.
@@ -43,11 +45,13 @@ pub enum LineBreaking {
     Overflow,
 }
 
-impl Label {
+impl Text {
     /// Create a new `Label`.
     pub fn new(text: impl Into<String>) -> Self {
+        let mut layout = TextLayout::from_text(text);
+        layout.set_text_size(20.);
         Self {
-            layout: TextLayout::from_text(text),
+            layout,
             line_break_mode: LineBreaking::Overflow,
         }
     }
@@ -84,7 +88,7 @@ impl Label {
     }
 }
 
-impl Label {
+impl Text {
     /// Draw this label's text at the provided `Point`, without internal padding.
     ///
     /// This is a convenience for widgets that want to use Label as a way
@@ -114,30 +118,28 @@ impl Label {
     }
 }
 
-impl RenderObject<Label> for Label {
+impl RenderObject<Text> for Text {
     type Action = ();
 
-    fn create(props: Label) -> Self {
+    fn create(props: Text) -> Self {
         props
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, props: Label) {
+    fn update(&mut self, ctx: &mut UpdateCtx, props: Text) {
         if self.layout.text() != props.layout.text() {
             ctx.request_layout();
-            println!("update1");
             self.layout = props.layout;
         }
         if self.layout.layout().is_none() {
-            println!("update2");
             ctx.request_layout();
         }
     }
 }
 
-impl RenderObjectInterface for Label {
+impl RenderObjectInterface for Text {
     fn event(&mut self, _ctx: &mut EventCtx, _event: &Event, _children: &mut Children) {}
 
-    fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle) {}
+    fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, children: &mut Children) {}
 
     fn layout(
         &mut self,
@@ -145,6 +147,8 @@ impl RenderObjectInterface for Label {
         bc: &BoxConstraints,
         _children: &mut Children,
     ) -> Size {
+        // tracing::debug!("layout for text {:?}", self.layout.text());
+
         bc.debug_check("Label");
 
         let width = match self.line_break_mode {
@@ -164,6 +168,8 @@ impl RenderObjectInterface for Label {
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, _children: &mut Children) {
+        // tracing::debug!("paint for text {:?}", self.layout.text());
+
         let origin = Point::new(LABEL_X_PADDING, 0.0);
         let label_size = ctx.size();
 

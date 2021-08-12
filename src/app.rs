@@ -2,8 +2,11 @@ use std::any::Any;
 
 use druid_shell::kurbo::{Point, Size};
 use druid_shell::piet::Piet;
+use druid_shell::text::InputHandler;
 use druid_shell::{
-    Application, HotKey, Menu, MouseEvent, Region, SysMods, WinHandler, WindowBuilder, WindowHandle,
+    Application, FileDialogToken, FileInfo, HotKey, IdleToken, KeyEvent, Menu, Monitor, MouseEvent,
+    Region, Scale, Screen, SysMods, TextFieldToken, TimerToken, WinHandler, WindowBuilder,
+    WindowHandle,
 };
 use tracing::{debug, instrument};
 
@@ -46,6 +49,18 @@ impl App {
         builder.set_title(self.name);
         builder.set_menu(menubar);
 
+        let primary_monitor = Screen::get_monitors()
+            .into_iter()
+            .find(Monitor::is_primary)
+            .unwrap();
+        let window_size = Size::new(800., 600.);
+        let virtual_rect = primary_monitor.virtual_rect();
+        let x = (virtual_rect.x1 - window_size.width + virtual_rect.x0) / 2.;
+        let y = (virtual_rect.y1 - window_size.height + virtual_rect.y0) / 2.;
+        let window_offset = Point::new(x, y);
+        builder.set_size(window_size);
+        builder.set_position(window_offset);
+
         let window = builder.build().unwrap();
         window.show();
 
@@ -58,7 +73,6 @@ struct AppWidget {
     app: Box<dyn FnMut(&mut Ui)>,
     root: Children,
     child_counter: ChildCounter,
-    focus_widget: Option<ChildId>,
     mouse_pos: Option<Point>,
 }
 
@@ -69,7 +83,6 @@ impl AppWidget {
             app: Box::new(app),
             root: Children::new(),
             child_counter: ChildCounter::new(),
-            focus_widget: None,
             mouse_pos: None,
         }
     }
@@ -93,7 +106,6 @@ impl AppWidget {
 
     #[instrument(skip(self))]
     fn layout(&mut self, bc: &BoxConstraints) {
-        debug!("AppWidget::layout called");
         let Self { handle, root, .. } = self;
 
         let mut context_state = ContextState {
@@ -146,6 +158,8 @@ impl AppWidget {
         child
             .object
             .event(&mut event_ctx, &event, &mut child.children);
+        self.run_app();
+        self.handle.invalidate();
     }
 }
 
@@ -157,7 +171,6 @@ impl WinHandler for AppWidget {
 
     #[instrument(skip(self))]
     fn size(&mut self, size: Size) {
-        debug!("WinHandler::size");
         if self.root.is_empty() {
             self.run_app();
         } else {
@@ -165,13 +178,10 @@ impl WinHandler for AppWidget {
         }
     }
 
-    fn prepare_paint(&mut self) {
-        debug!("WinHandler::prepeare_paint");
-    }
+    fn prepare_paint(&mut self) {}
 
     #[instrument(skip(self, piet))]
     fn paint(&mut self, piet: &mut Piet, invalid: &Region) {
-        debug!("WinHandler::paint");
         self.layout(&BoxConstraints::new(Size::ZERO, self.handle.get_size()));
 
         let Self { handle, root, .. } = self;
@@ -205,6 +215,11 @@ impl WinHandler for AppWidget {
     #[instrument(skip(self))]
     fn mouse_up(&mut self, mouse_event: &MouseEvent) {
         self.event(Event::MouseUp(mouse_event.clone()));
+    }
+
+    #[instrument(skip(self))]
+    fn wheel(&mut self, mouse_event: &MouseEvent) {
+        self.event(Event::Wheel(mouse_event.clone()));
     }
 
     fn request_close(&mut self) {

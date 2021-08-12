@@ -1,3 +1,8 @@
+use std::borrow::Borrow;
+use std::cell::{Ref, RefCell};
+use std::fmt::{Debug, Formatter};
+use std::rc::Rc;
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::{
     any::Any,
     ops::{Index, IndexMut},
@@ -14,14 +19,81 @@ use crate::id::ChildId;
 use crate::key::Caller;
 use crate::lifecycle::LifeCycle;
 use crate::object::AnyRenderObject;
+use crate::ui::Ui;
 
 #[derive(Default)]
 pub struct Children {
-    pub(crate) states: Vec<State>,
+    pub(crate) states: Vec<StateNode>,
     pub(crate) renders: Vec<Child>,
+    pub(crate) tracked_states: Vec<String>,
 }
 
-pub struct State {
+static COUNTER: AtomicI64 = AtomicI64::new(0);
+
+struct Counter<T> {
+    val: T,
+}
+
+impl<T> Counter<T> {
+    pub fn new(v: T) -> Self {
+        println!(
+            "new state counter: {}",
+            COUNTER.fetch_add(1, Ordering::SeqCst) + 1
+        );
+        Counter { val: v }
+    }
+}
+
+impl<T> Drop for Counter<T> {
+    fn drop(&mut self) {
+        println!(
+            "remove state counter: {}",
+            COUNTER.fetch_sub(1, Ordering::SeqCst) - 1
+        );
+    }
+}
+
+pub struct State<T> {
+    val: Rc<Counter<RefCell<T>>>,
+}
+
+impl<T> Clone for State<T> {
+    fn clone(&self) -> Self {
+        State {
+            val: self.val.clone(),
+        }
+    }
+}
+
+impl<T: Debug> Debug for State<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let v = (*self.val).val.borrow();
+        (*v).fmt(f)
+    }
+}
+
+impl<T> State<T> {
+    pub fn new(val: T) -> Self {
+        State {
+            val: Rc::new(Counter::new(RefCell::new(val))),
+        }
+    }
+
+    pub fn set(&self, val: T) -> T {
+        self.val.val.replace(val)
+    }
+
+    pub fn update(&self, f: impl FnOnce(&mut T)) {
+        let mut refmut = self.val.val.borrow_mut();
+        f(&mut *refmut);
+    }
+
+    pub fn get(&self) -> Ref<'_, T> {
+        (*self.val).val.borrow()
+    }
+}
+
+pub struct StateNode {
     pub(crate) key: Caller,
     pub(crate) state: Box<dyn Any>,
     pub(crate) dead: bool,
@@ -74,6 +146,10 @@ pub struct ChildState {
 impl Children {
     pub(crate) fn new() -> Self {
         Children::default()
+    }
+
+    pub(crate) fn track_state(&mut self, state: String) {
+        self.tracked_states.push(state);
     }
 }
 
@@ -135,8 +211,12 @@ impl Child {
     /// [`Rect`]: struct.Rect.html
     /// [`Size`]: struct.Size.html
     /// [`LifeCycle::Size`]: enum.LifeCycle.html#variant.Size
-    pub fn set_origin(&mut self, ctx: &mut LayoutCtx, origin: Point) {
+    pub fn set_origin(&mut self, _ctx: &mut LayoutCtx, origin: Point) {
         self.state.origin = origin;
+    }
+
+    pub fn origin(&self) -> Point {
+        self.state.origin
     }
 
     /// Returns the layout [`Rect`].
@@ -221,7 +301,7 @@ impl ChildState {
         }
     }
 
-    pub(crate) fn add_timer(&mut self, timer_token: TimerToken) {}
+    pub(crate) fn add_timer(&mut self, _timer_token: TimerToken) {}
 
     #[inline]
     pub(crate) fn size(&self) -> Size {
@@ -246,7 +326,7 @@ impl ChildState {
     /// This will also clear some requests in the child state.
     ///
     /// This method is idempotent and can be called multiple times.
-    fn merge_up(&mut self, child_state: &mut ChildState) {
+    pub fn merge_up(&mut self, child_state: &mut ChildState) {
         self.needs_layout |= child_state.needs_layout;
         self.has_active |= child_state.has_active;
     }
@@ -277,6 +357,7 @@ impl Child {
                 Child::set_hot_state(
                     self.object.as_mut(),
                     &mut self.state,
+                    &mut self.children,
                     ctx.context_state,
                     rect,
                     Some(mouse_event.pos),
@@ -294,6 +375,7 @@ impl Child {
                 Child::set_hot_state(
                     self.object.as_mut(),
                     &mut self.state,
+                    &mut self.children,
                     ctx.context_state,
                     rect,
                     Some(mouse_event.pos),
@@ -311,6 +393,7 @@ impl Child {
                 let hot_changed = Child::set_hot_state(
                     self.object.as_mut(),
                     &mut self.state,
+                    &mut self.children,
                     ctx.context_state,
                     rect,
                     Some(mouse_event.pos),
@@ -326,8 +409,9 @@ impl Child {
             }
             Event::Wheel(mouse_event) => {
                 Child::set_hot_state(
-                    self.object.as_mut(),
+                    &mut *self.object,
                     &mut self.state,
+                    &mut self.children,
                     ctx.context_state,
                     rect,
                     Some(mouse_event.pos),
@@ -369,13 +453,18 @@ impl Child {
         ctx.child_state.merge_up(&mut self.state)
     }
 
-    pub fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle) {
+    pub fn lifecycle(
+        &mut self,
+        ctx: &mut LifeCycleCtx,
+        event: &LifeCycle,
+        children: &mut Children,
+    ) {
         let mut child_ctx = LifeCycleCtx {
             context_state: ctx.context_state,
             child_state: &mut self.state,
         };
 
-        self.object.lifecycle(&mut child_ctx, event);
+        self.object.lifecycle(&mut child_ctx, event, children);
     }
 
     pub fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints) -> Size {
@@ -384,7 +473,6 @@ impl Child {
         let _h = span.enter();
 
         if !self.state.needs_layout {
-            tracing::debug!("skip child layout");
             return self.state.size;
         }
 
@@ -399,7 +487,6 @@ impl Child {
 
         self.state.size = new_size;
 
-        tracing::debug!(?new_size, ?self.state.origin);
         new_size
     }
 
@@ -468,6 +555,7 @@ impl Child {
     fn set_hot_state(
         child: &mut dyn AnyRenderObject,
         child_state: &mut ChildState,
+        children: &mut Children,
         context_state: &mut ContextState,
         rect: Rect,
         mouse_pos: Option<Point>,
@@ -483,7 +571,7 @@ impl Child {
                 context_state,
                 child_state,
             };
-            child.lifecycle(&mut child_ctx, &hot_changed_event);
+            child.lifecycle(&mut child_ctx, &hot_changed_event, children);
             // if hot changes and we're showing widget ids, always repaint
             // if env.get(Env::DEBUG_WIDGET_ID) {
             //     child_ctx.request_paint();
