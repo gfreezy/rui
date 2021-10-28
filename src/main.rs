@@ -1,16 +1,5 @@
-use std::cell::{Ref, RefCell};
-use std::rc::Rc;
-
-use druid_shell::kurbo::{Point, Size};
-
-use crate::app::App;
-use crate::ui::Ui;
-use crate::widgets::button::Button;
-use crate::widgets::hstack::{HStack, VerticalAlignment};
-use crate::widgets::scroll_view::ScrollView;
-use crate::widgets::text::Text;
-use crate::widgets::vstack::{HorizontalAlignment, VStack};
-
+#[macro_use]
+mod macros;
 pub mod app;
 pub mod box_constraints;
 pub mod context;
@@ -24,6 +13,16 @@ pub mod tree;
 pub mod ui;
 pub mod widgets;
 
+use druid_shell::kurbo::{Point, Size};
+
+use crate::app::App;
+use crate::ui::Ui;
+use crate::widgets::button::Button;
+use crate::widgets::hstack::{HStack, VerticalAlignment};
+use crate::widgets::scroll_view::ScrollView;
+use crate::widgets::text::Text;
+use crate::widgets::vstack::{HorizontalAlignment, VStack};
+
 fn win(ui: &mut Ui) {
     scroll_view(ui, |ui| {
         vstack(ui, |ui| {
@@ -33,30 +32,34 @@ fn win(ui: &mut Ui) {
                 let count = ui.state_node(|| 0isize);
                 text(ui, &format!("count: {}", *count.get()));
 
-                button(ui, "click to incr", {
-                    let count = count.clone();
-                    move || {
-                        count.update(|c| *c += 1);
-                    }
-                });
+                button(
+                    ui,
+                    "click to incr",
+                    clone!([count] move || {
+                            count.update(|c| *c += 1);
+                        }
+                    ),
+                );
             }
 
-            button(ui, "incr buttons", {
-                let count = count.clone();
-                move || {
+            button(
+                ui,
+                "incr buttons",
+                clone!([count] move || {
                     count.update(|c| *c += 1);
-                }
-            });
-            button(ui, "decr buttons", {
-                let count = count.clone();
-                move || {
+                }),
+            );
+            button(
+                ui,
+                "decr buttons",
+                clone!([count] move || {
                     count.update(|c| {
                         if *c > 0 {
                             *c -= 1
                         }
                     });
-                }
-            });
+                }),
+            );
         });
     });
 

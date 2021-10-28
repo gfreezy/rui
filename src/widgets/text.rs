@@ -26,12 +26,16 @@ const LABEL_X_PADDING: f64 = 2.0;
 /// [`Label`]: struct.Label.html
 #[derive(Debug, Clone)]
 pub struct Text {
-    layout: TextLayout<String>,
+    text: String,
     line_break_mode: LineBreaking,
+    text_color: Color,
+    text_size: f64,
+    font: FontDescriptor,
+    alignment: TextAlignment,
 }
 
 impl Properties for Text {
-    type Object = Text;
+    type Object = TextObject;
 }
 
 /// Options for handling lines that are too wide for the label.
@@ -48,26 +52,28 @@ pub enum LineBreaking {
 impl Text {
     /// Create a new `Label`.
     pub fn new(text: impl Into<String>) -> Self {
-        let mut layout = TextLayout::from_text(text);
-        layout.set_text_size(20.);
         Self {
-            layout,
+            text: text.into(),
             line_break_mode: LineBreaking::Overflow,
+            text_color: Color::BLACK,
+            text_size: 14.,
+            font: FontDescriptor::default(),
+            alignment: TextAlignment::Start,
         }
     }
 
     pub fn text_color(mut self, color: Color) -> Self {
-        self.layout.set_text_color(color);
+        self.text_color = color;
         self
     }
 
     pub fn text_size(mut self, size: f64) -> Self {
-        self.layout.set_text_size(size);
+        self.text_size = size;
         self
     }
 
     pub fn font(mut self, font: FontDescriptor) -> Self {
-        self.layout.set_font(font);
+        self.font = font;
         self
     }
 
@@ -77,7 +83,7 @@ impl Text {
     }
 
     pub fn text_alignment(mut self, alignment: TextAlignment) -> Self {
-        self.layout.set_text_alignment(alignment);
+        self.alignment = alignment;
         self
     }
 
@@ -88,7 +94,31 @@ impl Text {
     }
 }
 
-impl Text {
+pub struct TextObject {
+    text: Text,
+    layout: TextLayout<String>,
+}
+
+impl TextObject {
+    fn new(text: Text) -> Self {
+        let layout = TextLayout::from_text(&text.text);
+
+        let mut obj = TextObject { text, layout };
+        obj.update_attrs();
+        obj
+    }
+
+    fn set_text_color(&mut self, color: Color) {
+        self.layout.set_text_color(color);
+    }
+
+    fn update_attrs(&mut self) {
+        self.layout.set_text(self.text.text.clone());
+        self.layout.set_font(self.text.font.clone());
+        self.layout.set_text_size(self.text.text_size);
+        self.layout.set_text_alignment(self.text.alignment);
+    }
+
     /// Draw this label's text at the provided `Point`, without internal padding.
     ///
     /// This is a convenience for widgets that want to use Label as a way
@@ -118,17 +148,22 @@ impl Text {
     }
 }
 
-impl RenderObject<Text> for Text {
+impl RenderObject<Text> for TextObject {
     type Action = ();
 
     fn create(props: Text) -> Self {
-        props
+        TextObject::new(props)
     }
 
     fn update(&mut self, ctx: &mut UpdateCtx, props: Text) {
-        if self.layout.text() != props.layout.text() {
+        if self.text.text_color != props.text_color {
+            self.text = props;
+            self.set_text_color(self.text.text_color.clone());
+            ctx.request_paint();
+        } else {
+            self.text = props;
             ctx.request_layout();
-            self.layout = props.layout;
+            self.update_attrs();
         }
         if self.layout.layout().is_none() {
             ctx.request_layout();
@@ -136,10 +171,11 @@ impl RenderObject<Text> for Text {
     }
 }
 
-impl RenderObjectInterface for Text {
+impl RenderObjectInterface for TextObject {
     fn event(&mut self, _ctx: &mut EventCtx, _event: &Event, _children: &mut Children) {}
 
-    fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, children: &mut Children) {}
+    fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _children: &mut Children) {
+    }
 
     fn layout(
         &mut self,
@@ -151,7 +187,7 @@ impl RenderObjectInterface for Text {
 
         bc.debug_check("Label");
 
-        let width = match self.line_break_mode {
+        let width = match self.text.line_break_mode {
             LineBreaking::WordWrap => bc.max().width - LABEL_X_PADDING * 2.0,
             _ => f64::INFINITY,
         };
@@ -173,7 +209,7 @@ impl RenderObjectInterface for Text {
         let origin = Point::new(LABEL_X_PADDING, 0.0);
         let label_size = ctx.size();
 
-        if self.line_break_mode == LineBreaking::Clip {
+        if self.text.line_break_mode == LineBreaking::Clip {
             ctx.clip(label_size.to_rect());
         }
         self.draw_at(ctx, origin)

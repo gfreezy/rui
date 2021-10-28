@@ -1,4 +1,3 @@
-use std::borrow::Borrow;
 use std::cell::{Ref, RefCell};
 use std::fmt::{Debug, Formatter};
 use std::rc::Rc;
@@ -8,9 +7,9 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-use druid_shell::kurbo::{Affine, Insets, Point, Rect, Shape, Size};
+use druid_shell::kurbo::{Affine, Insets, Point, Rect, Shape, Size, Vec2};
 use druid_shell::piet::{Color, LineJoin, PaintBrush, RenderContext, StrokeStyle};
-use druid_shell::TimerToken;
+use druid_shell::{Region, TimerToken};
 
 use crate::box_constraints::BoxConstraints;
 use crate::context::{ContextState, EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx};
@@ -19,7 +18,6 @@ use crate::id::ChildId;
 use crate::key::Caller;
 use crate::lifecycle::LifeCycle;
 use crate::object::AnyRenderObject;
-use crate::ui::Ui;
 
 #[derive(Default)]
 pub struct Children {
@@ -118,6 +116,9 @@ pub struct ChildState {
     /// `size` these constitute the child's layout rect.
     pub(crate) origin: Point,
 
+    /// The origin of the parent in the window coordinate space;
+    pub(crate) parent_window_origin: Point,
+
     /// The insets applied to the layout rect to generate the paint rect.
     /// In general, these will be zero; the exception is for things like
     /// drop shadows or overflowing text.
@@ -130,6 +131,14 @@ pub struct ChildState {
     /// laid out alongside text can set this as appropriate.
     pub(crate) baseline_offset: f64,
 
+    // The region that needs to be repainted, relative to the widget's bounds.
+    pub(crate) invalid: Region,
+
+    // The part of this widget that is visible on the screen is offset by this
+    // much. This will be non-zero for widgets that are children of `Scroll`, or
+    // similar, and it is used for propagating invalid regions.
+    pub(crate) viewport_offset: Vec2,
+
     // TODO: consider using bitflags for the booleans.
     // hover state
     pub(crate) is_hot: bool,
@@ -141,6 +150,9 @@ pub struct ChildState {
     pub(crate) has_active: bool,
 
     pub(crate) needs_layout: bool,
+
+    /// Any descendant has requested update.
+    pub(crate) request_update: bool,
 }
 
 impl Children {
@@ -232,6 +244,38 @@ impl Child {
         self.state.layout_rect()
     }
 
+    /// Set the viewport offset.
+    ///
+    /// This is relevant only for children of a scroll view (or similar). It must
+    /// be set by the parent widget whenever it modifies the position of its child
+    /// while painting it and propagating events. As a rule of thumb, you need this
+    /// if and only if you `Affine::translate` the paint context before painting
+    /// your child. For an example, see the implentation of [`Scroll`].
+    ///
+    /// [`Scroll`]: widget/struct.Scroll.html
+    pub fn set_viewport_offset(&mut self, offset: Vec2) {
+        if offset != self.state.viewport_offset {
+            // We need the parent_window_origin recalculated.
+            // It should be possible to just trigger the InternalLifeCycle::ParentWindowOrigin here,
+            // instead of full layout. Would need more management in WidgetState.
+            self.state.needs_layout = true;
+        }
+        self.state.viewport_offset = offset;
+    }
+
+    /// The viewport offset.
+    ///
+    /// This will be the same value as set by [`set_viewport_offset`].
+    ///
+    /// [`set_viewport_offset`]: #method.viewport_offset
+    pub fn viewport_offset(&self) -> Vec2 {
+        self.state.viewport_offset
+    }
+
+    pub fn request_update(&mut self) {
+        self.state.request_update = true;
+    }
+
     /// Returns `true` if any descendant is active.
     pub fn has_active(&self) -> bool {
         self.state.has_active
@@ -293,11 +337,15 @@ impl ChildState {
             origin: Point::ORIGIN,
             size: size.unwrap_or_default(),
             baseline_offset: 0.,
+            invalid: Region::EMPTY,
+            viewport_offset: Vec2::ZERO,
             is_hot: false,
             is_active: false,
             has_active: false,
             needs_layout: true,
             paint_insets: Insets::ZERO,
+            parent_window_origin: Point::ORIGIN,
+            request_update: false,
         }
     }
 
@@ -327,8 +375,30 @@ impl ChildState {
     ///
     /// This method is idempotent and can be called multiple times.
     pub fn merge_up(&mut self, child_state: &mut ChildState) {
+        let clip = self
+            .layout_rect()
+            .with_origin(Point::ORIGIN)
+            .inset(self.paint_insets);
+        let offset = child_state.layout_rect().origin().to_vec2() - child_state.viewport_offset;
+        for &r in child_state.invalid.rects() {
+            let r = (r + offset).intersect(clip);
+            if r.area() != 0.0 {
+                self.invalid.add_rect(r);
+            }
+        }
+        // Clearing the invalid rects here is less fragile than doing it while painting. The
+        // problem is that widgets (for example, Either) might choose not to paint certain
+        // invisible children, and we shouldn't allow these invisible children to accumulate
+        // invalid rects.
+        child_state.invalid.clear();
+
         self.needs_layout |= child_state.needs_layout;
         self.has_active |= child_state.has_active;
+        self.request_update |= child_state.request_update;
+    }
+
+    pub(crate) fn window_origin(&self) -> Point {
+        self.parent_window_origin + self.origin.to_vec2() - self.viewport_offset
     }
 }
 
@@ -537,6 +607,14 @@ impl Child {
             1.,
             &STYLE,
         );
+    }
+
+    pub(crate) fn needs_update(&self) -> bool {
+        self.state.request_update
+    }
+
+    pub(crate) fn needs_layout(&self) -> bool {
+        self.state.needs_layout
     }
 }
 

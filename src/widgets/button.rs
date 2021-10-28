@@ -21,7 +21,7 @@ pub struct Button {
 }
 
 impl PartialEq for Button {
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(&self, _other: &Self) -> bool {
         false
     }
 }
@@ -78,10 +78,11 @@ pub enum ButtonAction {
     Clicked,
 }
 
-#[derive(Default)]
 pub struct ButtonObject {
     props: Button,
     label_size: Size,
+    border_color: Color,
+    background_color: Color,
 }
 
 impl RenderObject<Button> for ButtonObject {
@@ -91,6 +92,8 @@ impl RenderObject<Button> for ButtonObject {
         ButtonObject {
             props,
             label_size: Size::ZERO,
+            border_color: Color::BLACK,
+            background_color: Color::WHITE,
         }
     }
 
@@ -108,7 +111,7 @@ impl RenderObjectInterface for ButtonObject {
             Event::MouseDown(mouse_event) => {
                 if mouse_event.button == MouseButton::Left {
                     ctx.set_active(true);
-                    ctx.set_handled();
+                    ctx.request_paint();
                 }
             }
             Event::MouseUp(mouse_event) => {
@@ -116,6 +119,7 @@ impl RenderObjectInterface for ButtonObject {
                     ctx.set_active(false);
                     if ctx.is_hot() {
                         (*self.props.handler)();
+                        ctx.request_update();
                         ctx.set_handled();
                     }
                 }
@@ -128,8 +132,17 @@ impl RenderObjectInterface for ButtonObject {
         }
     }
 
-    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children) {
-        if let LifeCycle::HotChanged(_) = event {}
+    fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, event: &LifeCycle, _children: &mut Children) {
+        match event {
+            LifeCycle::HotChanged(hot) => {
+                if *hot {
+                    self.background_color = Color::RED;
+                } else {
+                    self.background_color = Color::WHITE;
+                }
+            }
+            _ => {}
+        }
     }
 
     fn layout(
@@ -163,11 +176,14 @@ impl RenderObjectInterface for ButtonObject {
             .inset(-stroke_width / 2.0)
             .to_rounded_rect(1.0);
 
-        let border_color = PaintBrush::Color(Color::rgb8(0, 0, 0));
+        let border_color = PaintBrush::Color(self.border_color.clone());
 
         ctx.stroke(rounded_rect, &border_color, stroke_width);
 
-        ctx.fill(rounded_rect, &PaintBrush::Color(Color::rgb8(255, 255, 255)));
+        ctx.fill(
+            rounded_rect,
+            &PaintBrush::Color(self.background_color.clone()),
+        );
         children[0].paint(ctx);
     }
 }

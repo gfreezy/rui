@@ -2,18 +2,16 @@ use std::any::Any;
 
 use druid_shell::kurbo::{Point, Size};
 use druid_shell::piet::Piet;
-use druid_shell::text::InputHandler;
 use druid_shell::{
-    Application, FileDialogToken, FileInfo, HotKey, IdleToken, KeyEvent, Menu, Monitor, MouseEvent,
-    Region, Scale, Screen, SysMods, TextFieldToken, TimerToken, WinHandler, WindowBuilder,
-    WindowHandle,
+    Application, HotKey, Menu, Monitor, MouseEvent, Region, Screen, SysMods, WinHandler,
+    WindowBuilder, WindowHandle,
 };
-use tracing::{debug, instrument};
+use tracing::instrument;
 
 use crate::box_constraints::BoxConstraints;
 use crate::context::{ContextState, EventCtx, LayoutCtx, PaintCtx};
 use crate::event::Event;
-use crate::id::{ChildCounter, ChildId};
+use crate::id::ChildCounter;
 use crate::tree::Children;
 use crate::ui::Ui;
 use crate::widgets::sized_box::SizedBox;
@@ -158,8 +156,15 @@ impl AppWidget {
         child
             .object
             .event(&mut event_ctx, &event, &mut child.children);
+
+        if child.needs_layout() {
+            self.handle.invalidate();
+        } else {
+            let invalid_rect = child.state.invalid.bounding_box();
+            child.state.invalid.clear();
+            self.handle.invalidate_rect(dbg!(invalid_rect));
+        }
         self.run_app();
-        self.handle.invalidate();
     }
 }
 
@@ -203,6 +208,11 @@ impl WinHandler for AppWidget {
     }
 
     #[instrument(skip(self))]
+    fn wheel(&mut self, mouse_event: &MouseEvent) {
+        self.event(Event::Wheel(mouse_event.clone()));
+    }
+
+    #[instrument(skip(self))]
     fn mouse_move(&mut self, mouse_event: &MouseEvent) {
         self.event(Event::MouseMove(mouse_event.clone()));
     }
@@ -215,11 +225,6 @@ impl WinHandler for AppWidget {
     #[instrument(skip(self))]
     fn mouse_up(&mut self, mouse_event: &MouseEvent) {
         self.event(Event::MouseUp(mouse_event.clone()));
-    }
-
-    #[instrument(skip(self))]
-    fn wheel(&mut self, mouse_event: &MouseEvent) {
-        self.event(Event::Wheel(mouse_event.clone()));
     }
 
     fn request_close(&mut self) {

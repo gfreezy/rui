@@ -80,6 +80,7 @@ impl<'a, 'b> Ui<'a, 'b> {
                     child_state: &mut node.state,
                 };
                 action = object.update(&mut ctx, props);
+                node.request_update();
             } else {
                 // TODO: Think of something smart
                 panic!("Wrong node type. Expected {}", std::any::type_name::<R>())

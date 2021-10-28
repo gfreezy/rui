@@ -3,7 +3,6 @@
 use std::panic::Location;
 
 use druid_shell::kurbo::Size;
-use druid_shell::piet::RenderContext;
 
 use crate::box_constraints::BoxConstraints;
 use crate::context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx};
@@ -147,7 +146,8 @@ impl RenderObjectInterface for SizedBox {
         }
     }
 
-    fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, children: &mut Children) {}
+    fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _children: &mut Children) {
+    }
 
     fn layout(
         &mut self,

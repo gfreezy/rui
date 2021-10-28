@@ -10,3 +10,5 @@ druid-shell = { git = "https://github.com/linebender/druid", rev = "f74a712" }
 #druid = { git = "https://github.com/linebender/druid", rev = "f74a712" }
 tracing = "0.1"
 tracing-subscriber = "0.2"
+unicode-segmentation = "1.8.0"
+xi-unicode = "0.3.0"

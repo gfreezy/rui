@@ -1,8 +1,7 @@
-use std::ops::Add;
 use std::panic::Location;
 
 use druid_shell::kurbo::{Point, Rect, Size, Vec2};
-use druid_shell::piet::{Color, PaintBrush, RenderContext, StrokeStyle};
+use druid_shell::piet::{Color, PaintBrush, RenderContext};
 
 use crate::box_constraints::BoxConstraints;
 use crate::context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx};
@@ -107,7 +106,8 @@ impl RenderObjectInterface for ScrollViewObject {
         children[0].event(ctx, event)
     }
 
-    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children) {}
+    fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _children: &mut Children) {
+    }
 
     fn layout(
         &mut self,

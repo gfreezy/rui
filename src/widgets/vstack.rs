@@ -2,7 +2,7 @@
 
 use std::panic::Location;
 
-use druid_shell::kurbo::{Insets, Point, Size};
+use druid_shell::kurbo::{Point, Size};
 
 use crate::box_constraints::BoxConstraints;
 use crate::{
@@ -66,7 +66,8 @@ impl RenderObjectInterface for VStack {
         }
     }
 
-    fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, children: &mut Children) {}
+    fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _children: &mut Children) {
+    }
 
     fn layout(
         &mut self,

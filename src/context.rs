@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use druid_shell::kurbo::{Affine, Insets, Point, Size};
+use druid_shell::kurbo::{Affine, Insets, Rect, Size};
 use druid_shell::piet::{Piet, PietText, RenderContext};
 use druid_shell::{Region, TimerToken, WindowHandle};
 
@@ -59,13 +59,6 @@ pub struct PaintCtx<'a, 'b, 'c> {
     pub render_ctx: &'a mut Piet<'c>,
     /// The currently visible region.
     pub(crate) region: Region,
-}
-
-/// Z-order paint operations with transformations.
-pub(crate) struct ZOrderPaintOp {
-    pub z_index: u32,
-    pub paint_func: Box<dyn FnOnce(&mut PaintCtx) + 'static>,
-    pub transform: Affine,
 }
 
 // methods on everyone
@@ -147,7 +140,28 @@ impl_context_method!(
     }
 );
 
+// methods on event, update, and lifecycle
 impl_context_method!(EventCtx<'_, '_>, UpdateCtx<'_, '_>, LifeCycleCtx<'_, '_>, {
+    /// Request a [`paint`] pass. This is equivalent to calling
+    /// [`request_paint_rect`] for the widget's [`paint_rect`].
+    ///
+    /// [`paint`]: trait.Widget.html#tymethod.paint
+    /// [`request_paint_rect`]: #method.request_paint_rect
+    /// [`paint_rect`]: struct.WidgetPod.html#method.paint_rect
+    pub fn request_paint(&mut self) {
+        self.child_state.invalid.set_rect(
+            self.child_state.paint_rect() - self.child_state.layout_rect().origin().to_vec2(),
+        );
+    }
+
+    /// Request a [`paint`] pass for redrawing a rectangle, which is given
+    /// relative to our layout rectangle.
+    ///
+    /// [`paint`]: trait.Widget.html#tymethod.paint
+    pub fn request_paint_rect(&mut self, rect: Rect) {
+        self.child_state.invalid.add_rect(rect);
+    }
+
     /// Request a layout pass.
     ///
     /// A Widget's [`layout`] method is always called when the widget tree
@@ -163,11 +177,42 @@ impl_context_method!(EventCtx<'_, '_>, UpdateCtx<'_, '_>, LifeCycleCtx<'_, '_>, 
     }
 });
 
+// methods on everyone but paintctx
+impl_context_method!(
+    EventCtx<'_, '_>,
+    UpdateCtx<'_, '_>,
+    LifeCycleCtx<'_, '_>,
+    LayoutCtx<'_, '_>,
+    {
+        /// Request a timer event.
+        ///
+        /// The return value is a token, which can be used to associate the
+        /// request with the event.
+        pub fn request_timer(&mut self, deadline: Duration) -> TimerToken {
+            self.context_state
+                .request_timer(&mut self.child_state, deadline)
+        }
+    }
+);
+
 impl<'a> ContextState<'a> {
     fn request_timer(&self, child_state: &mut ChildState, deadline: Duration) -> TimerToken {
         let timer_token = self.window.request_timer(deadline);
         child_state.add_timer(timer_token);
         timer_token
+    }
+}
+
+impl UpdateCtx<'_, '_> {
+    /// Returns `true` if this widget or a descendent as explicitly requested
+    /// an update call.
+    ///
+    /// This should only be needed in advanced cases;
+    /// see [`EventCtx::request_update`] for more information.
+    ///
+    /// [`EventCtx::request_update`]: struct.EventCtx.html#method.request_update
+    pub fn has_requested_update(&mut self) -> bool {
+        self.child_state.request_update
     }
 }
 
@@ -218,7 +263,21 @@ impl EventCtx<'_, '_> {
     pub fn is_handled(&self) -> bool {
         self.is_handled
     }
+
+    /// Request an update cycle.
+    ///
+    /// After this, `update` will be called on the widget in the next update cycle, even
+    /// if there's not a data change.
+    ///
+    /// The use case for this method is when a container widget synthesizes data for its
+    /// children. This is appropriate in specialized cases, but before reaching for this
+    /// method, consider whether it might be better to refactor to be more idiomatic, in
+    /// particular to make that data available in the app state.
+    pub fn request_update(&mut self) {
+        self.child_state.request_update = true;
+    }
 }
+
 impl<'c> Deref for PaintCtx<'_, '_, 'c> {
     type Target = Piet<'c>;
 
