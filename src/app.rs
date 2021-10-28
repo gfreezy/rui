@@ -3,7 +3,7 @@ use std::any::Any;
 use druid_shell::kurbo::{Point, Size};
 use druid_shell::piet::Piet;
 use druid_shell::{
-    Application, HotKey, Menu, Monitor, MouseEvent, Region, Screen, SysMods, WinHandler,
+    Application, HotKey, KeyEvent, Menu, Monitor, MouseEvent, Region, Screen, SysMods, WinHandler,
     WindowBuilder, WindowHandle,
 };
 use tracing::instrument;
@@ -122,7 +122,7 @@ impl AppWidget {
     }
 
     #[instrument(skip(self))]
-    fn event(&mut self, event: Event) {
+    fn event(&mut self, event: Event) -> bool {
         let Self {
             handle,
             root,
@@ -157,6 +157,8 @@ impl AppWidget {
             .object
             .event(&mut event_ctx, &event, &mut child.children);
 
+        let is_handled = event_ctx.is_handled;
+
         if child.needs_layout() {
             self.handle.invalidate();
         } else {
@@ -165,6 +167,7 @@ impl AppWidget {
             self.handle.invalidate_rect(dbg!(invalid_rect));
         }
         self.run_app();
+        is_handled
     }
 }
 
@@ -205,6 +208,14 @@ impl WinHandler for AppWidget {
         };
 
         root.object.paint(&mut paint_ctx, &mut root.children);
+    }
+
+    fn key_down(&mut self, event: KeyEvent) -> bool {
+        self.event(Event::KeyUp(event))
+    }
+
+    fn key_up(&mut self, event: KeyEvent) {
+        self.event(Event::KeyDown(event));
     }
 
     #[instrument(skip(self))]

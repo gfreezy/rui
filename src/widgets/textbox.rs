@@ -20,12 +20,12 @@ const CURSOR_BLINK_DURATION: Duration = Duration::from_millis(500);
 #[derive(PartialEq)]
 pub struct TextBox<'a> {
     placeholder: &'a str,
-    editable: &'a mut String,
+    editable: &'a String,
     alignment: TextAlignment,
 }
 
 impl<'a> TextBox<'a> {
-    pub fn new(text: &'a mut String) -> Self {
+    pub fn new(text: &'a String) -> Self {
         TextBox {
             placeholder: "",
             editable: text,
@@ -115,7 +115,6 @@ impl RenderObject<TextBox<'_>> for TextBoxObject {
     fn update(&mut self, ctx: &mut UpdateCtx, props: TextBox<'_>) -> Self::Action {
         if props.editable != &self.text {
             if props.editable == self.editor.layout().text().unwrap() {
-                props.editable.replace_range(.., &self.text);
                 self.editor.set_text(self.text.clone());
             } else {
                 self.text = props.editable.to_owned();

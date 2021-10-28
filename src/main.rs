@@ -21,12 +21,16 @@ use crate::widgets::button::Button;
 use crate::widgets::hstack::{HStack, VerticalAlignment};
 use crate::widgets::scroll_view::ScrollView;
 use crate::widgets::text::Text;
+use crate::widgets::textbox::TextBox;
 use crate::widgets::vstack::{HorizontalAlignment, VStack};
 
 fn win(ui: &mut Ui) {
     scroll_view(ui, |ui| {
         vstack(ui, |ui| {
             let count = ui.state_node(|| 0isize);
+
+            let mut t = "haha".to_string();
+            TextBox::new(&mut t).build(ui);
 
             for _ in 0..(*count.get() as usize) {
                 let count = ui.state_node(|| 0isize);
