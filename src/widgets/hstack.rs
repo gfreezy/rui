@@ -3,6 +3,7 @@ use std::panic::Location;
 use druid_shell::kurbo::{Point, Size};
 
 use crate::box_constraints::BoxConstraints;
+use crate::constraints::Constraints;
 use crate::{
     context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx},
     event::Event,
@@ -69,18 +70,14 @@ impl RenderObjectInterface for HStack {
     fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _children: &mut Children) {
     }
 
-    fn layout(
-        &mut self,
-        ctx: &mut LayoutCtx,
-        bc: &BoxConstraints,
-        children: &mut Children,
-    ) -> Size {
+    fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, children: &mut Children) -> Size {
+        let bc: BoxConstraints = c.into();
         bc.debug_check("HStack");
         let mut child_bc = bc.clone();
         let mut total_width: f64 = 0.;
         let mut total_height: f64 = 0.;
         for (i, child) in children.iter().enumerate() {
-            let size = child.layout(ctx, &child_bc);
+            let size = child.layout(ctx, &(child_bc.into()));
             total_width += size.width;
             if i != 0 {
                 total_width += self.spacing;

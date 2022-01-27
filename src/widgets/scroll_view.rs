@@ -4,6 +4,7 @@ use druid_shell::kurbo::{Point, Rect, Size, Vec2};
 use druid_shell::piet::{Color, PaintBrush, RenderContext};
 
 use crate::box_constraints::BoxConstraints;
+use crate::constraints::Constraints;
 use crate::context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx};
 use crate::event::Event;
 use crate::lifecycle::LifeCycle;
@@ -109,13 +110,9 @@ impl RenderObjectInterface for ScrollViewObject {
     fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _children: &mut Children) {
     }
 
-    fn layout(
-        &mut self,
-        ctx: &mut LayoutCtx,
-        _bc: &BoxConstraints,
-        children: &mut Children,
-    ) -> Size {
-        self.content_size = children[0].layout(ctx, &BoxConstraints::UNBOUNDED);
+    fn layout(&mut self, ctx: &mut LayoutCtx, _c: &Constraints, children: &mut Children) -> Size {
+        self.content_size =
+            children[0].layout(ctx, &Constraints::BoxConstraints(BoxConstraints::UNBOUNDED));
         self.update_content_offset(Vec2::ZERO);
         children[0].set_origin(
             ctx,

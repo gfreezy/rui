@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::marker::PhantomData;
 use std::panic::Location;
 
 use crate::context::{ContextState, UpdateCtx};
@@ -7,18 +8,18 @@ use crate::key::Caller;
 use crate::object::{AnyRenderObject, Properties, RenderObject};
 use crate::tree::{Child, ChildState, Children, State, StateNode};
 
-pub struct Ui<'a, 'b> {
+pub struct Ui<'a> {
     pub(crate) tree: &'a mut Children,
-    context_state: &'a mut ContextState<'b>,
+    context_state: &'a mut ContextState,
     child_counter: &'a mut ChildCounter,
     state_index: usize,
     render_index: usize,
 }
 
-impl<'a, 'b> Ui<'a, 'b> {
+impl<'a> Ui<'a> {
     pub(crate) fn new(
         tree: &'a mut Children,
-        context_state: &'a mut ContextState<'b>,
+        context_state: &'a mut ContextState,
         child_counter: &'a mut ChildCounter,
     ) -> Self {
         Ui {
@@ -33,9 +34,10 @@ impl<'a, 'b> Ui<'a, 'b> {
     #[track_caller]
     pub fn state_node<T: 'static>(&mut self, init: impl FnOnce() -> T) -> State<T> {
         let caller = Location::caller().into();
-        let index = match self.find_state_node(caller) {
+        let idx = self.find_state_node(caller);
+        let index = match idx {
             None => {
-                let init_value = Box::new(State::new(init()));
+                let init_value: *mut dyn Any = self.tree.bump.alloc(init());
                 self.insert_state_node(caller, init_value)
             }
             Some(index) => index,
@@ -45,11 +47,10 @@ impl<'a, 'b> Ui<'a, 'b> {
         }
         self.state_index = index + 1;
 
-        self.tree.states[index]
-            .state
-            .downcast_ref::<State<T>>()
-            .unwrap()
-            .clone()
+        let state = &self.tree.states[index].state;
+        let raw_box: *mut dyn Any = unsafe { &mut **state };
+
+        State::new(raw_box)
     }
 
     pub fn render_object<P, R, N>(&mut self, caller: Caller, props: P, content: N) -> R::Action
@@ -87,14 +88,32 @@ impl<'a, 'b> Ui<'a, 'b> {
             }
         }
 
-        let mut object_cx = Ui::new(&mut node.children, self.context_state, self.child_counter);
-        content(&mut object_cx);
+        let mut child_ui = Ui::new(&mut node.children, self.context_state, self.child_counter);
+        content(&mut child_ui);
 
-        object_cx.tree.states.truncate(object_cx.state_index);
-        object_cx.tree.states.retain(|s| !s.dead);
-        object_cx.tree.renders.truncate(object_cx.render_index);
-        object_cx.tree.renders.retain(|c| !c.dead);
+        let mut request_layout = false;
+        let child_states = &mut child_ui.tree.states;
+        let child_renders = &mut child_ui.tree.renders;
+        if child_states.len() > child_ui.state_index {
+            child_states.truncate(child_ui.state_index);
+            request_layout = true;
+        }
+        if child_states.iter().any(|s| s.dead) {
+            child_states.retain(|s| !s.dead);
+            request_layout = true;
+        }
+        if child_renders.len() > child_ui.state_index {
+            child_renders.truncate(child_ui.render_index);
+            request_layout = true;
+        }
+        if child_renders.iter().any(|s| s.dead) {
+            child_renders.retain(|c| !c.dead);
+            request_layout = true;
+        }
 
+        if request_layout {
+            node.request_layout();
+        }
         for child in &mut node.children {
             node.state.merge_up(&mut child.state);
         }
@@ -103,7 +122,7 @@ impl<'a, 'b> Ui<'a, 'b> {
     }
 }
 
-impl Ui<'_, '_> {
+impl Ui<'_> {
     fn find_state_node(&mut self, caller: Caller) -> Option<usize> {
         let mut ix = self.state_index;
         for node in &mut self.tree.states[ix..] {
@@ -115,7 +134,7 @@ impl Ui<'_, '_> {
         None
     }
 
-    fn insert_state_node(&mut self, caller: Caller, state: Box<dyn Any>) -> usize {
+    fn insert_state_node(&mut self, caller: Caller, state: *mut dyn Any) -> usize {
         let key = caller;
         let dead = false;
         self.tree

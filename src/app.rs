@@ -1,18 +1,20 @@
 use std::any::Any;
 
-use druid_shell::kurbo::{Point, Size};
-use druid_shell::piet::Piet;
+use druid_shell::kurbo::{Insets, Point, Rect, Size, Vec2};
+use druid_shell::piet::{Color, PaintBrush, Piet, RenderContext};
 use druid_shell::{
     Application, HotKey, KeyEvent, Menu, Monitor, MouseEvent, Region, Screen, SysMods, WinHandler,
     WindowBuilder, WindowHandle,
 };
-use tracing::instrument;
+use tracing::{debug, instrument};
 
 use crate::box_constraints::BoxConstraints;
 use crate::context::{ContextState, EventCtx, LayoutCtx, PaintCtx};
 use crate::event::Event;
-use crate::id::ChildCounter;
-use crate::tree::Children;
+use crate::id::{ChildCounter, ChildId};
+use crate::perf::FPSCounter;
+use crate::text::layout::{self, TextLayout};
+use crate::tree::{ChildState, Children};
 use crate::ui::Ui;
 use crate::widgets::sized_box::SizedBox;
 
@@ -70,32 +72,34 @@ struct AppWidget {
     handle: WindowHandle,
     app: Box<dyn FnMut(&mut Ui)>,
     root: Children,
+    root_state: ChildState,
     child_counter: ChildCounter,
     mouse_pos: Option<Point>,
+    fps_counter: FPSCounter,
 }
 
 impl AppWidget {
     pub fn new(app: impl FnMut(&mut Ui) + 'static) -> Self {
+        let mut counter = ChildCounter::new();
         AppWidget {
             handle: WindowHandle::default(),
             app: Box::new(app),
             root: Children::new(),
-            child_counter: ChildCounter::new(),
+            root_state: ChildState::new(counter.generate_id(), None),
+            child_counter: counter,
             mouse_pos: None,
+            fps_counter: FPSCounter::new(),
         }
     }
 
-    fn run_app(&mut self) {
-        let Self {
-            handle,
-            app,
-            root,
-            child_counter,
-            ..
-        } = self;
-
+    fn run_app(
+        handle: &WindowHandle,
+        app: &mut Box<dyn FnMut(&mut Ui)>,
+        root: &mut Children,
+        child_counter: &mut ChildCounter,
+    ) {
         let mut context_state = ContextState {
-            window: handle,
+            window: handle.clone(),
             text: handle.text(),
         };
         let mut cx = Ui::new(root, &mut context_state, child_counter);
@@ -104,21 +108,24 @@ impl AppWidget {
 
     #[instrument(skip(self))]
     fn layout(&mut self, bc: &BoxConstraints) {
-        let Self { handle, root, .. } = self;
+        let Self {
+            handle,
+            root,
+            root_state,
+            ..
+        } = self;
 
         let mut context_state = ContextState {
-            window: handle,
+            window: handle.clone(),
             text: handle.text(),
         };
         let child = &mut root.renders[0];
         let mut layout_ctx = LayoutCtx {
             context_state: &mut context_state,
-            child_state: &mut child.state,
+            child_state: root_state,
         };
 
-        child.state.size = child
-            .object
-            .layout(&mut layout_ctx, bc, &mut child.children);
+        root_state.size = child.layout(&mut layout_ctx, &bc.into());
     }
 
     #[instrument(skip(self))]
@@ -127,6 +134,9 @@ impl AppWidget {
             handle,
             root,
             mouse_pos,
+            app,
+            child_counter,
+            root_state,
             ..
         } = self;
 
@@ -141,34 +151,51 @@ impl AppWidget {
         };
 
         let mut context_state = ContextState {
-            window: handle,
+            window: handle.clone(),
             text: handle.text(),
         };
 
         let child = &mut root.renders[0];
         let mut event_ctx = EventCtx {
             context_state: &mut context_state,
-            child_state: &mut child.state,
+            child_state: root_state,
             is_active: false,
             is_handled: false,
         };
 
-        child
-            .object
-            .event(&mut event_ctx, &event, &mut child.children);
+        child.event(&mut event_ctx, &event);
 
         let is_handled = event_ctx.is_handled;
+        if is_handled {
+            AppWidget::run_app(&handle, app, root, child_counter);
+        }
+
+        let child = &mut root.renders[0];
 
         if child.needs_layout() {
-            self.handle.invalidate();
+            handle.invalidate();
         } else {
-            let invalid_rect = child.state.invalid.bounding_box();
-            child.state.invalid.clear();
-            self.handle.invalidate_rect(dbg!(invalid_rect));
+            let invalid_rect = root_state.invalid.bounding_box();
+            root_state.invalid.clear();
+            handle.invalidate_rect(invalid_rect);
         }
-        self.run_app();
         is_handled
     }
+}
+
+fn draw_fps(fps: usize, window_size: Size, paint_ctx: &mut PaintCtx) {
+    let mut layout: TextLayout<String> = TextLayout::from_text(format!("{}", fps));
+    layout.rebuild_if_needed(&mut paint_ctx.text());
+    let text_size = layout.size();
+    let win_size = window_size;
+    let origin = Point::new(win_size.width - text_size.width, 0.);
+    let text_rect = Rect::from_origin_size(origin, text_size) - Vec2::new(5., 0.);
+    let bg_rect = text_rect.inset(5.);
+    paint_ctx.fill(
+        bg_rect,
+        &PaintBrush::Color(Color::from_hex_str("#fff").unwrap()),
+    );
+    paint_ctx.draw_text(layout.layout().unwrap(), text_rect.origin());
 }
 
 impl WinHandler for AppWidget {
@@ -180,7 +207,15 @@ impl WinHandler for AppWidget {
     #[instrument(skip(self))]
     fn size(&mut self, size: Size) {
         if self.root.is_empty() {
-            self.run_app();
+            let Self {
+                handle,
+                root,
+
+                app,
+                child_counter,
+                ..
+            } = self;
+            AppWidget::run_app(&handle, app, root, child_counter);
         } else {
             self.event(Event::WindowSize(size));
         }
@@ -192,22 +227,27 @@ impl WinHandler for AppWidget {
     fn paint(&mut self, piet: &mut Piet, invalid: &Region) {
         self.layout(&BoxConstraints::new(Size::ZERO, self.handle.get_size()));
 
-        let Self { handle, root, .. } = self;
+        let Self {
+            handle,
+            root,
+            root_state,
+            ..
+        } = self;
 
         let mut context_state = ContextState {
-            window: handle,
+            window: handle.clone(),
             text: handle.text(),
         };
 
-        let root = &mut root.renders[0];
+        let child = &mut root.renders[0];
         let mut paint_ctx = PaintCtx {
             context_state: &mut context_state,
-            child_state: &mut root.state,
+            child_state: &root_state,
             region: invalid.clone(),
             render_ctx: piet,
         };
-
-        root.object.paint(&mut paint_ctx, &mut root.children);
+        child.paint(&mut paint_ctx);
+        draw_fps(self.fps_counter.tick(), handle.get_size(), &mut paint_ctx);
     }
 
     fn key_down(&mut self, event: KeyEvent) -> bool {

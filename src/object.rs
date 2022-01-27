@@ -3,7 +3,9 @@ use std::any::Any;
 use druid_shell::kurbo::Size;
 
 use crate::box_constraints::BoxConstraints;
+use crate::constraints::Constraints;
 use crate::lifecycle::LifeCycle;
+use crate::sliver_constraints::SliverConstraints;
 use crate::{
     context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx},
     event::Event,
@@ -24,8 +26,27 @@ pub trait RenderObject<Props>: RenderObjectInterface {
 pub trait RenderObjectInterface {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children);
     fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children);
+    fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, children: &mut Children) -> Size;
+    fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children);
+}
+
+pub trait BoxRenderObjectInterface {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children);
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children);
     fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, children: &mut Children)
         -> Size;
+    fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children);
+}
+
+pub trait SliverRenderObjectInterface {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children);
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children);
+    fn layout(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        sc: &SliverConstraints,
+        children: &mut Children,
+    ) -> Size;
     fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children);
 }
 
@@ -35,8 +56,7 @@ pub trait AnyRenderObject: Any {
 
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children);
     fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children);
-    fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, children: &mut Children)
-        -> Size;
+    fn layout(&mut self, ctx: &mut LayoutCtx, bc: &Constraints, children: &mut Children) -> Size;
     fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children);
 }
 
@@ -60,12 +80,7 @@ where
         R::lifecycle(self, ctx, event, children)
     }
 
-    fn layout(
-        &mut self,
-        ctx: &mut LayoutCtx,
-        bc: &BoxConstraints,
-        children: &mut Children,
-    ) -> Size {
+    fn layout(&mut self, ctx: &mut LayoutCtx, bc: &Constraints, children: &mut Children) -> Size {
         R::layout(self, ctx, bc, children)
     }
 

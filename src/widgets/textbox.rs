@@ -1,4 +1,5 @@
 use crate::box_constraints::BoxConstraints;
+use crate::constraints::Constraints;
 use crate::context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx};
 use crate::event::Event;
 use crate::lifecycle::LifeCycle;
@@ -17,23 +18,32 @@ use std::time::Duration;
 
 const CURSOR_BLINK_DURATION: Duration = Duration::from_millis(500);
 
-#[derive(PartialEq)]
-pub struct TextBox<'a> {
-    placeholder: &'a str,
-    editable: &'a String,
+pub struct TextBox {
+    placeholder: String,
+    editable: String,
     alignment: TextAlignment,
+    text_size: f64,
+    on_changed: Box<dyn FnMut(String) + 'static>,
 }
 
-impl<'a> TextBox<'a> {
-    pub fn new(text: &'a String) -> Self {
+impl PartialEq for TextBox {
+    fn eq(&self, _other: &Self) -> bool {
+        false
+    }
+}
+
+impl TextBox {
+    pub fn new(text: String) -> Self {
         TextBox {
-            placeholder: "",
+            placeholder: "".to_string(),
             editable: text,
             alignment: TextAlignment::Start,
+            on_changed: Box::new(|_| {}),
+            text_size: 14.,
         }
     }
 
-    pub fn placeholder(mut self, text: &'a str) -> Self {
+    pub fn placeholder(mut self, text: String) -> Self {
         self.placeholder = text;
         self
     }
@@ -43,13 +53,23 @@ impl<'a> TextBox<'a> {
         self
     }
 
+    pub fn text_size(mut self, size: f64) -> Self {
+        self.text_size = size;
+        self
+    }
+
+    pub fn on_changed(mut self, on_changed: impl FnMut(String) + 'static) -> Self {
+        self.on_changed = Box::new(on_changed);
+        self
+    }
+
     pub fn build(self, ui: &mut Ui) -> bool {
         let caller = Location::caller().into();
         ui.render_object(caller, self, |_| {})
     }
 }
 
-impl Properties for TextBox<'_> {
+impl Properties for TextBox {
     type Object = TextBoxObject;
 }
 
@@ -58,6 +78,7 @@ pub struct TextBoxObject {
     text: String,
     editor: Editor<String>,
     alignment: TextAlignment,
+    text_size: f64,
     activated: bool,
 
     // this can be Box<dyn TextInput> in the future
@@ -75,6 +96,7 @@ pub struct TextBoxObject {
     /// on the click position; if focus happens automatically (e.g. on tab)
     /// then we select our entire contents.
     was_focused_from_click: bool,
+    on_changed: Box<dyn FnMut(String)>,
 }
 
 impl TextBoxObject {
@@ -90,16 +112,20 @@ impl TextBoxObject {
     }
 }
 
-impl RenderObject<TextBox<'_>> for TextBoxObject {
+impl RenderObject<TextBox> for TextBoxObject {
     type Action = bool;
 
-    fn create(props: TextBox<'_>) -> Self {
+    fn create(props: TextBox) -> Self {
+        let mut editor = Editor::from_text(&*props.editable);
+        editor.layout_mut().set_text_size(props.text_size);
+
         TextBoxObject {
             placeholder: TextLayout::from_text(props.placeholder),
             text: String::from(&*props.editable),
-            editor: Editor::from_text(&*props.editable),
+            editor,
             input_handler: BasicTextInput::default(),
             activated: false,
+            text_size: props.text_size,
 
             hscroll_offset: 0.,
             suppress_adjust_hscroll: false,
@@ -109,20 +135,23 @@ impl RenderObject<TextBox<'_>> for TextBoxObject {
             alignment_offset: 0.0,
             text_pos: Point::ZERO,
             was_focused_from_click: false,
+            on_changed: props.on_changed,
         }
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, props: TextBox<'_>) -> Self::Action {
-        if props.editable != &self.text {
-            if props.editable == self.editor.layout().text().unwrap() {
-                self.editor.set_text(self.text.clone());
-            } else {
-                self.text = props.editable.to_owned();
-                self.editor.set_text(props.editable.to_owned());
-            }
+    fn update(&mut self, ctx: &mut UpdateCtx, props: TextBox) -> Self::Action {
+        if self.text != props.editable {
+            self.text = props.editable.to_owned();
+            self.editor.set_text(self.text.clone());
             ctx.request_layout();
         }
-        if props.placeholder != self.placeholder.text().unwrap() {
+
+        if self.text_size != props.text_size {
+            self.editor.layout_mut().set_text_size(props.text_size);
+            ctx.request_layout();
+        }
+
+        if Some(&props.placeholder) != self.placeholder.text() {
             self.placeholder.set_text(props.placeholder.to_owned());
             ctx.request_layout();
         }
@@ -130,6 +159,7 @@ impl RenderObject<TextBox<'_>> for TextBoxObject {
             self.alignment = props.alignment;
             ctx.request_layout();
         }
+        self.on_changed = props.on_changed;
 
         let was_activated = self.activated;
         self.activated = false;
@@ -140,6 +170,7 @@ impl RenderObject<TextBox<'_>> for TextBoxObject {
 impl RenderObjectInterface for TextBoxObject {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, _children: &mut Children) {
         self.suppress_adjust_hscroll = false;
+        let mut new_text = self.text.clone();
         match event {
             Event::MouseDown(mouse) => {
                 // ctx.request_focus();
@@ -150,7 +181,7 @@ impl RenderObjectInterface for TextBoxObject {
                 if !mouse.focus {
                     self.was_focused_from_click = true;
                     self.reset_cursor_blink(ctx.request_timer(CURSOR_BLINK_DURATION));
-                    self.editor.click(&mouse, &mut self.text);
+                    self.editor.click(&mouse, &mut new_text);
                 }
 
                 ctx.request_paint();
@@ -159,7 +190,7 @@ impl RenderObjectInterface for TextBoxObject {
                 let mut mouse = mouse.clone();
                 mouse.pos += Vec2::new(self.hscroll_offset - self.alignment_offset, 0.0);
                 if ctx.is_active() {
-                    self.editor.drag(&mouse, &mut self.text);
+                    self.editor.drag(&mouse, &mut new_text);
                     ctx.request_paint();
                 }
             }
@@ -190,7 +221,7 @@ impl RenderObjectInterface for TextBoxObject {
             // }
             Event::Paste(ref item) => {
                 if let Some(string) = item.get_string() {
-                    self.editor.paste(string, &mut self.text);
+                    self.editor.paste(string, &mut new_text);
                 }
             }
             Event::KeyDown(key_event) => {
@@ -212,7 +243,7 @@ impl RenderObjectInterface for TextBoxObject {
                     k_e => {
                         if let Some(edit) = self.input_handler.handle_event(k_e) {
                             self.suppress_adjust_hscroll = matches!(edit, EditAction::SelectAll);
-                            self.editor.do_edit(edit, &mut self.text);
+                            self.editor.do_edit(edit, &mut new_text);
                             ctx.request_update();
                             ctx.request_paint();
                         }
@@ -223,17 +254,17 @@ impl RenderObjectInterface for TextBoxObject {
             }
             _ => (),
         }
+        if &self.text != &new_text {
+            (self.on_changed)(new_text);
+        }
     }
 
     fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _children: &mut Children) {
     }
 
-    fn layout(
-        &mut self,
-        ctx: &mut LayoutCtx,
-        bc: &BoxConstraints,
-        _children: &mut Children,
-    ) -> Size {
+    fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, _children: &mut Children) -> Size {
+        let bc: BoxConstraints = c.into();
+
         let width = 200.0;
         let text_insets = Insets::uniform(3.0);
 

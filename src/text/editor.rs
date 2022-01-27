@@ -110,9 +110,14 @@ impl<T: TextStorage + EditableText + Clone> Editor<T> {
     /// This must be set before the editor is used, such as in [`WidgetAdded`].
     ///
     /// [`WidgetAdded`]: ../enum.LifeCycle.html#variant.WidgetAdded
-    pub fn set_text(&mut self, text: T) {
-        self.selection = self.selection.constrained(&text);
-        self.layout.set_text(text);
+    pub fn set_text(&mut self, text: T) -> bool {
+        if self.data_is_stale(&text) {
+            self.selection = self.selection.constrained(&text);
+            self.layout.set_text(text);
+            true
+        } else {
+            false
+        }
     }
 
     /// Return the current selection.
@@ -185,23 +190,6 @@ impl<T: TextStorage + EditableText + Clone> Editor<T> {
             column: pos,
             mods: event.mods,
         }
-    }
-
-    /// Update the editor if the data or env has changed.
-    ///
-    /// The widget owning this `Editor` must call this method during its own
-    /// [`update`] call.
-    ///
-    /// [`update`]: ../trait.Widget.html#tymethod.update
-    pub fn update(&mut self, ctx: &mut UpdateCtx, new_data: &T) {
-        if self.data_is_stale(new_data) {
-            self.layout.set_text(new_data.clone());
-            self.selection = self.selection.constrained(new_data);
-            ctx.request_layout();
-        } else if self.layout.needs_rebuild_after_update(ctx) {
-            ctx.request_layout();
-        }
-        self.rebuild_if_needed(ctx.text());
     }
 
     /// Must be called in WidgetAdded

@@ -5,6 +5,7 @@ use std::panic::Location;
 use druid_shell::kurbo::{Insets, Point, Size};
 
 use crate::box_constraints::BoxConstraints;
+use crate::constraints::Constraints;
 use crate::{
     context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx},
     event::Event,
@@ -95,20 +96,16 @@ impl RenderObjectInterface for Padding {
     fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _children: &mut Children) {
     }
 
-    fn layout(
-        &mut self,
-        ctx: &mut LayoutCtx,
-        bc: &BoxConstraints,
-        children: &mut Children,
-    ) -> Size {
+    fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, children: &mut Children) -> Size {
+        let bc: BoxConstraints = c.into();
         bc.debug_check("Padding");
         let child = &mut children[0];
 
         let hpad = self.left + self.right;
         let vpad = self.top + self.bottom;
 
-        let child_bc = bc.shrink((hpad, vpad));
-        let size = child.layout(ctx, &child_bc);
+        let child_c = bc.shrink((hpad, vpad)).into();
+        let size = child.layout(ctx, &child_c);
         let origin = Point::new(self.left, self.top);
         child.set_origin(ctx, origin);
 

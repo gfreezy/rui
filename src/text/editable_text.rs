@@ -530,6 +530,6 @@ mod tests {
         let a = Arc::new("hello".to_owned());
         let mut b = a.clone();
         b.edit(5..5, "");
-        assert!(a.same(&b));
+        assert!(a == b);
     }
 }

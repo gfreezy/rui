@@ -5,6 +5,7 @@ use druid_shell::piet::{Color, PaintBrush, RenderContext};
 use druid_shell::MouseButton;
 
 use crate::box_constraints::BoxConstraints;
+use crate::constraints::Constraints;
 use crate::lifecycle::LifeCycle;
 use crate::{
     context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx},
@@ -17,21 +18,12 @@ use crate::{
 
 pub struct Button {
     disabled: bool,
-    handler: Box<dyn FnMut()>,
+    handler: Box<dyn FnMut() + 'static>,
 }
 
 impl PartialEq for Button {
-    fn eq(&self, _other: &Self) -> bool {
-        false
-    }
-}
-
-impl Default for Button {
-    fn default() -> Self {
-        Button {
-            disabled: false,
-            handler: Box::new(|| {}),
-        }
+    fn eq(&self, other: &Self) -> bool {
+        self.disabled == other.disabled
     }
 }
 
@@ -41,7 +33,10 @@ impl Properties for Button {
 
 impl Button {
     pub fn new() -> Self {
-        Self::default()
+        Button {
+            disabled: false,
+            handler: Box::new(|| {}),
+        }
     }
 
     pub fn disabled(mut self, disabled: bool) -> Self {
@@ -100,8 +95,8 @@ impl RenderObject<Button> for ButtonObject {
     fn update(&mut self, ctx: &mut UpdateCtx, props: Button) -> Self::Action {
         if self.props != props {
             ctx.request_layout();
-            self.props = props;
         }
+        self.props = props;
     }
 }
 
@@ -132,7 +127,7 @@ impl RenderObjectInterface for ButtonObject {
         }
     }
 
-    fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, event: &LifeCycle, _children: &mut Children) {
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, _children: &mut Children) {
         match event {
             LifeCycle::HotChanged(hot) => {
                 if *hot {
@@ -140,22 +135,19 @@ impl RenderObjectInterface for ButtonObject {
                 } else {
                     self.background_color = Color::WHITE;
                 }
+                ctx.request_paint();
             }
             _ => {}
         }
     }
 
-    fn layout(
-        &mut self,
-        ctx: &mut LayoutCtx,
-        bc: &BoxConstraints,
-        children: &mut Children,
-    ) -> Size {
+    fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, children: &mut Children) -> Size {
+        let bc: BoxConstraints = c.into();
         bc.debug_check("Button");
 
         let padding = Size::new(2.0, 2.0);
-        let label_bc = bc.loosen().shrink(padding);
-        self.label_size = children[0].layout(ctx, &label_bc);
+        let label_c: Constraints = bc.loosen().shrink(padding).into();
+        self.label_size = children[0].layout(ctx, &label_c);
 
         let required_size = self.label_size + padding;
         let size = bc.constrain(required_size);

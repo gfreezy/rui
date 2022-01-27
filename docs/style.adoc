@@ -1,0 +1,4 @@
+# Style
+每个 component 定义一个 ComponentStyle 结构，然后这个结构用 state_node() 生成。
+独立一个线程监控本地文件，文件有变动的时候，更新 state。state 更新后，会自动触发 component 的
+update 操作。自动更新页面样式。

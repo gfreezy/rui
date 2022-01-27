@@ -1,17 +1,18 @@
-use std::cell::{Ref, RefCell};
-use std::fmt::{Debug, Formatter};
-use std::rc::Rc;
+use std::marker::PhantomData;
+use std::ops::Deref;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::{
     any::Any,
     ops::{Index, IndexMut},
 };
 
+use bumpalo::Bump;
 use druid_shell::kurbo::{Affine, Insets, Point, Rect, Shape, Size, Vec2};
 use druid_shell::piet::{Color, LineJoin, PaintBrush, RenderContext, StrokeStyle};
 use druid_shell::{Region, TimerToken};
+use tracing::debug;
 
-use crate::box_constraints::BoxConstraints;
+use crate::constraints::Constraints;
 use crate::context::{ContextState, EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx};
 use crate::event::Event;
 use crate::id::ChildId;
@@ -24,77 +25,56 @@ pub struct Children {
     pub(crate) states: Vec<StateNode>,
     pub(crate) renders: Vec<Child>,
     pub(crate) tracked_states: Vec<String>,
+    pub(crate) bump: Bump,
 }
 
-static COUNTER: AtomicI64 = AtomicI64::new(0);
-
-struct Counter<T> {
-    val: T,
-}
-
-impl<T> Counter<T> {
-    pub fn new(v: T) -> Self {
-        println!(
-            "new state counter: {}",
-            COUNTER.fetch_add(1, Ordering::SeqCst) + 1
-        );
-        Counter { val: v }
-    }
-}
-
-impl<T> Drop for Counter<T> {
-    fn drop(&mut self) {
-        println!(
-            "remove state counter: {}",
-            COUNTER.fetch_sub(1, Ordering::SeqCst) - 1
-        );
-    }
-}
-
-pub struct State<T> {
-    val: Rc<Counter<RefCell<T>>>,
-}
-
-impl<T> Clone for State<T> {
-    fn clone(&self) -> Self {
-        State {
-            val: self.val.clone(),
-        }
-    }
-}
-
-impl<T: Debug> Debug for State<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let v = (*self.val).val.borrow();
-        (*v).fmt(f)
-    }
+#[derive(Clone, Copy)]
+pub struct State<T: 'static> {
+    pub(crate) ptr: *mut dyn Any,
+    phaton: PhantomData<T>,
 }
 
 impl<T> State<T> {
-    pub fn new(val: T) -> Self {
+    pub(crate) fn new(raw_obx: *mut dyn Any) -> State<T> {
         State {
-            val: Rc::new(Counter::new(RefCell::new(val))),
+            ptr: raw_obx,
+            phaton: PhantomData,
         }
     }
 
-    pub fn set(&self, val: T) -> T {
-        self.val.val.replace(val)
+    pub fn set(&self, val: T) {
+        let v = unsafe { &mut *self.ptr };
+        *v.downcast_mut::<T>().unwrap() = val;
     }
 
-    pub fn update(&self, f: impl FnOnce(&mut T)) {
-        let mut refmut = self.val.val.borrow_mut();
-        f(&mut *refmut);
+    pub fn update(&self, updater: impl FnOnce(&mut T)) {
+        let v = unsafe { &mut *self.ptr };
+        let old = v.downcast_mut::<T>().unwrap();
+        updater(old);
     }
+}
 
-    pub fn get(&self) -> Ref<'_, T> {
-        (*self.val).val.borrow()
+impl<T: 'static> Deref for State<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        let v = unsafe { &mut *self.ptr };
+        v.downcast_mut::<T>().unwrap()
     }
 }
 
 pub struct StateNode {
     pub(crate) key: Caller,
-    pub(crate) state: Box<dyn Any>,
+    pub(crate) state: *mut dyn Any,
     pub(crate) dead: bool,
+}
+
+impl Drop for StateNode {
+    fn drop(&mut self) {
+        let as_mut = unsafe { &mut *self.state };
+        let boxed = unsafe { bumpalo::boxed::Box::from_raw(as_mut) };
+        drop(boxed);
+    }
 }
 
 pub struct Child {
@@ -276,6 +256,10 @@ impl Child {
         self.state.request_update = true;
     }
 
+    pub fn request_layout(&mut self) {
+        self.state.needs_layout = true;
+    }
+
     /// Returns `true` if any descendant is active.
     pub fn has_active(&self) -> bool {
         self.state.has_active
@@ -379,7 +363,8 @@ impl ChildState {
             .layout_rect()
             .with_origin(Point::ORIGIN)
             .inset(self.paint_insets);
-        let offset = child_state.layout_rect().origin().to_vec2() - child_state.viewport_offset;
+        // let offset = child_state.layout_rect().origin().to_vec2() - child_state.viewport_offset;
+        let offset = Vec2::ZERO;
         for &r in child_state.invalid.rects() {
             let r = (r + offset).intersect(clip);
             if r.area() != 0.0 {
@@ -520,7 +505,7 @@ impl Child {
             inner_ctx.child_state.has_active |= inner_ctx.child_state.is_active;
             ctx.is_handled |= inner_ctx.is_handled;
         }
-        ctx.child_state.merge_up(&mut self.state)
+        ctx.child_state.merge_up(&mut self.state);
     }
 
     pub fn lifecycle(
@@ -537,9 +522,9 @@ impl Child {
         self.object.lifecycle(&mut child_ctx, event, children);
     }
 
-    pub fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints) -> Size {
+    pub fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints) -> Size {
         let object_name = self.object.name();
-        let span = tracing::span!(tracing::Level::DEBUG, "layout", ?bc, object_name);
+        let span = tracing::span!(tracing::Level::DEBUG, "layout", ?c, object_name);
         let _h = span.enter();
 
         if !self.state.needs_layout {
@@ -553,7 +538,7 @@ impl Child {
             child_state: &mut self.state,
         };
 
-        let new_size = self.object.layout(&mut child_ctx, bc, &mut self.children);
+        let new_size = self.object.layout(&mut child_ctx, c, &mut self.children);
 
         self.state.size = new_size;
 

@@ -3,8 +3,10 @@
 use std::panic::Location;
 
 use druid_shell::kurbo::{Point, Size};
+use tracing::debug;
 
 use crate::box_constraints::BoxConstraints;
+use crate::constraints::Constraints;
 use crate::{
     context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx},
     event::Event,
@@ -69,24 +71,20 @@ impl RenderObjectInterface for VStack {
     fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _children: &mut Children) {
     }
 
-    fn layout(
-        &mut self,
-        ctx: &mut LayoutCtx,
-        bc: &BoxConstraints,
-        children: &mut Children,
-    ) -> Size {
+    fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, children: &mut Children) -> Size {
+        let bc: BoxConstraints = c.into();
         bc.debug_check("VStack");
         let mut child_bc = bc.clone();
         let mut total_width: f64 = 0.;
         let mut total_height: f64 = 0.;
         for (i, child) in children.iter().enumerate() {
-            let size = child.layout(ctx, &child_bc);
+            let size = child.layout(ctx, &(child_bc.into()));
             total_height += size.height;
             if i != 0 {
                 total_height += self.spacing;
             }
             total_width = total_width.max(size.width);
-            child_bc = child_bc.shrink((0.0, total_height));
+            child_bc = bc.shrink((0.0, total_height));
         }
 
         let mut y = 0.;
@@ -102,7 +100,9 @@ impl RenderObjectInterface for VStack {
 
             y += self.spacing + child_size.height;
         }
-        Size::new(total_width, total_height)
+
+        let size = Size::new(total_width, total_height);
+        size
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children) {

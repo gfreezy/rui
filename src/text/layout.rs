@@ -16,7 +16,7 @@
 
 use std::ops::Range;
 
-use crate::context::{PaintCtx, UpdateCtx};
+use crate::context::PaintCtx;
 use crate::text::font_descriptor::FontDescriptor;
 use crate::text::storage::TextStorage;
 use druid_shell::kurbo::{Line, Point, Rect, Size};
@@ -277,15 +277,6 @@ impl<T: TextStorage + Clone> TextLayout<T> {
                 Line::new(p1, p2)
             })
             .unwrap_or_else(|| Line::new(Point::ZERO, Point::ZERO))
-    }
-
-    /// Called during the containing widgets `update` method; this text object
-    /// will check to see if any used environment items have changed,
-    /// and invalidate itself as needed.
-    ///
-    /// Returns `true` if the text item needs to be rebuilt.
-    pub fn needs_rebuild_after_update(&mut self, _ctx: &mut UpdateCtx) -> bool {
-        self.layout.is_none()
     }
 
     /// Rebuild the inner layout as needed.
