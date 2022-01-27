@@ -3,7 +3,7 @@
 use std::panic::Location;
 
 use druid_shell::kurbo::Size;
-use tracing::debug;
+
 
 use crate::box_constraints::BoxConstraints;
 use crate::constraints::Constraints;
@@ -155,7 +155,7 @@ impl RenderObjectInterface for SizedBox {
         let bc: BoxConstraints = c.into();
         bc.debug_check("SizedBox");
 
-        let child_bc = self.child_constraints(&bc);
+        let _child_bc = self.child_constraints(&bc);
         let size = match children.get_mut(0) {
             Some(inner) => inner.layout(ctx, c),
             None => bc.constrain((self.width.unwrap_or(0.0), self.height.unwrap_or(0.0))),

@@ -25,7 +25,7 @@ use crate::widgets::button::Button;
 use crate::widgets::hstack::{HStack, VerticalAlignment};
 use crate::widgets::scroll_view::ScrollView;
 use crate::widgets::text::Text;
-use crate::widgets::textbox::TextBox;
+
 use crate::widgets::vstack::{HorizontalAlignment, VStack};
 
 fn win(ui: &mut Ui) {
@@ -39,7 +39,7 @@ fn win(ui: &mut Ui) {
         //     .build(ui);
 
         let style = ui.state_node(|| TextStyle::default());
-        let i = 1;
+        let _i = 1;
         for i in 0..(*count as usize) {
             let count2 = ui.state_node(|| 0isize);
             text(

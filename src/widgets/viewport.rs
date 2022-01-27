@@ -1,7 +1,6 @@
-use std::os::raw::c_double;
 use std::panic::Location;
 
-use druid_shell::kurbo::{Point, Size};
+use druid_shell::kurbo::Size;
 
 use crate::sliver_constraints::{AxisDirection, CacheExtent, ScrollDirection};
 use crate::{
@@ -121,22 +120,26 @@ impl RenderObjectInterface for ViewportObject {
 
     fn lifecycle(
         &mut self,
-        ctx: &mut crate::context::LifeCycleCtx,
-        event: &crate::lifecycle::LifeCycle,
-        children: &mut crate::tree::Children,
+        _ctx: &mut crate::context::LifeCycleCtx,
+        _event: &crate::lifecycle::LifeCycle,
+        _children: &mut crate::tree::Children,
     ) {
     }
 
     fn layout(
         &mut self,
-        ctx: &mut crate::context::LayoutCtx,
-        c: &crate::constraints::Constraints,
-        children: &mut crate::tree::Children,
+        _ctx: &mut crate::context::LayoutCtx,
+        _c: &crate::constraints::Constraints,
+        _children: &mut crate::tree::Children,
     ) -> Size {
         todo!()
     }
 
-    fn paint(&mut self, ctx: &mut crate::context::PaintCtx, children: &mut crate::tree::Children) {
+    fn paint(
+        &mut self,
+        _ctx: &mut crate::context::PaintCtx,
+        _children: &mut crate::tree::Children,
+    ) {
         todo!()
     }
 }

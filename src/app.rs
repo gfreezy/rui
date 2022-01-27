@@ -1,19 +1,19 @@
 use std::any::Any;
 
-use druid_shell::kurbo::{Insets, Point, Rect, Size, Vec2};
+use druid_shell::kurbo::{Point, Rect, Size, Vec2};
 use druid_shell::piet::{Color, PaintBrush, Piet, RenderContext};
 use druid_shell::{
     Application, HotKey, KeyEvent, Menu, Monitor, MouseEvent, Region, Screen, SysMods, WinHandler,
     WindowBuilder, WindowHandle,
 };
-use tracing::{debug, instrument};
+use tracing::{instrument};
 
 use crate::box_constraints::BoxConstraints;
 use crate::context::{ContextState, EventCtx, LayoutCtx, PaintCtx};
 use crate::event::Event;
-use crate::id::{ChildCounter, ChildId};
+use crate::id::{ChildCounter};
 use crate::perf::FPSCounter;
-use crate::text::layout::{self, TextLayout};
+use crate::text::layout::{TextLayout};
 use crate::tree::{ChildState, Children};
 use crate::ui::Ui;
 use crate::widgets::sized_box::SizedBox;
