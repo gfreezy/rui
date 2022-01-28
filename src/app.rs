@@ -6,14 +6,14 @@ use druid_shell::{
     Application, HotKey, KeyEvent, Menu, Monitor, MouseEvent, Region, Screen, SysMods, WinHandler,
     WindowBuilder, WindowHandle,
 };
-use tracing::{instrument};
+use tracing::instrument;
 
 use crate::box_constraints::BoxConstraints;
 use crate::context::{ContextState, EventCtx, LayoutCtx, PaintCtx};
 use crate::event::Event;
-use crate::id::{ChildCounter};
+use crate::id::ChildCounter;
 use crate::perf::FPSCounter;
-use crate::text::layout::{TextLayout};
+use crate::text::layout::TextLayout;
 use crate::tree::{ChildState, Children};
 use crate::ui::Ui;
 use crate::widgets::sized_box::SizedBox;
@@ -284,6 +284,16 @@ impl WinHandler for AppWidget {
 
     fn destroy(&mut self) {
         Application::global().quit();
+    }
+
+    fn command(&mut self, id: u32) {
+        match id {
+            0x100 => {
+                self.handle.close();
+                Application::global().quit()
+            }
+            _ => println!("unexpected id {}", id),
+        }
     }
 
     fn as_any(&mut self) -> &mut dyn Any {
