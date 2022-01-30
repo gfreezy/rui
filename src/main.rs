@@ -1,13 +1,17 @@
 #[macro_use]
 mod macros;
 pub mod app;
+pub mod app_state;
 pub mod box_constraints;
+pub mod command;
 pub mod constraints;
 pub mod context;
 pub mod event;
+pub mod ext_event;
 pub mod id;
 pub mod key;
 pub mod lifecycle;
+pub mod menu;
 pub mod object;
 pub mod perf;
 pub mod sliver_constraints;
@@ -15,11 +19,14 @@ pub mod text;
 pub mod tree;
 pub mod ui;
 pub mod widgets;
+pub mod window;
 
+use app::WindowDesc;
 use druid_shell::kurbo::{Point, Size};
+use menu::mac::menu_bar;
 use widgets::text::TextStyle;
 
-use crate::app::App;
+use crate::app::AppLauncher;
 use crate::ui::Ui;
 use crate::widgets::button::Button;
 use crate::widgets::hstack::{HStack, VerticalAlignment};
@@ -92,10 +99,7 @@ fn button<'a>(ui: &'a mut Ui<'_>, text: &str, click: impl FnMut() + 'static) {
 }
 
 fn main() {
-    tracing_subscriber::fmt::fmt()
-        .with_max_level(tracing::Level::DEBUG)
-        .pretty()
-        .init();
-    let app = App::new("test");
-    app.run(win);
+    let desc = WindowDesc::new("app".to_string(), win).menu(|_| menu_bar());
+    let app = AppLauncher::with_window(desc).log_to_console();
+    app.launch().unwrap();
 }

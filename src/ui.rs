@@ -102,7 +102,7 @@ impl<'a> Ui<'a> {
             child_states.retain(|s| !s.dead);
             request_layout = true;
         }
-        if child_renders.len() > child_ui.state_index {
+        if child_renders.len() > child_ui.render_index {
             child_renders.truncate(child_ui.render_index);
             request_layout = true;
         }
@@ -157,13 +157,7 @@ impl Ui<'_> {
     fn insert_render_object(&mut self, caller: Caller, object: Box<dyn AnyRenderObject>) -> usize {
         self.tree.renders.insert(
             self.render_index,
-            Child {
-                key: caller,
-                object,
-                children: Children::new(),
-                state: ChildState::new(self.child_counter.generate_id(), None),
-                dead: false,
-            },
+            Child::new(caller, object, self.child_counter.generate_id()),
         );
         self.render_index
     }

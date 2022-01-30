@@ -1,6 +1,8 @@
 use druid_shell::kurbo::Size;
 use druid_shell::{Clipboard, KeyEvent, MouseEvent, TimerToken};
 
+use crate::command::{Command, Notification};
+
 #[derive(Debug, Clone)]
 pub enum Event {
     /// Sent to all widgets in a given window when that window is first instantiated.
@@ -13,6 +15,20 @@ pub enum Event {
     ///
     /// [`LifeCycle::WidgetAdded`]: enum.LifeCycle.html#variant.WidgetAdded
     WindowConnected,
+    /// Sent to all widgets in a given window when the system requests to close the window.
+    ///
+    /// If the event is handled (with [`set_handled`]), the window will not be closed.
+    /// All widgets are given an opportunity to handle this event; your widget should not assume
+    /// that the window *will* close just because this event is received; for instance, you should
+    /// avoid destructive side effects such as cleaning up resources.
+    ///
+    /// [`set_handled`]: crate::EventCtx::set_handled
+    WindowCloseRequested,
+    /// Sent to all widgets in a given window when the system is going to close that window.
+    ///
+    /// This event means the window *will* go away; it is safe to dispose of resources and
+    /// do any other cleanup.
+    WindowDisconnected,
     /// Called on the root widget when the window size changes.
     ///
     /// Discussion: it's not obvious this should be propagated to user
@@ -76,4 +92,52 @@ pub enum Event {
     /// intensive in response to an `AnimFrame` event: it might make Druid miss
     /// the monitor's refresh, causing lag or jerky animation.
     AnimFrame(u64),
+    /// An event containing a [`Command`] to be handled by the widget.
+    ///
+    /// [`Command`]s are messages, optionally with attached data, that can
+    /// may be generated from a number of sources:
+    ///
+    /// - If your application uses  menus (either window or context menus)
+    /// then the [`MenuItem`]s in the menu will each correspond to a `Command`.
+    /// When the menu item is selected, that [`Command`] will be delivered to
+    /// the root widget of the appropriate window.
+    /// - If you are doing work in another thread (using an [`ExtEventSink`])
+    /// then [`Command`]s are the mechanism by which you communicate back to
+    /// the main thread.
+    /// - Widgets and other Druid components can send custom [`Command`]s at
+    /// runtime, via methods such as [`EventCtx::submit_command`].
+    ///
+    /// [`Command`]: struct.Command.html
+    /// [`Widget`]: trait.Widget.html
+    /// [`EventCtx::submit_command`]: struct.EventCtx.html#method.submit_command
+    /// [`ExtEventSink`]: crate::ExtEventSink
+    /// [`MenuItem`]: crate::MenuItem
+    Command(Command),
+    /// A [`Notification`] from one of this widget's descendants.
+    ///
+    /// While handling events, widgets can submit notifications to be
+    /// delivered to their ancestors immdiately after they return.
+    ///
+    /// If you handle a [`Notification`], you should call [`EventCtx::set_handled`]
+    /// to stop the notification from being delivered to further ancestors.
+    ///
+    /// ## Special considerations
+    ///
+    /// Notifications are slightly different from other events; they originate
+    /// inside Druid, and they are delivered as part of the handling of another
+    /// event. In this sense, they can sort of be thought of as an augmentation
+    /// of an event; they are a way for multiple widgets to coordinate the
+    /// handling of an event.
+    ///
+    /// [`EventCtx::set_handled`]: crate::EventCtx::set_handled
+    Notification(Notification),
+    /// Sent to a widget when the platform may have mutated shared IME state.
+    ///
+    /// This is sent to a widget that has an attached IME session anytime the
+    /// platform has released a mutable lock on shared state.
+    ///
+    /// This does not *mean* that any state has changed, but the widget
+    /// should check the shared state, perform invalidation, and update `Data`
+    /// as necessary.
+    ImeStateChange,
 }

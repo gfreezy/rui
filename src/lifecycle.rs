@@ -53,4 +53,5 @@ pub enum LifeCycle {
     ///
     /// [`EventCtx::is_focused`]: struct.EventCtx.html#method.is_focused
     FocusChanged(bool),
+    Other,
 }

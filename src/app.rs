@@ -1,302 +1,496 @@
-use std::any::Any;
+use druid_shell::kurbo::{Point, Size};
+use druid_shell::{Application, WindowBuilder, WindowHandle, WindowLevel, WindowState};
+use tracing::warn;
 
-use druid_shell::kurbo::{Point, Rect, Size, Vec2};
-use druid_shell::piet::{Color, PaintBrush, Piet, RenderContext};
-use druid_shell::{
-    Application, HotKey, KeyEvent, Menu, Monitor, MouseEvent, Region, Screen, SysMods, WinHandler,
-    WindowBuilder, WindowHandle,
-};
-use tracing::instrument;
+use crate::app_state::{AppHandler, AppState};
 
-use crate::box_constraints::BoxConstraints;
-use crate::context::{ContextState, EventCtx, LayoutCtx, PaintCtx};
-use crate::event::Event;
-use crate::id::ChildCounter;
-use crate::perf::FPSCounter;
-use crate::text::layout::TextLayout;
-use crate::tree::{ChildState, Children};
+use crate::ext_event::{ExtEventHost, ExtEventSink};
+use crate::id::WindowId;
+
+use crate::menu::{Menu, MenuManager};
 use crate::ui::Ui;
-use crate::widgets::sized_box::SizedBox;
 
-pub struct App {
-    name: String,
+/// Defines how a windows size should be determined
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum WindowSizePolicy {
+    /// Use the content of the window to determine the size.
+    ///
+    /// If you use this option, your root widget will be passed infinite constraints;
+    /// you are responsible for ensuring that your content picks an appropriate size.
+    Content,
+    /// Use the provided window size
+    User,
 }
 
-impl App {
-    pub fn new(name: impl Into<String>) -> Self {
-        App { name: name.into() }
-    }
-
-    pub fn run(self, mut fun: impl FnMut(&mut Ui) + 'static) {
-        let app = Application::new().unwrap();
-
-        let mut file_menu = Menu::new();
-        file_menu.add_item(
-            0x100,
-            "E&xit",
-            Some(&HotKey::new(SysMods::Cmd, "q")),
-            true,
-            false,
-        );
-
-        let mut menubar = Menu::new();
-        menubar.add_dropdown(file_menu, "Application", true);
-
-        let mut builder = WindowBuilder::new(app.clone());
-        builder.set_handler(Box::new(AppWidget::new(move |ui| {
-            SizedBox::new().build(ui, |ui| fun(ui))
-        })));
-        builder.set_title(self.name);
-        builder.set_menu(menubar);
-
-        let primary_monitor = Screen::get_monitors()
-            .into_iter()
-            .find(Monitor::is_primary)
-            .unwrap();
-        let window_size = Size::new(800., 600.);
-        let virtual_rect = primary_monitor.virtual_rect();
-        let x = (virtual_rect.x1 - window_size.width + virtual_rect.x0) / 2.;
-        let y = (virtual_rect.y1 - window_size.height + virtual_rect.y0) / 2.;
-        let window_offset = Point::new(x, y);
-        builder.set_size(window_size);
-        builder.set_position(window_offset);
-
-        let window = builder.build().unwrap();
-        window.show();
-
-        app.run(None);
-    }
+/// Window configuration that can be applied to a WindowBuilder, or to an existing WindowHandle.
+/// It does not include anything related to app data.
+#[derive(PartialEq)]
+pub struct WindowConfig {
+    pub(crate) size_policy: WindowSizePolicy,
+    pub(crate) size: Option<Size>,
+    pub(crate) min_size: Option<Size>,
+    pub(crate) position: Option<Point>,
+    pub(crate) resizable: Option<bool>,
+    pub(crate) transparent: Option<bool>,
+    pub(crate) show_titlebar: Option<bool>,
+    pub(crate) level: Option<WindowLevel>,
+    pub(crate) state: Option<WindowState>,
 }
 
-struct AppWidget {
-    handle: WindowHandle,
-    app: Box<dyn FnMut(&mut Ui)>,
-    root: Children,
-    root_state: ChildState,
-    child_counter: ChildCounter,
-    mouse_pos: Option<Point>,
-    fps_counter: FPSCounter,
-}
-
-impl AppWidget {
-    pub fn new(app: impl FnMut(&mut Ui) + 'static) -> Self {
-        let mut counter = ChildCounter::new();
-        AppWidget {
-            handle: WindowHandle::default(),
-            app: Box::new(app),
-            root: Children::new(),
-            root_state: ChildState::new(counter.generate_id(), None),
-            child_counter: counter,
-            mouse_pos: None,
-            fps_counter: FPSCounter::new(),
+impl Default for WindowConfig {
+    fn default() -> Self {
+        WindowConfig {
+            size_policy: WindowSizePolicy::User,
+            size: None,
+            min_size: None,
+            position: None,
+            resizable: None,
+            show_titlebar: None,
+            transparent: None,
+            level: None,
+            state: None,
         }
     }
+}
 
-    fn run_app(
-        handle: &WindowHandle,
-        app: &mut Box<dyn FnMut(&mut Ui)>,
-        root: &mut Children,
-        child_counter: &mut ChildCounter,
-    ) {
-        let mut context_state = ContextState {
-            window: handle.clone(),
-            text: handle.text(),
-        };
-        let mut cx = Ui::new(root, &mut context_state, child_counter);
-        app(&mut cx);
-    }
-
-    #[instrument(skip(self))]
-    fn layout(&mut self, bc: &BoxConstraints) {
-        let Self {
-            handle,
-            root,
-            root_state,
-            ..
-        } = self;
-
-        let mut context_state = ContextState {
-            window: handle.clone(),
-            text: handle.text(),
-        };
-        let child = &mut root.renders[0];
-        let mut layout_ctx = LayoutCtx {
-            context_state: &mut context_state,
-            child_state: root_state,
-        };
-
-        root_state.size = child.layout(&mut layout_ctx, &bc.into());
-    }
-
-    #[instrument(skip(self))]
-    fn event(&mut self, event: Event) -> bool {
-        let Self {
-            handle,
-            root,
-            mouse_pos,
-            app,
-            child_counter,
-            root_state,
-            ..
-        } = self;
-
-        match &event {
-            Event::MouseMove(mouse_event)
-            | Event::MouseUp(mouse_event)
-            | Event::MouseDown(mouse_event)
-            | Event::Wheel(mouse_event) => {
-                *mouse_pos = Some(mouse_event.pos);
+impl WindowConfig {
+    /// Set the window size policy.
+    pub fn window_size_policy(mut self, size_policy: WindowSizePolicy) -> Self {
+        #[cfg(windows)]
+        {
+            // On Windows content_insets doesn't work on window with no initial size
+            // so the window size can't be adapted to the content, to fix this a
+            // non null initial size is set here.
+            if size_policy == WindowSizePolicy::Content {
+                self.size = Some(Size::new(1., 1.))
             }
-            _ => {}
-        };
-
-        let mut context_state = ContextState {
-            window: handle.clone(),
-            text: handle.text(),
-        };
-
-        let child = &mut root.renders[0];
-        let mut event_ctx = EventCtx {
-            context_state: &mut context_state,
-            child_state: root_state,
-            is_active: false,
-            is_handled: false,
-        };
-
-        child.event(&mut event_ctx, &event);
-
-        let is_handled = event_ctx.is_handled;
-        if is_handled {
-            AppWidget::run_app(&handle, app, root, child_counter);
         }
-
-        let child = &mut root.renders[0];
-
-        if child.needs_layout() {
-            handle.invalidate();
-        } else {
-            let invalid_rect = root_state.invalid.bounding_box();
-            root_state.invalid.clear();
-            handle.invalidate_rect(invalid_rect);
-        }
-        is_handled
-    }
-}
-
-fn draw_fps(fps: usize, window_size: Size, paint_ctx: &mut PaintCtx) {
-    let mut layout: TextLayout<String> = TextLayout::from_text(format!("{}", fps));
-    layout.rebuild_if_needed(&mut paint_ctx.text());
-    let text_size = layout.size();
-    let win_size = window_size;
-    let origin = Point::new(win_size.width - text_size.width, 0.);
-    let text_rect = Rect::from_origin_size(origin, text_size) - Vec2::new(5., 0.);
-    let bg_rect = text_rect.inset(5.);
-    paint_ctx.fill(
-        bg_rect,
-        &PaintBrush::Color(Color::from_hex_str("#fff").unwrap()),
-    );
-    paint_ctx.draw_text(layout.layout().unwrap(), text_rect.origin());
-}
-
-impl WinHandler for AppWidget {
-    #[instrument(skip(self, handle))]
-    fn connect(&mut self, handle: &WindowHandle) {
-        self.handle = handle.clone();
-    }
-
-    #[instrument(skip(self))]
-    fn size(&mut self, size: Size) {
-        if self.root.is_empty() {
-            let Self {
-                handle,
-                root,
-
-                app,
-                child_counter,
-                ..
-            } = self;
-            AppWidget::run_app(&handle, app, root, child_counter);
-        } else {
-            self.event(Event::WindowSize(size));
-        }
-    }
-
-    fn prepare_paint(&mut self) {}
-
-    #[instrument(skip(self, piet))]
-    fn paint(&mut self, piet: &mut Piet, invalid: &Region) {
-        self.layout(&BoxConstraints::new(Size::ZERO, self.handle.get_size()));
-
-        let Self {
-            handle,
-            root,
-            root_state,
-            ..
-        } = self;
-
-        let mut context_state = ContextState {
-            window: handle.clone(),
-            text: handle.text(),
-        };
-
-        let child = &mut root.renders[0];
-        let mut paint_ctx = PaintCtx {
-            context_state: &mut context_state,
-            child_state: &root_state,
-            region: invalid.clone(),
-            render_ctx: piet,
-        };
-        child.paint(&mut paint_ctx);
-        draw_fps(self.fps_counter.tick(), handle.get_size(), &mut paint_ctx);
-    }
-
-    fn key_down(&mut self, event: KeyEvent) -> bool {
-        self.event(Event::KeyUp(event))
-    }
-
-    fn key_up(&mut self, event: KeyEvent) {
-        self.event(Event::KeyDown(event));
-    }
-
-    #[instrument(skip(self))]
-    fn wheel(&mut self, mouse_event: &MouseEvent) {
-        self.event(Event::Wheel(mouse_event.clone()));
-    }
-
-    #[instrument(skip(self))]
-    fn mouse_move(&mut self, mouse_event: &MouseEvent) {
-        self.event(Event::MouseMove(mouse_event.clone()));
-    }
-
-    #[instrument(skip(self))]
-    fn mouse_down(&mut self, mouse_event: &MouseEvent) {
-        self.event(Event::MouseDown(mouse_event.clone()));
-    }
-
-    #[instrument(skip(self))]
-    fn mouse_up(&mut self, mouse_event: &MouseEvent) {
-        self.event(Event::MouseUp(mouse_event.clone()));
-    }
-
-    fn request_close(&mut self) {
-        self.handle.close();
-    }
-
-    fn destroy(&mut self) {
-        Application::global().quit();
-    }
-
-    fn command(&mut self, id: u32) {
-        match id {
-            0x100 => {
-                self.handle.close();
-                Application::global().quit()
-            }
-            _ => println!("unexpected id {}", id),
-        }
-    }
-
-    fn as_any(&mut self) -> &mut dyn Any {
+        self.size_policy = size_policy;
         self
+    }
+
+    /// Set the window's initial drawing area size in [display points].
+    ///
+    /// You can pass in a tuple `(width, height)` or a [`Size`],
+    /// e.g. to create a window with a drawing area 1000dp wide and 500dp high:
+    ///
+    /// ```ignore
+    /// window.window_size((1000.0, 500.0));
+    /// ```
+    ///
+    /// The actual window size in pixels will depend on the platform DPI settings.
+    ///
+    /// This should be considered a request to the platform to set the size of the window.
+    /// The platform might increase the size a tiny bit due to DPI.
+    ///
+    /// [`Size`]: struct.Size.html
+    /// [display points]: struct.Scale.html
+    pub fn window_size(mut self, size: impl Into<Size>) -> Self {
+        self.size = Some(size.into());
+        self
+    }
+
+    /// Set the window's minimum drawing area size in [display points].
+    ///
+    /// The actual minimum window size in pixels will depend on the platform DPI settings.
+    ///
+    /// This should be considered a request to the platform to set the minimum size of the window.
+    /// The platform might increase the size a tiny bit due to DPI.
+    ///
+    /// To set the window's initial drawing area size use [`window_size`].
+    ///
+    /// [`window_size`]: #method.window_size
+    /// [display points]: struct.Scale.html
+    pub fn with_min_size(mut self, size: impl Into<Size>) -> Self {
+        self.min_size = Some(size.into());
+        self
+    }
+
+    /// Set whether the window should be resizable.
+    pub fn resizable(mut self, resizable: bool) -> Self {
+        self.resizable = Some(resizable);
+        self
+    }
+
+    /// Set whether the window should have a titlebar and decorations.
+    pub fn show_titlebar(mut self, show_titlebar: bool) -> Self {
+        self.show_titlebar = Some(show_titlebar);
+        self
+    }
+
+    /// Sets the window position in virtual screen coordinates.
+    /// [`position`] Position in pixels.
+    ///
+    /// [`position`]: struct.Point.html
+    pub fn set_position(mut self, position: Point) -> Self {
+        self.position = Some(position);
+        self
+    }
+
+    /// Sets the [`WindowLevel`] of the window
+    ///
+    /// [`WindowLevel`]: enum.WindowLevel.html
+    pub fn set_level(mut self, level: WindowLevel) -> Self {
+        self.level = Some(level);
+        self
+    }
+
+    /// Sets the [`WindowState`] of the window.
+    ///
+    /// [`WindowState`]: enum.WindowState.html
+    pub fn set_window_state(mut self, state: WindowState) -> Self {
+        self.state = Some(state);
+        self
+    }
+
+    /// Set whether the window background should be transparent
+    pub fn transparent(mut self, transparent: bool) -> Self {
+        self.transparent = Some(transparent);
+        self
+    }
+
+    /// Apply this window configuration to the passed in WindowBuilder
+    pub fn apply_to_builder(&self, builder: &mut WindowBuilder) {
+        if let Some(resizable) = self.resizable {
+            builder.resizable(resizable);
+        }
+
+        if let Some(show_titlebar) = self.show_titlebar {
+            builder.show_titlebar(show_titlebar);
+        }
+
+        if let Some(size) = self.size {
+            builder.set_size(size);
+        } else if let WindowSizePolicy::Content = self.size_policy {
+            builder.set_size(Size::new(0., 0.));
+        }
+
+        if let Some(position) = self.position {
+            builder.set_position(position);
+        }
+
+        if let Some(transparent) = self.transparent {
+            builder.set_transparent(transparent);
+        }
+
+        if let Some(level) = self.level.clone() {
+            builder.set_level(level)
+        }
+
+        if let Some(state) = self.state {
+            builder.set_window_state(state);
+        }
+
+        if let Some(min_size) = self.min_size {
+            builder.set_min_size(min_size);
+        }
+    }
+
+    /// Apply this window configuration to the passed in WindowHandle
+    pub fn apply_to_handle(&self, win_handle: &mut WindowHandle) {
+        if let Some(resizable) = self.resizable {
+            win_handle.resizable(resizable);
+        }
+
+        if let Some(show_titlebar) = self.show_titlebar {
+            win_handle.show_titlebar(show_titlebar);
+        }
+
+        if let Some(size) = self.size {
+            win_handle.set_size(size);
+        }
+
+        // Can't apply min size currently as window handle
+        // does not support it.
+
+        if let Some(position) = self.position {
+            win_handle.set_position(position);
+        }
+
+        if self.level.is_some() {
+            warn!("Applying a level can only be done on window builders");
+        }
+
+        if let Some(state) = self.state {
+            win_handle.set_window_state(state);
+        }
+    }
+}
+
+/// The parts of a window, pending construction, that are dependent on top level app state
+/// or are not part of the druid shells windowing abstraction.
+/// This includes the boxed root widget, as well as other window properties such as the title.
+pub struct PendingWindow {
+    pub(crate) root: Box<dyn FnMut(&mut Ui)>,
+    pub(crate) title: String,
+    pub(crate) menu: Option<MenuManager>,
+    pub(crate) transparent: bool,
+    pub(crate) size_policy: WindowSizePolicy, // This is copied over from the WindowConfig
+}
+
+impl PendingWindow {
+    /// Create a pending window from any widget.
+    pub fn new<W>(title: String, root: W) -> PendingWindow
+    where
+        W: FnMut(&mut Ui) + 'static,
+    {
+        // This just makes our API slightly cleaner; callers don't need to explicitly box.
+        PendingWindow {
+            title,
+            menu: None,
+            root: Box::new(root),
+            transparent: false,
+            size_policy: WindowSizePolicy::User,
+        }
+    }
+
+    /// Set the title for this window. This is a [`LabelText`]; it can be either
+    /// a `String`, a [`LocalizedString`], or a closure that computes a string;
+    /// it will be kept up to date as the application's state changes.
+    ///
+    /// [`LabelText`]: widget/enum.LocalizedString.html
+    /// [`LocalizedString`]: struct.LocalizedString.html
+    pub fn title(mut self, title: String) -> Self {
+        self.title = title;
+        self
+    }
+
+    /// Set wether the background should be transparent
+    pub fn transparent(mut self, transparent: bool) -> Self {
+        self.transparent = transparent;
+        self
+    }
+
+    /// Set the menu for this window.
+    ///
+    /// `menu` is a callback for creating the menu. Its first argument is the id of the window that
+    /// will have the menu, or `None` if it's creating the root application menu for an app with no
+    /// menus (which can happen, for example, on macOS).
+    pub fn menu(mut self, menu: impl FnMut(Option<WindowId>) -> Menu + 'static) -> Self {
+        self.menu = Some(MenuManager::new(menu));
+        self
+    }
+}
+
+/// A description of a window to be instantiated.
+pub struct WindowDesc {
+    pub(crate) pending: PendingWindow,
+    pub(crate) config: WindowConfig,
+    /// The `WindowId` that will be assigned to this window.
+    ///
+    /// This can be used to track a window from when it is launched and when
+    /// it actually connects.
+    pub id: WindowId,
+}
+
+impl WindowDesc {
+    /// Create a new `WindowDesc`, taking the root [`Widget`] for this window.
+    ///
+    /// [`Widget`]: trait.Widget.html
+    pub fn new<W>(title: String, root: W) -> WindowDesc
+    where
+        W: FnMut(&mut Ui) + 'static,
+    {
+        WindowDesc {
+            pending: PendingWindow::new(title, root),
+            config: WindowConfig::default(),
+            id: WindowId::next(),
+        }
+    }
+
+    /// Set the title for this window. This is a [`LabelText`]; it can be either
+    /// a `String`, a [`LocalizedString`], or a closure that computes a string;
+    /// it will be kept up to date as the application's state changes.
+    ///
+    /// [`LabelText`]: widget/enum.LocalizedString.html
+    /// [`LocalizedString`]: struct.LocalizedString.html
+    pub fn title(mut self, title: String) -> Self {
+        self.pending = self.pending.title(title);
+        self
+    }
+
+    /// Set the menu for this window.
+    ///
+    /// `menu` is a callback for creating the menu. Its first argument is the id of the window that
+    /// will have the menu, or `None` if it's creating the root application menu for an app with no
+    /// menus (which can happen, for example, on macOS).
+    pub fn menu(mut self, menu: impl FnMut(Option<WindowId>) -> Menu + 'static) -> Self {
+        self.pending = self.pending.menu(menu);
+        self
+    }
+
+    /// Set the window size policy
+    pub fn window_size_policy(mut self, size_policy: WindowSizePolicy) -> Self {
+        #[cfg(windows)]
+        {
+            // On Windows content_insets doesn't work on window with no initial size
+            // so the window size can't be adapted to the content, to fix this a
+            // non null initial size is set here.
+            if size_policy == WindowSizePolicy::Content {
+                self.config.size = Some(Size::new(1., 1.))
+            }
+        }
+        self.config.size_policy = size_policy;
+        self
+    }
+
+    /// Set the window's initial drawing area size in [display points].
+    ///
+    /// You can pass in a tuple `(width, height)` or a [`Size`],
+    /// e.g. to create a window with a drawing area 1000dp wide and 500dp high:
+    ///
+    /// ```ignore
+    /// window.window_size((1000.0, 500.0));
+    /// ```
+    ///
+    /// The actual window size in pixels will depend on the platform DPI settings.
+    ///
+    /// This should be considered a request to the platform to set the size of the window.
+    /// The platform might increase the size a tiny bit due to DPI.
+    ///
+    /// [`Size`]: struct.Size.html
+    /// [display points]: struct.Scale.html
+    pub fn window_size(mut self, size: impl Into<Size>) -> Self {
+        self.config.size = Some(size.into());
+        self
+    }
+
+    /// Set the window's minimum drawing area size in [display points].
+    ///
+    /// The actual minimum window size in pixels will depend on the platform DPI settings.
+    ///
+    /// This should be considered a request to the platform to set the minimum size of the window.
+    /// The platform might increase the size a tiny bit due to DPI.
+    ///
+    /// To set the window's initial drawing area size use [`window_size`].
+    ///
+    /// [`window_size`]: #method.window_size
+    /// [display points]: struct.Scale.html
+    pub fn with_min_size(mut self, size: impl Into<Size>) -> Self {
+        self.config = self.config.with_min_size(size);
+        self
+    }
+
+    /// Builder-style method to set whether this window can be resized.
+    pub fn resizable(mut self, resizable: bool) -> Self {
+        self.config = self.config.resizable(resizable);
+        self
+    }
+
+    /// Builder-style method to set whether this window's titlebar is visible.
+    pub fn show_titlebar(mut self, show_titlebar: bool) -> Self {
+        self.config = self.config.show_titlebar(show_titlebar);
+        self
+    }
+
+    /// Builder-style method to set whether this window's background should be
+    /// transparent.
+    pub fn transparent(mut self, transparent: bool) -> Self {
+        self.config = self.config.transparent(transparent);
+        self.pending = self.pending.transparent(transparent);
+        self
+    }
+
+    /// Sets the initial window position in [display points], relative to the origin
+    /// of the [virtual screen].
+    ///
+    /// [display points]: crate::Scale
+    /// [virtual screen]: crate::Screen
+    pub fn set_position(mut self, position: impl Into<Point>) -> Self {
+        self.config = self.config.set_position(position.into());
+        self
+    }
+
+    /// Sets the [`WindowLevel`] of the window
+    ///
+    /// [`WindowLevel`]: enum.WindowLevel.html
+    pub fn set_level(mut self, level: WindowLevel) -> Self {
+        self.config = self.config.set_level(level);
+        self
+    }
+
+    /// Set initial state for the window.
+    pub fn set_window_state(mut self, state: WindowState) -> Self {
+        self.config = self.config.set_window_state(state);
+        self
+    }
+
+    /// Set the [`WindowConfig`] of window.
+    pub fn with_config(mut self, config: WindowConfig) -> Self {
+        self.config = config;
+        self
+    }
+
+    /// Attempt to create a platform window from this `WindowDesc`.
+    pub(crate) fn build_native(
+        self,
+        state: &mut AppState,
+    ) -> Result<WindowHandle, druid_shell::Error> {
+        state.build_native_window(self.id, self.pending, self.config)
+    }
+}
+
+pub struct AppLauncher {
+    windows: Vec<WindowDesc>,
+    ext_event_host: ExtEventHost,
+}
+
+impl AppLauncher {
+    pub fn with_window(window: WindowDesc) -> Self {
+        AppLauncher {
+            windows: vec![window],
+            ext_event_host: ExtEventHost::new(),
+        }
+    }
+
+    /// Returns an [`ExtEventSink`] that can be moved between threads,
+    /// and can be used to submit commands back to the application.
+    ///
+    /// [`ExtEventSink`]: struct.ExtEventSink.html
+    pub fn get_external_handle(&self) -> ExtEventSink {
+        self.ext_event_host.make_sink()
+    }
+
+    /// Initialize a minimal tracing subscriber with DEBUG max level for printing logs out to
+    /// stderr.
+    ///
+    /// This is meant for quick-and-dirty debugging. If you want more serious trace handling,
+    /// it's probably better to implement it yourself.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the subscriber fails to initialize, for example if a `tracing`/`tracing_wasm`
+    /// global logger was already set.
+    pub fn log_to_console(self) -> Self {
+        use tracing_subscriber::prelude::*;
+        let filter_layer = tracing_subscriber::filter::LevelFilter::DEBUG;
+        let fmt_layer = tracing_subscriber::fmt::layer()
+            // Display target (eg "my_crate::some_mod::submod") with logs
+            .with_target(true);
+
+        tracing_subscriber::registry()
+            .with(filter_layer)
+            .with(fmt_layer)
+            .init();
+        self
+    }
+
+    /// Build the windows and start the runloop.
+    ///
+    /// Returns an error if a window cannot be instantiated. This is usually
+    /// a fatal error.
+    pub fn launch(self) -> Result<(), druid_shell::Error> {
+        let app = Application::new()?;
+
+        let mut app_state = AppState::new(app.clone(), self.ext_event_host);
+
+        for desc in self.windows {
+            let window = desc.build_native(&mut app_state)?;
+            window.show();
+        }
+
+        let handler = AppHandler::new(app_state);
+        app.run(Some(Box::new(handler)));
+        Ok(())
     }
 }

@@ -11,7 +11,6 @@ use druid_shell::kurbo::{Affine, Insets, Point, Rect, Shape, Size, Vec2};
 use druid_shell::piet::{Color, LineJoin, PaintBrush, RenderContext, StrokeStyle};
 use druid_shell::{Region, TimerToken};
 
-
 use crate::constraints::Constraints;
 use crate::context::{ContextState, EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx};
 use crate::event::Event;
@@ -183,7 +182,17 @@ impl IndexMut<usize> for Children {
 }
 
 /// [`RenderObject`] API for `Child` nodes.
-impl Child {}
+impl Child {
+    pub(crate) fn new(key: Caller, object: Box<dyn AnyRenderObject>, id: ChildId) -> Self {
+        Child {
+            key,
+            object,
+            children: Children::new(),
+            state: ChildState::new(id, None),
+            dead: false,
+        }
+    }
+}
 
 /// Public API for child nodes.
 impl Child {
@@ -487,6 +496,7 @@ impl Child {
             Event::Paste(_) => true,
             Event::Zoom(_) => true,
             Event::Timer(_) => false, // This event was targeted only to our parent
+            _ => true,
         };
 
         if recurse {
@@ -508,18 +518,14 @@ impl Child {
         ctx.child_state.merge_up(&mut self.state);
     }
 
-    pub fn lifecycle(
-        &mut self,
-        ctx: &mut LifeCycleCtx,
-        event: &LifeCycle,
-        children: &mut Children,
-    ) {
+    pub fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle) {
         let mut child_ctx = LifeCycleCtx {
             context_state: ctx.context_state,
             child_state: &mut self.state,
         };
 
-        self.object.lifecycle(&mut child_ctx, event, children);
+        self.object
+            .lifecycle(&mut child_ctx, event, &mut self.children);
     }
 
     pub fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints) -> Size {

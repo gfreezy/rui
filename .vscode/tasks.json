@@ -13,9 +13,7 @@
 			},
 			"label": "rust: cargo run",
 			"presentation": {
-				"reveal": "silent",
-				"close": true,
-				"revealProblems": "onProblem"
+				"focus": true
 			}
 		},
 		{

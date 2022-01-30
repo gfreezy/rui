@@ -7,8 +7,8 @@ use druid_shell::kurbo::{Insets, Rect, Size};
 use druid_shell::piet::{Piet, PietText, RenderContext};
 use druid_shell::{Region, TimerToken, WindowHandle};
 
-use crate::id::ChildId;
 use crate::tree::ChildState;
+use crate::{ext_event::ExtEventSink, id::ChildId};
 
 /// A macro for implementing methods on multiple contexts.
 ///
@@ -27,6 +27,7 @@ macro_rules! impl_context_method {
 /// Static state that is shared between most contexts.
 pub(crate) struct ContextState {
     pub(crate) window: WindowHandle,
+    pub(crate) ext_handle: ExtEventSink,
     pub(crate) text: PietText,
 }
 
