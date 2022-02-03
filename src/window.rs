@@ -1,9 +1,11 @@
+use std::panic::Location;
+
 use druid_shell::{
     kurbo::{Point, Rect, Size, Vec2},
     piet::{Color, PaintBrush, Piet, RenderContext},
     Region, WindowHandle,
 };
-use tracing::instrument;
+use tracing::{instrument};
 
 use crate::{
     app::{PendingWindow, WindowSizePolicy},
@@ -12,13 +14,14 @@ use crate::{
     context::{ContextState, EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx},
     event::Event,
     ext_event::ExtEventSink,
-    id::{ChildCounter, WindowId},
+    id::{ChildCounter, ChildId, WindowId},
     lifecycle::LifeCycle,
     menu::{MenuItemId, MenuManager},
     perf::FPSCounter,
     text::layout::TextLayout,
-    tree::{ChildState, Children},
+    tree::{Child, ChildState},
     ui::Ui,
+    widgets::window_container::WindowContainer,
 };
 
 pub struct Window {
@@ -27,9 +30,10 @@ pub struct Window {
     size_policy: WindowSizePolicy,
     pub(crate) handle: WindowHandle,
     app: Box<dyn FnMut(&mut Ui)>,
-    root: Children,
+    root: Child,
+    root_child_id: ChildId,
+    invalid: Region,
     pub(crate) menu: Option<MenuManager>,
-    root_state: ChildState,
     child_counter: ChildCounter,
     ext_handle: ExtEventSink,
     fps_counter: FPSCounter,
@@ -47,12 +51,17 @@ impl Window {
             id,
             size: Size::ZERO,
             size_policy: pending.size_policy,
-            handle: handle,
+            handle,
+            root_child_id: counter.generate_id(),
             app: pending.root,
             menu: pending.menu,
-            root: Children::new(),
+            root: Child::new(
+                Location::caller().into(),
+                WindowContainer,
+                counter.generate_id(),
+            ),
+            invalid: Region::EMPTY,
             ext_handle,
-            root_state: ChildState::new(counter.generate_id(), None),
             child_counter: counter,
             fps_counter: FPSCounter::new(),
         }
@@ -71,11 +80,17 @@ impl Window {
 
     #[instrument(skip(self, piet))]
     pub(crate) fn paint(&mut self, piet: &mut Piet, invalid: &Region, queue: &mut CommandQueue) {
+        if self.root.needs_layout() {
+            // debug!("layout");
+            self.layout(queue);
+        }
+
         let Self {
             handle,
             ext_handle,
             root,
-            root_state,
+            root_child_id,
+            size,
             ..
         } = self;
 
@@ -86,14 +101,14 @@ impl Window {
             text: handle.text(),
         };
 
-        let child = &mut root.renders[0];
+        let root_state = ChildState::new(*root_child_id, Some(size.clone()));
         let mut paint_ctx = PaintCtx {
             context_state: &mut context_state,
             child_state: &root_state,
             region: invalid.clone(),
             render_ctx: piet,
         };
-        child.paint(&mut paint_ctx);
+        root.paint(&mut paint_ctx);
         draw_fps(self.fps_counter.tick(), handle.get_size(), &mut paint_ctx);
     }
 
@@ -103,7 +118,9 @@ impl Window {
             handle,
             ext_handle,
             root,
-            root_state,
+            root_child_id,
+            size,
+            invalid,
             ..
         } = self;
 
@@ -112,20 +129,23 @@ impl Window {
             ext_handle: ext_handle.clone(),
             text: handle.text(),
         };
-        let child = &mut root.renders[0];
+        let mut root_state = ChildState::new(*root_child_id, Some(size.clone()));
+
         let mut layout_ctx = LayoutCtx {
             context_state: &mut context_state,
-            child_state: root_state,
+            child_state: &mut root_state,
         };
 
-        root_state.size = child.layout(
+        root_state.size = root.layout(
             &mut layout_ctx,
             &(BoxConstraints::new(Size::ZERO, self.size).into()),
         );
+        invalid.union_with(&root_state.invalid);
     }
 
     #[instrument(skip(self))]
     pub(crate) fn event(&mut self, queue: &mut CommandQueue, event: Event) -> Handled {
+        // debug!("event");
         match &event {
             Event::WindowSize(size) => self.size = *size,
             _ => (),
@@ -138,8 +158,9 @@ impl Window {
         let Self {
             handle,
             ext_handle,
-            root,
-            root_state,
+            root_child_id,
+            size,
+            invalid,
             ..
         } = self;
 
@@ -148,18 +169,18 @@ impl Window {
             ext_handle: ext_handle.clone(),
             text: handle.text(),
         };
+        let mut root_state = ChildState::new(*root_child_id, Some(size.clone()));
 
-        let child = &mut root.renders[0];
         let mut event_ctx = EventCtx {
             context_state: &mut context_state,
-            child_state: root_state,
+            child_state: &mut root_state,
             is_active: false,
             is_handled: false,
         };
 
-        child.event(&mut event_ctx, &event);
-
+        self.root.event(&mut event_ctx, &event);
         let is_handled = event_ctx.is_handled;
+        invalid.union_with(&root_state.invalid);
 
         if matches!(
             (event, self.size_policy),
@@ -178,9 +199,9 @@ impl Window {
             handle,
             ext_handle,
             root,
-            app: _,
-            child_counter: _,
-            root_state,
+            root_child_id,
+            size,
+            invalid,
             ..
         } = self;
 
@@ -189,17 +210,19 @@ impl Window {
             ext_handle: ext_handle.clone(),
             text: handle.text(),
         };
+        let mut root_state = ChildState::new(*root_child_id, Some(size.clone()));
 
         let mut ctx = LifeCycleCtx {
-            child_state: root_state,
+            child_state: &mut root_state,
             context_state: &mut context_state,
         };
-        let child = &mut root.renders[0];
 
-        child.lifecycle(&mut ctx, event);
+        root.lifecycle(&mut ctx, event);
+        invalid.union_with(&root_state.invalid);
     }
 
     pub(crate) fn update(&mut self, _queue: &mut CommandQueue) {
+        // debug!("update");
         let Self {
             handle,
             ext_handle,
@@ -208,33 +231,38 @@ impl Window {
             child_counter,
             ..
         } = self;
+
         let mut context_state = ContextState {
             window: handle.clone(),
             ext_handle: ext_handle.clone(),
             text: handle.text(),
         };
-        let mut cx = Ui::new(root, &mut context_state, child_counter);
+        let mut cx = Ui::new(&mut root.children, &mut context_state, child_counter);
         app(&mut cx);
+
+        // merge children state up to root
+        for child in &mut root.children {
+            root.state.merge_up(&mut child.state);
+        }
     }
 
     pub(crate) fn invalidate_and_finalize(&mut self) {
         let Self {
             handle,
             root,
-            root_state,
+            invalid,
             ..
         } = self;
-        let child = &mut root.renders[0];
 
-        if child.needs_layout() {
+        if root.needs_layout() {
             // debug!("needs layout");
             handle.invalidate();
         } else {
-            let invalid_rect = root_state.invalid.bounding_box();
-            root_state.invalid.clear();
+            let invalid_rect = invalid.bounding_box();
             handle.invalidate_rect(invalid_rect);
             // debug!("invalidate rect: {invalid_rect}");
         }
+        invalid.clear();
     }
 }
 

@@ -6,7 +6,6 @@ use std::rc::Rc;
 
 use druid_shell::kurbo::Size;
 use druid_shell::piet::Piet;
-use druid_shell::text::InputHandler;
 use druid_shell::{
     Application, IdleToken, KeyEvent, MouseEvent, Region, Scale, TextFieldToken, TimerToken,
     WinHandler, WindowBuilder, WindowHandle,
@@ -239,7 +238,7 @@ impl InnerAppState {
         if let Some(win) = self.windows.get_mut(window_id) {
             win.prepare_paint();
         }
-        self.do_update();
+        // self.do_update();
     }
 
     fn paint(&mut self, window_id: WindowId, piet: &mut Piet, invalid: &Region) {

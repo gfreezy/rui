@@ -4,7 +4,6 @@ use std::panic::Location;
 
 use druid_shell::kurbo::Size;
 
-
 use crate::box_constraints::BoxConstraints;
 use crate::constraints::Constraints;
 use crate::context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx};
@@ -31,7 +30,7 @@ pub struct SizedBox {
 }
 
 impl Properties for SizedBox {
-    type Object = SizedBox;
+    type Object = SizedBoxObject;
 }
 
 impl SizedBox {
@@ -99,7 +98,16 @@ impl SizedBox {
         self.height = Some(f64::INFINITY);
         self
     }
+}
 
+#[derive(Debug, Default, PartialEq)]
+pub struct SizedBoxObject {
+    width: Option<f64>,
+    height: Option<f64>,
+    clip: bool,
+}
+
+impl SizedBoxObject {
     fn child_constraints(&self, bc: &BoxConstraints) -> BoxConstraints {
         // if we don't have a width/height, we don't change that axis.
         // if we have a width/height, we clamp it on that axis.
@@ -126,22 +134,28 @@ impl SizedBox {
     }
 }
 
-impl RenderObject<SizedBox> for SizedBox {
+impl RenderObject<SizedBox> for SizedBoxObject {
     type Action = ();
 
     fn create(props: SizedBox) -> Self {
-        props
+        SizedBoxObject {
+            width: props.width,
+            height: props.height,
+            clip: props.clip,
+        }
     }
 
     fn update(&mut self, ctx: &mut UpdateCtx, props: SizedBox) {
-        if self != &props {
+        if self.width != props.width || self.height != props.height || self.clip != props.clip {
             ctx.request_layout();
-            *self = props;
+            self.width = props.width;
+            self.height = props.height;
+            self.clip = props.clip;
         }
     }
 }
 
-impl RenderObjectInterface for SizedBox {
+impl RenderObjectInterface for SizedBoxObject {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children) {
         if !children.is_empty() {
             children[0].event(ctx, event);
@@ -178,29 +192,5 @@ impl RenderObjectInterface for SizedBox {
             // ctx.clip(clip_size);
             children[0].paint(ctx);
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::box_constraints::BoxConstraints;
-
-    use super::*;
-
-    #[test]
-    fn expand() {
-        let expand = SizedBox::new().expand();
-        let bc = BoxConstraints::tight(Size::new(400., 400.)).loosen();
-        let child_bc = expand.child_constraints(&bc);
-        assert_eq!(child_bc.min(), Size::new(400., 400.));
-    }
-
-    #[test]
-    fn no_width() {
-        let expand = SizedBox::new().height(200.);
-        let bc = BoxConstraints::tight(Size::new(400., 400.)).loosen();
-        let child_bc = expand.child_constraints(&bc);
-        assert_eq!(child_bc.min(), Size::new(0., 200.,));
-        assert_eq!(child_bc.max(), Size::new(400., 200.,));
     }
 }

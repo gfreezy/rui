@@ -55,7 +55,7 @@ fn win(ui: &mut Ui) {
                 (*style).clone(),
             );
 
-            button(ui, &format!("button{i}, click to incr"), move || {
+            button(ui, &format!("button{i}, click to incr你好"), move || {
                 println!("click to incr");
                 count2.update(|c| *c += 1);
             });

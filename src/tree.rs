@@ -1,5 +1,7 @@
+use std::any::type_name;
 use std::marker::PhantomData;
 use std::ops::Deref;
+
 
 use std::{
     any::Any,
@@ -10,6 +12,7 @@ use bumpalo::Bump;
 use druid_shell::kurbo::{Affine, Insets, Point, Rect, Shape, Size, Vec2};
 use druid_shell::piet::{Color, LineJoin, PaintBrush, RenderContext, StrokeStyle};
 use druid_shell::{Region, TimerToken};
+
 
 use crate::constraints::Constraints;
 use crate::context::{ContextState, EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx};
@@ -77,6 +80,7 @@ impl Drop for StateNode {
 }
 
 pub struct Child {
+    pub(crate) name: &'static str,
     pub(crate) key: Caller,
     pub(crate) object: Box<dyn AnyRenderObject>,
     pub(crate) children: Children,
@@ -183,10 +187,14 @@ impl IndexMut<usize> for Children {
 
 /// [`RenderObject`] API for `Child` nodes.
 impl Child {
-    pub(crate) fn new(key: Caller, object: Box<dyn AnyRenderObject>, id: ChildId) -> Self {
+    pub(crate) fn new<T>(key: Caller, object: T, id: ChildId) -> Self
+    where
+        T: AnyRenderObject,
+    {
         Child {
+            name: type_name::<T>(),
             key,
-            object,
+            object: Box::new(object),
             children: Children::new(),
             state: ChildState::new(id, None),
             dead: false,
@@ -265,7 +273,10 @@ impl Child {
         self.state.request_update = true;
     }
 
+    // #[track_caller]
     pub fn request_layout(&mut self) {
+        // let caller = Location::caller();
+        // debug!("{} request layout: {caller:?}", self.name());
         self.state.needs_layout = true;
     }
 
@@ -615,6 +626,9 @@ impl Child {
         self.state.size()
     }
 
+    pub fn name(&self) -> &'static str {
+        self.name
+    }
     /// Determines if the provided `mouse_pos` is inside `rect`
     /// and if so updates the hot state and sends `LifeCycle::HotChanged`.
     ///

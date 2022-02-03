@@ -2,11 +2,13 @@ use std::any::Any;
 
 use std::panic::Location;
 
+
+
 use crate::context::{ContextState, UpdateCtx};
 use crate::id::ChildCounter;
 use crate::key::Caller;
 use crate::object::{AnyRenderObject, Properties, RenderObject};
-use crate::tree::{Child, ChildState, Children, State, StateNode};
+use crate::tree::{Child, Children, State, StateNode};
 
 pub struct Ui<'a> {
     pub(crate) tree: &'a mut Children,
@@ -59,35 +61,33 @@ impl<'a> Ui<'a> {
         R: RenderObject<P> + Any,
         N: FnOnce(&mut Ui),
     {
-        let mut props = Some(props);
-        let index = match self.find_render_object(caller) {
-            Some(index) => index,
-            None => {
-                let object = R::create(props.take().unwrap());
-                self.insert_render_object(caller, Box::new(object))
-            }
-        };
-        for node in &mut self.tree.renders[self.render_index..index] {
-            node.dead = true;
-        }
-        let node = &mut self.tree.renders[index];
-        self.render_index = index + 1;
-
         let mut action = R::Action::default();
-        if let Some(props) = props {
+        let index = if let Some(index) = self.find_render_object(caller) {
+            let node = &mut self.tree.renders[index];
             if let Some(object) = node.object.as_any().downcast_mut::<R>() {
                 let mut ctx = UpdateCtx {
                     context_state: self.context_state,
                     child_state: &mut node.state,
                 };
                 action = object.update(&mut ctx, props);
-                node.request_update();
             } else {
                 // TODO: Think of something smart
                 panic!("Wrong node type. Expected {}", std::any::type_name::<R>())
             }
+            index
+        } else {
+            let object = R::create(props);
+            let index = self.insert_render_object(caller, object);
+            let node = &mut self.tree.renders[index];
+            node.request_layout();
+            index
+        };
+        for node in &mut self.tree.renders[self.render_index..index] {
+            node.dead = true;
         }
+        self.render_index = index + 1;
 
+        let node = &mut self.tree.renders[index];
         let mut child_ui = Ui::new(&mut node.children, self.context_state, self.child_counter);
         content(&mut child_ui);
 
@@ -114,7 +114,10 @@ impl<'a> Ui<'a> {
         if request_layout {
             node.request_layout();
         }
+
+        // let node_name = node.name();
         for child in &mut node.children {
+            // debug!("merge from {} to {}", child.name(), node_name);
             node.state.merge_up(&mut child.state);
         }
 
@@ -154,7 +157,7 @@ impl Ui<'_> {
         None
     }
 
-    fn insert_render_object(&mut self, caller: Caller, object: Box<dyn AnyRenderObject>) -> usize {
+    fn insert_render_object(&mut self, caller: Caller, object: impl AnyRenderObject) -> usize {
         self.tree.renders.insert(
             self.render_index,
             Child::new(caller, object, self.child_counter.generate_id()),
