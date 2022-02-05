@@ -2,7 +2,6 @@ use std::any::type_name;
 use std::marker::PhantomData;
 use std::ops::Deref;
 
-
 use std::{
     any::Any,
     ops::{Index, IndexMut},
@@ -12,7 +11,6 @@ use bumpalo::Bump;
 use druid_shell::kurbo::{Affine, Insets, Point, Rect, Shape, Size, Vec2};
 use druid_shell::piet::{Color, LineJoin, PaintBrush, RenderContext, StrokeStyle};
 use druid_shell::{Region, TimerToken};
-
 
 use crate::constraints::Constraints;
 use crate::context::{ContextState, EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx};

@@ -2,9 +2,8 @@ use std::any::Any;
 
 use std::panic::Location;
 
-
-
 use crate::context::{ContextState, UpdateCtx};
+use crate::ext_event::ExtEventSink;
 use crate::id::ChildCounter;
 use crate::key::Caller;
 use crate::object::{AnyRenderObject, Properties, RenderObject};
@@ -167,5 +166,9 @@ impl Ui<'_> {
 
     pub fn track_state(&mut self, state_name: String) {
         self.tree.track_state(state_name);
+    }
+
+    pub fn ext_handle(&self) -> &ExtEventSink {
+        &self.context_state.ext_handle
     }
 }

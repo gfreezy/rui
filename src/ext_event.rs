@@ -18,7 +18,7 @@ use std::any::Any;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
-use crate::app_state::{AppState, EXT_EVENT_IDLE_TOKEN};
+use crate::app_state::{WindowHandler, EXT_EVENT_IDLE_TOKEN};
 use crate::command::{Command, Selector, SelectorSymbol, Target};
 use crate::id::WindowId;
 use druid_shell::IdleHandle;
@@ -134,8 +134,8 @@ impl ExtEventSink {
         let mut handle = self.handle.lock().unwrap();
         if let Some(handle) = handle.as_mut() {
             handle.add_idle(|win_handler| {
-                if let Some(win_handler) = win_handler.as_any().downcast_mut::<AppState>() {
-                    win_handler.handle_idle_callback(cb);
+                if let Some(win_handler) = win_handler.as_any().downcast_mut::<WindowHandler>() {
+                    win_handler.app_state.handle_idle_callback(cb);
                 } else {
                     panic!("is not the type of root data");
                 }

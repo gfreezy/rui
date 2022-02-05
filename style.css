@@ -1,0 +1,8 @@
+    .classname {
+        family: monospace;
+        size: 21;
+        weight: bold;
+        color: rgb(25, 199, 54);
+        line_breaking: clip;
+        alignment: center;
+    }

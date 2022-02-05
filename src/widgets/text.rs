@@ -3,8 +3,7 @@
 use std::panic::Location;
 
 use druid_shell::kurbo::{Point, Size};
-use druid_shell::piet::{Color, RenderContext, TextAlignment};
-use serde::{Deserialize, Deserializer};
+use druid_shell::piet::RenderContext;
 
 use crate::box_constraints::BoxConstraints;
 use crate::constraints::Constraints;
@@ -12,6 +11,7 @@ use crate::context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx};
 use crate::event::Event;
 use crate::lifecycle::LifeCycle;
 use crate::object::{Properties, RenderObject, RenderObjectInterface};
+use crate::style::{LineBreaking, TextStyle};
 use crate::text::font_descriptor::FontDescriptor;
 use crate::text::layout::TextLayout;
 use crate::tree::Children;
@@ -19,40 +19,6 @@ use crate::ui::Ui;
 
 // added padding between the edges of the widget and the text.
 const LABEL_X_PADDING: f64 = 2.0;
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct TextStyle {
-    text_size: usize,
-    #[serde(deserialize_with = "de_color")]
-    text_color: Color,
-    line_break: LineBreaking,
-    width: usize,
-    height: usize,
-}
-
-impl Default for TextStyle {
-    fn default() -> Self {
-        Self {
-            text_size: 14,
-            text_color: Color::from_hex_str("#000").unwrap(),
-            line_break: LineBreaking::Overflow,
-            width: 0,
-            height: 0,
-        }
-    }
-}
-
-fn de_color<'de, D>(deserializer: D) -> Result<Color, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s: &str = serde::Deserialize::deserialize(deserializer)?;
-    Color::from_hex_str(s).map_err(|_| serde::de::Error::custom("invalid color"))
-}
-
-impl Properties for Text {
-    type Object = TextObject;
-}
 
 /// A widget that displays text data.
 ///
@@ -63,20 +29,11 @@ impl Properties for Text {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Text {
     text: String,
-    font: FontDescriptor,
-    alignment: TextAlignment,
     style: TextStyle,
 }
 
-/// Options for handling lines that are too wide for the label.
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
-pub enum LineBreaking {
-    /// Lines are broken at word boundaries.
-    WordWrap,
-    /// Lines are truncated to the width of the label.
-    Clip,
-    /// Lines overflow the label.
-    Overflow,
+impl Properties for Text {
+    type Object = TextObject;
 }
 
 impl Text {
@@ -84,24 +41,12 @@ impl Text {
     pub fn new(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
-            font: FontDescriptor::default(),
-            alignment: TextAlignment::Start,
             style: TextStyle::default(),
         }
     }
 
     pub fn style(mut self, style: TextStyle) -> Self {
         self.style = style;
-        self
-    }
-
-    pub fn font(mut self, font: FontDescriptor) -> Self {
-        self.font = font;
-        self
-    }
-
-    pub fn text_alignment(mut self, alignment: TextAlignment) -> Self {
-        self.alignment = alignment;
         self
     }
 
@@ -113,7 +58,7 @@ impl Text {
 }
 
 pub struct TextObject {
-    text: Text,
+    style: TextStyle,
     layout: TextLayout<String>,
 }
 
@@ -121,17 +66,22 @@ impl TextObject {
     fn new(text: Text) -> Self {
         let layout = TextLayout::from_text(&text.text);
 
-        let mut obj = TextObject { text, layout };
-        obj.update_attrs();
+        let mut obj = TextObject {
+            style: text.style,
+            layout,
+        };
+        obj.update_style();
         obj
     }
 
-    fn update_attrs(&mut self) {
-        self.layout.set_text(self.text.text.clone());
-        self.layout.set_font(self.text.font.clone());
-        self.layout.set_text_alignment(self.text.alignment);
-        self.layout
-            .set_text_color(self.text.style.text_color.clone());
+    fn update_style(&mut self) {
+        let font_descriptor = FontDescriptor::new(self.style.family.clone())
+            .with_size(self.style.size)
+            .with_style(self.style.style)
+            .with_weight(self.style.weight);
+        self.layout.set_font(font_descriptor);
+        self.layout.set_text_alignment(self.style.alignment);
+        self.layout.set_text_color(self.style.color.clone());
     }
 
     /// Draw this label's text at the provided `Point`, without internal padding.
@@ -171,10 +121,15 @@ impl RenderObject<Text> for TextObject {
     }
 
     fn update(&mut self, ctx: &mut UpdateCtx, props: Text) {
-        if self.text != props {
-            self.text = props;
+        if self.layout.text() != Some(&props.text) {
+            self.layout.set_text(props.text);
             ctx.request_layout();
-            self.update_attrs();
+        }
+
+        if self.style != props.style {
+            self.style = props.style;
+            self.update_style();
+            ctx.request_layout();
         }
 
         if self.layout.layout().is_none() {
@@ -194,7 +149,7 @@ impl RenderObjectInterface for TextObject {
         let bc: BoxConstraints = c.into();
         bc.debug_check("Label");
 
-        let width = match self.text.style.line_break {
+        let width = match self.style.line_breaking {
             LineBreaking::WordWrap => bc.max().width - LABEL_X_PADDING * 2.0,
             _ => f64::INFINITY,
         };
@@ -216,7 +171,7 @@ impl RenderObjectInterface for TextObject {
         let origin = Point::new(LABEL_X_PADDING, 0.0);
         let label_size = ctx.size();
 
-        if self.text.style.line_break == LineBreaking::Clip {
+        if self.style.line_breaking == LineBreaking::Clip {
             ctx.clip(label_size.to_rect());
         }
         self.draw_at(ctx, origin)

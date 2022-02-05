@@ -11,10 +11,12 @@ pub mod ext_event;
 pub mod id;
 pub mod key;
 pub mod lifecycle;
+mod live_style;
 pub mod menu;
 pub mod object;
 pub mod perf;
 pub mod sliver_constraints;
+mod style;
 pub mod text;
 pub mod tree;
 pub mod ui;
@@ -23,8 +25,11 @@ pub mod window;
 
 use app::WindowDesc;
 use druid_shell::kurbo::{Point, Size};
+
 use menu::mac::menu_bar;
-use widgets::text::TextStyle;
+
+use live_style::live_style;
+use style::TextStyle;
 
 use crate::app::AppLauncher;
 use crate::ui::Ui;
@@ -45,14 +50,14 @@ fn win(ui: &mut Ui) {
         //     .on_changed(move |val| text_val.set(format!("{val}")))
         //     .build(ui);
 
-        let style = ui.state_node(|| TextStyle::default());
+        let style = live_style(ui, "a");
         let _i = 1;
         for i in 0..(*count as usize) {
             let count2 = ui.state_node(|| 0isize);
             text(
                 ui,
                 &format!("label {}, count: {}", i, *count2),
-                (*style).clone(),
+                style.clone(),
             );
 
             button(ui, &format!("button{i}, click to incr你好"), move || {
