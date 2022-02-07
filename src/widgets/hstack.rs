@@ -4,6 +4,7 @@ use druid_shell::kurbo::{Point, Size};
 
 use crate::box_constraints::BoxConstraints;
 use crate::constraints::Constraints;
+use crate::style::alignment::VerticalAlignment;
 use crate::{
     context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx},
     event::Event,
@@ -12,15 +13,6 @@ use crate::{
     tree::Children,
     ui::Ui,
 };
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum VerticalAlignment {
-    Bottom,
-    Center,
-    // FirstTextBaseline,
-    // LastTextBaseline,
-    Top,
-}
 
 /// A widget that just adds padding around its child.
 #[derive(Debug, Clone, Copy, PartialEq)]

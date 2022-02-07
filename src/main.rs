@@ -6,6 +6,7 @@ pub mod box_constraints;
 pub mod command;
 pub mod constraints;
 pub mod context;
+mod debug_state;
 pub mod event;
 pub mod ext_event;
 pub mod id;
@@ -24,25 +25,33 @@ pub mod widgets;
 pub mod window;
 
 use app::WindowDesc;
-use druid_shell::kurbo::{Point, Size};
+use druid_shell::kurbo::{Insets, Point, Size};
 
+use druid_shell::piet::Color;
 use menu::mac::menu_bar;
 
 use live_style::live_style;
-use style::TextStyle;
+use style::alignment::HorizontalAlignment;
+use style::{draw, Style};
+use widgets::background::Background;
+use widgets::flex::{self, Flex};
+use widgets::padding::Padding;
+use widgets::sized_box::SizedBox;
 
 use crate::app::AppLauncher;
 use crate::ui::Ui;
 use crate::widgets::button::Button;
-use crate::widgets::hstack::{HStack, VerticalAlignment};
+
 use crate::widgets::scroll_view::ScrollView;
 use crate::widgets::text::Text;
 
-use crate::widgets::vstack::{HorizontalAlignment, VStack};
+use crate::widgets::vstack::VStack;
 
 fn win(ui: &mut Ui) {
     // scroll_view(ui, |ui| {
-    vstack(ui, |ui| {
+    let flex_style: Style = live_style(ui, ".flex");
+
+    flex(ui, flex_style, |ui| {
         let count = ui.state_node(|| 0isize);
         // let text_val = ui.state_node(|| "haha".to_string());
         // TextBox::new((*text_val).clone())
@@ -50,7 +59,7 @@ fn win(ui: &mut Ui) {
         //     .on_changed(move |val| text_val.set(format!("{val}")))
         //     .build(ui);
 
-        let style = live_style(ui, "a");
+        let style = live_style(ui, ".text");
         let _i = 1;
         for i in 0..(*count as usize) {
             let count2 = ui.state_node(|| 0isize);
@@ -91,16 +100,21 @@ fn vstack(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
     VStack::new(10., HorizontalAlignment::Center).build(ui, content);
 }
 
-fn hstack(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
-    HStack::new(10., VerticalAlignment::Center).build(ui, content);
+fn flex(ui: &mut Ui, style: Style, content: impl FnMut(&mut Ui)) {
+    Flex::new(style).build(ui, content);
 }
 
-fn text(ui: &mut Ui, text: &str, style: TextStyle) {
+fn text(ui: &mut Ui, text: &str, style: Style) {
     Text::new(text).style(style).build(ui);
 }
 
 fn button<'a>(ui: &'a mut Ui<'_>, text: &str, click: impl FnMut() + 'static) {
     Button::new().labeled(ui, text, click);
+}
+
+fn test(ui: &mut Ui) {
+    let style = live_style(ui, ".text");
+    Padding::new(Insets::uniform(100.)).build(ui, |ui| button(ui, "incr buttons", move || {}));
 }
 
 fn main() {

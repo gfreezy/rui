@@ -548,7 +548,7 @@ impl WindowHandler {
 }
 
 impl WinHandler for WindowHandler {
-    #[instrument(skip(self, handle))]
+    // #[instrument(skip(self, handle))]
     fn connect(&mut self, handle: &WindowHandle) {
         self.app_state
             .connect_window(self.window_id, handle.clone());

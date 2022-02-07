@@ -4,9 +4,10 @@ use std::panic::Location;
 
 use druid_shell::kurbo::{Point, Size};
 
-
 use crate::box_constraints::BoxConstraints;
 use crate::constraints::Constraints;
+
+use crate::style::alignment::HorizontalAlignment;
 use crate::{
     context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx},
     event::Event,
@@ -15,13 +16,6 @@ use crate::{
     tree::Children,
     ui::Ui,
 };
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum HorizontalAlignment {
-    Leading,
-    Trailing,
-    Center,
-}
 
 /// A widget that just adds padding around its child.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -91,9 +85,9 @@ impl RenderObjectInterface for VStack {
         for child in children.iter() {
             let child_size = child.size();
             let x = match self.alignment {
-                HorizontalAlignment::Leading => 0.,
+                HorizontalAlignment::Start => 0.,
                 HorizontalAlignment::Center => (total_width - child_size.width) / 2.,
-                HorizontalAlignment::Trailing => total_width - child_size.width,
+                HorizontalAlignment::End => total_width - child_size.width,
             };
 
             child.set_origin(ctx, Point::new(x, y));

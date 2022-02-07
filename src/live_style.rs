@@ -1,6 +1,8 @@
+
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
+
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -12,7 +14,8 @@ use once_cell::sync::OnceCell;
 use tracing::{debug, error};
 
 use crate::ext_event::ExtEventSink;
-use crate::style::TextStyle;
+
+use crate::style::{parse_style_content, Style};
 use crate::ui::Ui;
 
 #[derive(Clone)]
@@ -64,9 +67,20 @@ impl StyleWatcher {
         self.ext_handle.add_idle_callback(|| {});
     }
 
-    fn get_style(&self, _name: &str) -> TextStyle {
+    fn get_style(&self, name: &str) -> Style {
         let content = self.content.lock().unwrap();
-        content.parse().unwrap_or_default()
+        let styles = match parse_style_content(&content) {
+            Ok(s) => s,
+            Err(e) => {
+                error!("parse style error: {}", e);
+                Default::default()
+            }
+        };
+        styles
+            .into_iter()
+            .find(|s| s.name == name)
+            .map(|v| v.into())
+            .unwrap_or_default()
     }
 
     fn get_or_init(ui: &mut Ui) -> &'static StyleWatcher {
@@ -76,7 +90,7 @@ impl StyleWatcher {
     }
 }
 
-pub fn live_style(ui: &mut Ui, name: &str) -> TextStyle {
+pub(crate) fn live_style(ui: &mut Ui, name: &str) -> Style {
     let instance = StyleWatcher::get_or_init(ui);
     instance.get_style(name)
 }

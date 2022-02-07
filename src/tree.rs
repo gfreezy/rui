@@ -1,4 +1,5 @@
 use std::any::type_name;
+use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Deref;
 
@@ -11,9 +12,11 @@ use bumpalo::Bump;
 use druid_shell::kurbo::{Affine, Insets, Point, Rect, Shape, Size, Vec2};
 use druid_shell::piet::{Color, LineJoin, PaintBrush, RenderContext, StrokeStyle};
 use druid_shell::{Region, TimerToken};
+use tracing::debug;
 
 use crate::constraints::Constraints;
 use crate::context::{ContextState, EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx};
+use crate::debug_state::DebugState;
 use crate::event::Event;
 use crate::id::ChildId;
 use crate::key::Caller;
@@ -196,6 +199,24 @@ impl Child {
             children: Children::new(),
             state: ChildState::new(id, None),
             dead: false,
+        }
+    }
+
+    #[doc(hidden)]
+    /// From the current data, get a best-effort description of the state of
+    /// this widget and its children for debugging purposes.
+    pub(crate) fn debug_state(&mut self) -> DebugState {
+        let children = self.children.iter().map(|c| c.debug_state()).collect();
+        let mut map = HashMap::new();
+        map.insert("key".to_string(), format!("{:?}", self.key));
+        map.insert("id".to_string(), format!("{:?}", self.state.id));
+        map.insert("origin".to_string(), format!("{:?}", self.state.origin));
+        map.insert("size".to_string(), format!("{:?}", self.state.size));
+        DebugState {
+            display_name: self.name().to_string(),
+            children,
+            other_values: map,
+            ..Default::default()
         }
     }
 }
@@ -381,13 +402,21 @@ impl ChildState {
             .layout_rect()
             .with_origin(Point::ORIGIN)
             .inset(self.paint_insets);
-        // let offset = child_state.layout_rect().origin().to_vec2() - child_state.viewport_offset;
-        let offset = Vec2::ZERO;
+        let offset = child_state.layout_rect().origin().to_vec2() - child_state.viewport_offset;
         for &r in child_state.invalid.rects() {
-            let r = (r + offset).intersect(clip);
+            let r = (dbg!(r) + dbg!(offset)).intersect(clip);
             if r.area() != 0.0 {
                 self.invalid.add_rect(r);
             }
+        }
+
+        if !child_state.invalid.is_empty() {
+            tracing::debug!(
+                "merge up: child invalid: {:?}, parent invalid: {:?}, clip: {:?}",
+                child_state.invalid,
+                self.invalid,
+                clip
+            );
         }
         // Clearing the invalid rects here is less fragile than doing it while painting. The
         // problem is that widgets (for example, Either) might choose not to paint certain
@@ -408,6 +437,10 @@ impl ChildState {
 /// [`RenderObject`] API for `Child` nodes.
 impl Child {
     pub fn event(&mut self, ctx: &mut EventCtx, event: &Event) {
+        let object_name = self.object.name();
+        let span = tracing::span!(tracing::Level::DEBUG, "event", object_name);
+        let _h = span.enter();
+
         if ctx.is_handled {
             // This function is called by containers to propagate an event from
             // containers to children. Non-recurse events will be invoked directly
@@ -542,9 +575,9 @@ impl Child {
         let span = tracing::span!(tracing::Level::DEBUG, "layout", ?c, object_name);
         let _h = span.enter();
 
-        if !self.state.needs_layout {
-            return self.state.size;
-        }
+        // if !self.state.needs_layout {
+        //     return self.state.size;
+        // }
 
         self.state.needs_layout = false;
 
@@ -561,6 +594,10 @@ impl Child {
     }
 
     pub fn paint(&mut self, ctx: &mut PaintCtx) {
+        let object_name = self.object.name();
+        let span = tracing::span!(tracing::Level::DEBUG, "paint", object_name);
+        let _h = span.enter();
+
         ctx.with_save(|ctx| {
             let layout_origin = self.layout_rect().origin().to_vec2();
             ctx.transform(Affine::translate(layout_origin));
@@ -583,10 +620,6 @@ impl Child {
     /// [`Widget::paint`]: trait.Widget.html#tymethod.paint
     /// [`paint`]: #method.paint
     pub fn paint_raw(&mut self, ctx: &mut PaintCtx) {
-        let object_name = self.object.name();
-        let span = tracing::span!(tracing::Level::DEBUG, "paint_raw", object_name);
-        let _h = span.enter();
-
         let mut inner_ctx = PaintCtx {
             render_ctx: ctx.render_ctx,
             context_state: ctx.context_state,
@@ -595,18 +628,19 @@ impl Child {
         };
         self.object.paint(&mut inner_ctx, &mut self.children);
 
+        debug!("layout rect: {:?}", self.layout_rect());
         let rect = inner_ctx.size().to_rect();
 
         const STYLE: StrokeStyle = StrokeStyle::new()
             .dash_pattern(&[4.0, 2.0])
             .dash_offset(8.0)
             .line_join(LineJoin::Round);
-        inner_ctx.render_ctx.stroke_styled(
-            rect,
-            &PaintBrush::Color(Color::rgb8(0, 0, 0)),
-            1.,
-            &STYLE,
-        );
+        // inner_ctx.render_ctx.stroke_styled(
+        //     rect,
+        //     &PaintBrush::Color(Color::rgb8(0, 0, 0)),
+        //     1.,
+        //     &STYLE,
+        // );
     }
 
     pub(crate) fn needs_update(&self) -> bool {

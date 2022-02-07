@@ -11,7 +11,8 @@ use crate::context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx};
 use crate::event::Event;
 use crate::lifecycle::LifeCycle;
 use crate::object::{Properties, RenderObject, RenderObjectInterface};
-use crate::style::{LineBreaking, TextStyle};
+use crate::style::text::LineBreaking;
+use crate::style::Style;
 use crate::text::font_descriptor::FontDescriptor;
 use crate::text::layout::TextLayout;
 use crate::tree::Children;
@@ -29,7 +30,7 @@ const LABEL_X_PADDING: f64 = 2.0;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Text {
     text: String,
-    style: TextStyle,
+    style: Style,
 }
 
 impl Properties for Text {
@@ -41,11 +42,11 @@ impl Text {
     pub fn new(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
-            style: TextStyle::default(),
+            style: Style::default(),
         }
     }
 
-    pub fn style(mut self, style: TextStyle) -> Self {
+    pub fn style(mut self, style: Style) -> Self {
         self.style = style;
         self
     }
@@ -58,7 +59,7 @@ impl Text {
 }
 
 pub struct TextObject {
-    style: TextStyle,
+    style: Style,
     layout: TextLayout<String>,
 }
 
@@ -75,12 +76,12 @@ impl TextObject {
     }
 
     fn update_style(&mut self) {
-        let font_descriptor = FontDescriptor::new(self.style.family.clone())
-            .with_size(self.style.size)
-            .with_style(self.style.style)
-            .with_weight(self.style.weight);
+        let font_descriptor = FontDescriptor::new(self.style.font_family.clone())
+            .with_size(self.style.font_size.into())
+            .with_style(self.style.font_style)
+            .with_weight(self.style.font_weight);
         self.layout.set_font(font_descriptor);
-        self.layout.set_text_alignment(self.style.alignment);
+        self.layout.set_text_alignment(self.style.text_alignment);
         self.layout.set_text_color(self.style.color.clone());
     }
 

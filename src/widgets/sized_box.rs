@@ -3,6 +3,7 @@
 use std::panic::Location;
 
 use druid_shell::kurbo::Size;
+use tracing::debug;
 
 use crate::box_constraints::BoxConstraints;
 use crate::constraints::Constraints;
@@ -10,6 +11,7 @@ use crate::context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx};
 use crate::event::Event;
 use crate::lifecycle::LifeCycle;
 use crate::object::{Properties, RenderObject, RenderObjectInterface};
+use crate::style::size::{Height, MaxHeight, MaxWidth, MinHeight, MinWidth, Width};
 use crate::tree::Children;
 use crate::ui::Ui;
 
@@ -24,8 +26,12 @@ use crate::ui::Ui;
 /// it will be treated as zero.
 #[derive(Debug, Default, PartialEq)]
 pub struct SizedBox {
-    width: Option<f64>,
-    height: Option<f64>,
+    width: Width,
+    height: Height,
+    min_width: MinWidth,
+    max_width: MaxWidth,
+    min_height: MinHeight,
+    max_height: MaxHeight,
     clip: bool,
 }
 
@@ -35,8 +41,23 @@ impl Properties for SizedBox {
 
 impl SizedBox {
     /// Construct container with child, and both width and height not set.
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(
+        width: Width,
+        height: Height,
+        min_width: MinWidth,
+        max_width: MaxWidth,
+        min_height: MinHeight,
+        max_height: MaxHeight,
+    ) -> Self {
+        SizedBox {
+            width,
+            height,
+            min_width,
+            max_width,
+            min_height,
+            max_height,
+            clip: true,
+        }
     }
 
     #[track_caller]
@@ -45,112 +66,65 @@ impl SizedBox {
         ui.render_object(caller, self, content);
     }
 
-    #[track_caller]
-    pub fn empty(self, cx: &mut Ui) {
-        let caller = Location::caller().into();
-        cx.render_object(caller, self, |_| {});
-    }
-
     /// Clip area.
     pub fn clip(mut self) -> Self {
         self.clip = true;
-        self
-    }
-
-    /// Set container's width.
-    pub fn width(mut self, width: f64) -> Self {
-        self.width = Some(width);
-        self
-    }
-
-    /// Set container's height.
-    pub fn height(mut self, height: f64) -> Self {
-        self.height = Some(height);
-        self
-    }
-
-    /// Expand container to fit the parent.
-    ///
-    /// Only call this method if you want your widget to occupy all available
-    /// space. If you only care about expanding in one of width or height, use
-    /// [`expand_width`] or [`expand_height`] instead.
-    ///
-    /// [`expand_height`]: #method.expand_height
-    /// [`expand_width`]: #method.expand_width
-    pub fn expand(mut self) -> Self {
-        self.width = Some(f64::INFINITY);
-        self.height = Some(f64::INFINITY);
-        self
-    }
-
-    /// Expand the container on the x-axis.
-    ///
-    /// This will force the child to have maximum width.
-    pub fn expand_width(mut self) -> Self {
-        self.width = Some(f64::INFINITY);
-        self
-    }
-
-    /// Expand the container on the y-axis.
-    ///
-    /// This will force the child to have maximum height.
-    pub fn expand_height(mut self) -> Self {
-        self.height = Some(f64::INFINITY);
         self
     }
 }
 
 #[derive(Debug, Default, PartialEq)]
 pub struct SizedBoxObject {
-    width: Option<f64>,
-    height: Option<f64>,
-    clip: bool,
+    props: SizedBox,
 }
 
-impl SizedBoxObject {
-    fn child_constraints(&self, bc: &BoxConstraints) -> BoxConstraints {
-        // if we don't have a width/height, we don't change that axis.
-        // if we have a width/height, we clamp it on that axis.
-        let (min_width, max_width) = match self.width {
-            Some(width) => {
-                let w = width.max(bc.min().width).min(bc.max().width);
-                (w, w)
-            }
-            None => (bc.min().width, bc.max().width),
-        };
+fn child_constraints(
+    c: &BoxConstraints,
+    fixed_width: f64,
+    fixed_height: f64,
+    min_width: f64,
+    min_height: f64,
+    max_width: f64,
+    max_height: f64,
+) -> BoxConstraints {
+    let mut min_size = c.min();
+    let mut max_size = c.max();
 
-        let (min_height, max_height) = match self.height {
-            Some(height) => {
-                let h = height.max(bc.min().height).min(bc.max().height);
-                (h, h)
-            }
-            None => (bc.min().height, bc.max().height),
-        };
-
-        BoxConstraints::new(
-            Size::new(min_width, min_height),
-            Size::new(max_width, max_height),
-        )
+    if !min_width.is_nan() {
+        min_size.width = min_width;
     }
+    if !min_height.is_nan() {
+        min_size.height = min_height;
+    }
+    if !max_width.is_nan() {
+        max_size.width = max_width;
+    }
+    if !max_height.is_nan() {
+        max_size.height = max_height;
+    }
+    if !fixed_width.is_nan() {
+        min_size.width = fixed_width;
+        max_size.width = fixed_width;
+    }
+    if !fixed_height.is_nan() {
+        min_size.height = fixed_height;
+        max_size.height = fixed_height;
+    }
+    BoxConstraints::new(min_size, max_size)
 }
 
 impl RenderObject<SizedBox> for SizedBoxObject {
     type Action = ();
 
     fn create(props: SizedBox) -> Self {
-        SizedBoxObject {
-            width: props.width,
-            height: props.height,
-            clip: props.clip,
-        }
+        SizedBoxObject { props }
     }
 
     fn update(&mut self, ctx: &mut UpdateCtx, props: SizedBox) {
-        if self.width != props.width || self.height != props.height || self.clip != props.clip {
+        if &self.props != &props {
             ctx.request_layout();
-            self.width = props.width;
-            self.height = props.height;
-            self.clip = props.clip;
+            self.props = props;
+            debug!("request layout");
         }
     }
 }
@@ -168,22 +142,30 @@ impl RenderObjectInterface for SizedBoxObject {
     fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, children: &mut Children) -> Size {
         let bc: BoxConstraints = c.into();
         bc.debug_check("SizedBox");
-
-        let _child_bc = self.child_constraints(&bc);
-        let size = match children.get_mut(0) {
-            Some(inner) => inner.layout(ctx, c),
-            None => bc.constrain((self.width.unwrap_or(0.0), self.height.unwrap_or(0.0))),
+        let props = &self.props;
+        let new_bc = child_constraints(
+            &bc,
+            props.width.into(),
+            props.height.into(),
+            props.min_width.into(),
+            props.min_height.into(),
+            props.max_width.into(),
+            props.max_height.into(),
+        );
+        let child_bc = new_bc.loosen();
+        let size = if !children.is_empty() {
+            children[0].layout(ctx, &(child_bc.into()))
+        } else {
+            Size::ZERO
         };
-
-        if size.width.is_infinite() {
-            tracing::warn!("SizedBox is returning an infinite width.");
+        let mut new_size = new_bc.constrain(size);
+        if props.width.is_normal() {
+            new_size.width = props.width.value();
         }
-
-        if size.height.is_infinite() {
-            tracing::warn!("SizedBox is returning an infinite height.");
+        if props.height.is_normal() {
+            new_size.height = props.height.value();
         }
-
-        size
+        new_size
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children) {

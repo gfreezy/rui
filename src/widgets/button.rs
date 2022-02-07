@@ -3,6 +3,7 @@ use std::panic::Location;
 use druid_shell::kurbo::{Point, Size};
 use druid_shell::piet::{Color, PaintBrush, RenderContext};
 use druid_shell::MouseButton;
+use tracing::debug;
 
 use crate::box_constraints::BoxConstraints;
 use crate::constraints::Constraints;
@@ -88,7 +89,7 @@ impl RenderObject<Button> for ButtonObject {
             props,
             label_size: Size::ZERO,
             border_color: Color::BLACK,
-            background_color: Color::WHITE,
+            background_color: Color::GREEN,
         }
     }
 
@@ -132,8 +133,10 @@ impl RenderObjectInterface for ButtonObject {
             LifeCycle::HotChanged(hot) => {
                 if *hot {
                     self.background_color = Color::RED;
+                    debug!("on hover");
                 } else {
                     self.background_color = Color::WHITE;
+                    debug!("off hover");
                 }
                 ctx.request_paint();
             }
@@ -161,20 +164,19 @@ impl RenderObjectInterface for ButtonObject {
 
     fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children) {
         let size = ctx.size();
-        let stroke_width = 1.0;
+        let stroke_width = 2.0;
 
-        let rounded_rect = size
-            .to_rect()
-            .inset(-stroke_width / 2.0)
-            .to_rounded_rect(1.0);
+        let rect = size.to_rect().inset(-stroke_width / 2.0);
 
         let border_color = PaintBrush::Color(self.border_color.clone());
 
-        ctx.stroke(rounded_rect, &border_color, stroke_width);
+        ctx.stroke(rect, &border_color, stroke_width);
 
-        ctx.fill(
-            rounded_rect,
-            &PaintBrush::Color(self.background_color.clone()),
+        ctx.fill(rect, &PaintBrush::Color(self.background_color.clone()));
+        debug!(
+            "fill {:?}, layout rect: {:?}",
+            rect,
+            ctx.child_state.layout_rect()
         );
         children[0].paint(ctx);
     }

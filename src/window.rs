@@ -5,7 +5,7 @@ use druid_shell::{
     piet::{Color, PaintBrush, Piet, RenderContext},
     Region, WindowHandle,
 };
-use tracing::{instrument};
+use tracing::instrument;
 
 use crate::{
     app::{PendingWindow, WindowSizePolicy},
@@ -78,7 +78,7 @@ impl Window {
 
     pub(crate) fn prepare_paint(&mut self) {}
 
-    #[instrument(skip(self, piet))]
+    // #[instrument(skip(self, piet))]
     pub(crate) fn paint(&mut self, piet: &mut Piet, invalid: &Region, queue: &mut CommandQueue) {
         if self.root.needs_layout() {
             // debug!("layout");
@@ -112,7 +112,7 @@ impl Window {
         draw_fps(self.fps_counter.tick(), handle.get_size(), &mut paint_ctx);
     }
 
-    #[instrument(skip(self))]
+    // #[instrument(skip(self))]
     pub(crate) fn layout(&mut self, command_queue: &mut CommandQueue) {
         let Self {
             handle,
@@ -143,7 +143,7 @@ impl Window {
         invalid.union_with(&root_state.invalid);
     }
 
-    #[instrument(skip(self))]
+    // #[instrument(skip(self))]
     pub(crate) fn event(&mut self, queue: &mut CommandQueue, event: Event) -> Handled {
         // debug!("event");
         match &event {
@@ -180,7 +180,7 @@ impl Window {
 
         self.root.event(&mut event_ctx, &event);
         let is_handled = event_ctx.is_handled;
-        invalid.union_with(&root_state.invalid);
+        invalid.union_with(&dbg!(root_state.invalid));
 
         if matches!(
             (event, self.size_policy),
@@ -244,6 +244,8 @@ impl Window {
         for child in &mut root.children {
             root.state.merge_up(&mut child.state);
         }
+
+        // println!("{:#?}", root.debug_state());
     }
 
     pub(crate) fn invalidate_and_finalize(&mut self) {
@@ -255,12 +257,12 @@ impl Window {
         } = self;
 
         if root.needs_layout() {
-            // debug!("needs layout");
+            tracing::debug!("needs layout");
             handle.invalidate();
         } else {
             let invalid_rect = invalid.bounding_box();
             handle.invalidate_rect(invalid_rect);
-            // debug!("invalidate rect: {invalid_rect}");
+            tracing::debug!("invalidate rect: {invalid_rect}");
         }
         invalid.clear();
     }

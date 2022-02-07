@@ -1,4 +1,3 @@
-#[macro_export]
 macro_rules! clone {
     (@as_expr $e:expr) => { $e };
 

@@ -1,4 +1,6 @@
+pub mod background;
 pub mod button;
+pub mod flex;
 pub mod hstack;
 pub mod padding;
 pub mod scroll_view;

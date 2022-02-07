@@ -150,9 +150,10 @@ impl_context_method!(EventCtx<'_>, UpdateCtx<'_>, LifeCycleCtx<'_>, {
     /// [`request_paint_rect`]: #method.request_paint_rect
     /// [`paint_rect`]: struct.WidgetPod.html#method.paint_rect
     pub fn request_paint(&mut self) {
-        self.child_state
-            .invalid
-            .set_rect(self.child_state.paint_rect());
+        self.child_state.invalid.set_rect(
+            self.child_state.paint_rect() - self.child_state.layout_rect().origin().to_vec2(),
+        );
+        tracing::debug!("request paint: {:?}", self.child_state.paint_rect());
     }
 
     /// Request a [`paint`] pass for redrawing a rectangle, which is given
