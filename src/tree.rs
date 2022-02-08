@@ -404,7 +404,7 @@ impl ChildState {
             .inset(self.paint_insets);
         let offset = child_state.layout_rect().origin().to_vec2() - child_state.viewport_offset;
         for &r in child_state.invalid.rects() {
-            let r = (dbg!(r) + dbg!(offset)).intersect(clip);
+            let r = (r + offset).intersect(clip);
             if r.area() != 0.0 {
                 self.invalid.add_rect(r);
             }

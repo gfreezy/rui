@@ -180,7 +180,7 @@ impl Window {
 
         self.root.event(&mut event_ctx, &event);
         let is_handled = event_ctx.is_handled;
-        invalid.union_with(&dbg!(root_state.invalid));
+        invalid.union_with(&root_state.invalid);
 
         if matches!(
             (event, self.size_policy),
@@ -262,7 +262,9 @@ impl Window {
         } else {
             let invalid_rect = invalid.bounding_box();
             handle.invalidate_rect(invalid_rect);
-            tracing::debug!("invalidate rect: {invalid_rect}");
+            if !invalid_rect.is_empty() {
+                tracing::debug!("invalidate rect: {invalid_rect}");
+            }
         }
         invalid.clear();
     }
