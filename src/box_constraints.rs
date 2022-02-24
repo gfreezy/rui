@@ -14,7 +14,7 @@
 
 //! The fundamental druid types.
 
-use std::panic::Location;
+
 
 use druid_shell::kurbo::Size;
 

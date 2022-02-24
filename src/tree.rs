@@ -10,9 +10,9 @@ use std::{
 
 use bumpalo::Bump;
 use druid_shell::kurbo::{Affine, Insets, Point, Rect, Shape, Size, Vec2};
-use druid_shell::piet::{LineJoin, RenderContext, StrokeStyle};
+use druid_shell::piet::{RenderContext};
 use druid_shell::{Region, TimerToken};
-use tracing::debug;
+
 
 use crate::constraints::Constraints;
 use crate::context::{ContextState, EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx};

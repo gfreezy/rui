@@ -112,9 +112,9 @@ impl RenderObjectInterface for ScrollViewObject {
 
     fn dry_layout(
         &mut self,
-        ctx: &mut LayoutCtx,
+        _ctx: &mut LayoutCtx,
         _c: &Constraints,
-        children: &mut Children,
+        _children: &mut Children,
     ) -> Size {
         self.viewport
     }
