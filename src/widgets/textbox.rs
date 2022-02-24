@@ -23,6 +23,7 @@ pub struct TextBox {
     editable: String,
     alignment: TextAlignment,
     text_size: f64,
+    width: Option<f64>,
     on_changed: Box<dyn FnMut(String) + 'static>,
 }
 
@@ -40,6 +41,7 @@ impl TextBox {
             alignment: TextAlignment::Start,
             on_changed: Box::new(|_| {}),
             text_size: 14.,
+            width: None,
         }
     }
 
@@ -80,6 +82,7 @@ pub struct TextBoxObject {
     alignment: TextAlignment,
     text_size: f64,
     activated: bool,
+    width: Option<f64>,
 
     // this can be Box<dyn TextInput> in the future
     input_handler: BasicTextInput,
@@ -126,7 +129,7 @@ impl RenderObject<TextBox> for TextBoxObject {
             input_handler: BasicTextInput::default(),
             activated: false,
             text_size: props.text_size,
-
+            width: props.width,
             hscroll_offset: 0.,
             suppress_adjust_hscroll: false,
             cursor_timer: TimerToken::INVALID,
@@ -150,7 +153,10 @@ impl RenderObject<TextBox> for TextBoxObject {
             self.editor.layout_mut().set_text_size(props.text_size);
             ctx.request_layout();
         }
-
+        if props.width != self.width {
+            self.width = props.width;
+            ctx.request_layout();
+        }
         if Some(&props.placeholder) != self.placeholder.text() {
             self.placeholder.set_text(props.placeholder.to_owned());
             ctx.request_layout();
@@ -262,18 +268,53 @@ impl RenderObjectInterface for TextBoxObject {
     fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _children: &mut Children) {
     }
 
+    fn dry_layout(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        c: &Constraints,
+        _children: &mut Children,
+    ) -> Size {
+        let bc: BoxConstraints = c.into();
+
+        let width = self.width.unwrap_or(f64::INFINITY);
+
+        self.placeholder.rebuild_if_needed(&mut ctx.text());
+        if self.editor.multiline() {
+            self.editor.set_wrap_width(bc.max().width.min(width));
+        }
+        self.editor.rebuild_if_needed(&mut ctx.text());
+
+        let text_metrics = if self.text.is_empty() {
+            self.placeholder.layout_metrics()
+        } else {
+            self.editor.layout().layout_metrics()
+        };
+
+        let height = text_metrics.size.height;
+        let size = bc.constrain((width, height));
+        // if we have a non-left text-alignment, we need to manually adjust our position.
+        self.update_alignment_adjustment(size.width, &text_metrics);
+
+        let bottom_padding = (size.height - text_metrics.size.height) / 2.0;
+        let baseline_off =
+            bottom_padding + (text_metrics.size.height - text_metrics.first_baseline);
+        ctx.set_baseline_offset(baseline_off);
+
+        size
+    }
+
     fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, _children: &mut Children) -> Size {
         let bc: BoxConstraints = c.into();
 
         let width = 200.0;
         let text_insets = Insets::uniform(3.0);
 
-        self.placeholder.rebuild_if_needed(ctx.text());
+        self.placeholder.rebuild_if_needed(&mut ctx.text());
         if self.editor.multiline() {
             self.editor
                 .set_wrap_width(bc.max().width - text_insets.x_value());
         }
-        self.editor.rebuild_if_needed(ctx.text());
+        self.editor.rebuild_if_needed(&mut ctx.text());
 
         let text_metrics = if self.text.is_empty() {
             self.placeholder.layout_metrics()

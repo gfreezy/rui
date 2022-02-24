@@ -49,7 +49,7 @@ macro_rules! alt {
 /// );
 /// ```
 macro_rules! style_parser {
-    ($fun:tt, $ty:ty, [$($attr_name:tt => $parse_fun:tt => $field_ty:ty),*]) => {
+    ($fun:tt, $ty:ty, [$($attr_name:tt => $parse_fun:tt => $field_ty:ty),* $(,)?]) => {
 
         pub(crate) fn $fun(input: &str) -> nom::IResult<&str, $ty> {
             let attrs = std::rc::Rc::new(std::cell::RefCell::new(anymap2::AnyMap::new()));
@@ -121,10 +121,49 @@ macro_rules! simple_attr_parser {
 
 ///
 /// ```rust
+/// enum_type!(Layout => [Flex, Default], Default, parse_layout)
+/// ```
+macro_rules! enum_type {
+    ($enum_ty:tt => [$($variant:tt),*$(,)?], $default:tt, $parser_name:tt) => {
+        #[derive(Debug, Clone, Copy, PartialEq)]
+        pub enum $enum_ty {
+            $($variant),*
+        }
+        impl Default for $enum_ty {
+            fn default() -> Self {
+                $enum_ty::$default
+            }
+        }
+
+        pub(crate) fn $parser_name<'a>(input: &'a str) -> IResult<&'a str, $enum_ty> {
+            fn parse_kebab_case(name: &str) -> impl FnMut(&str) -> nom::IResult<&str, &str> {
+                use convert_case::Casing;
+                let kebab_case = name.to_case(convert_case::Case::Kebab);
+
+                let original = name.to_string();
+                move |input: &str| {
+                    nom::branch::alt((
+                        nom::bytes::complete::tag_no_case(original.as_str()),
+                        nom::bytes::complete::tag_no_case(kebab_case.as_str()),
+                    ))(input)
+                }
+            }
+
+            alt!(
+                $(
+                    nom::combinator::map(parse_kebab_case(std::stringify!($variant)), |_| $enum_ty::$variant)
+                ),*
+            )(input)
+        }
+    };
+}
+
+///
+/// ```rust
 /// enum_parser!(parse_layout, Layout => [Flex])
 /// ```
 macro_rules! enum_parser {
-    ($parser_name:tt, $enum_ty:tt => [$($variant:tt),*]) => {
+    ($parser_name:tt, $enum_ty:tt => [$($variant:tt),*$(,)?]) => {
         pub(crate) fn $parser_name<'a>(input: &'a str) -> IResult<&'a str, $enum_ty> {
             fn parse_kebab_case(name: &str) -> impl FnMut(&str) -> nom::IResult<&str, &str> {
                 use convert_case::Casing;

@@ -14,6 +14,8 @@
 
 //! The fundamental druid types.
 
+
+
 use druid_shell::kurbo::Size;
 
 /// Constraints for layout.
@@ -80,6 +82,18 @@ impl BoxConstraints {
         }
     }
 
+    /// Create a "tight" box constraints object for one or more dimensions.
+    ///
+    /// [rounded away from zero]: struct.Size.html#method.expand
+    pub fn tight_for(width: Option<f64>, height: Option<f64>) -> BoxConstraints {
+        match (width, height) {
+            (None, None) => BoxConstraints::UNBOUNDED,
+            (None, Some(h)) => BoxConstraints::new(Size::new(0., h), Size::new(f64::INFINITY, h)),
+            (Some(w), None) => BoxConstraints::new(Size::new(w, 0.), Size::new(w, f64::INFINITY)),
+            (Some(w), Some(h)) => BoxConstraints::tight(Size::new(w, h)),
+        }
+    }
+
     /// Create a "loose" version of the constraints.
     ///
     /// Make a version with zero minimum size, but the same maximum size.
@@ -105,9 +119,29 @@ impl BoxConstraints {
         self.max
     }
 
+    /// Returns the max width of these constraints.
+    pub fn max_width(&self) -> f64 {
+        self.max.width
+    }
+
+    /// Returns the max height of these constraints.
+    pub fn max_height(&self) -> f64 {
+        self.max.height
+    }
+
     /// Returns the min size of these constraints.
     pub fn min(&self) -> Size {
         self.min
+    }
+
+    /// Returns the min width of these constraints.
+    pub fn min_width(&self) -> f64 {
+        self.min.width
+    }
+
+    /// Returns the min height of these constraints.
+    pub fn min_height(&self) -> f64 {
+        self.min.height
     }
 
     /// Whether there is an upper bound on the width.
@@ -123,6 +157,7 @@ impl BoxConstraints {
     /// Check to see if these constraints are legit.
     ///
     /// Logs a warning if BoxConstraints are invalid.
+
     pub fn debug_check(&self, name: &str) {
         if !(0.0 <= self.min.width
             && self.min.width <= self.max.width

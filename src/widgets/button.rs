@@ -180,4 +180,23 @@ impl RenderObjectInterface for ButtonObject {
         );
         children[0].paint(ctx);
     }
+
+    fn dry_layout(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        c: &Constraints,
+        children: &mut Children,
+    ) -> Size {
+        let bc: BoxConstraints = c.into();
+        bc.debug_check("Button");
+
+        let padding = Size::new(2.0, 2.0);
+        let label_c: Constraints = bc.loosen().shrink(padding).into();
+        let label_size = children[0].dry_layout(ctx, &label_c);
+
+        let required_size = label_size + padding;
+        let size = bc.constrain(required_size);
+
+        size
+    }
 }

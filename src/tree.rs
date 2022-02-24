@@ -10,9 +10,9 @@ use std::{
 
 use bumpalo::Bump;
 use druid_shell::kurbo::{Affine, Insets, Point, Rect, Shape, Size, Vec2};
-use druid_shell::piet::{Color, LineJoin, PaintBrush, RenderContext, StrokeStyle};
+use druid_shell::piet::{RenderContext};
 use druid_shell::{Region, TimerToken};
-use tracing::debug;
+
 
 use crate::constraints::Constraints;
 use crate::context::{ContextState, EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx};
@@ -103,6 +103,9 @@ pub struct ChildState {
     /// The origin of the parent in the window coordinate space;
     pub(crate) parent_window_origin: Point,
 
+    /// The origin of the parent in the window coordinate space;
+    pub(crate) parent_data: Option<Box<dyn Any>>,
+
     /// The insets applied to the layout rect to generate the paint rect.
     /// In general, these will be zero; the exception is for things like
     /// drop shadows or overflowing text.
@@ -165,6 +168,14 @@ impl Children {
 
     pub fn get_mut(&mut self, index: usize) -> Option<&mut Child> {
         self.renders.get_mut(index)
+    }
+
+    pub fn first(&self) -> Option<&Child> {
+        self.renders.first()
+    }
+
+    pub fn last(&self) -> Option<&Child> {
+        self.renders.last()
     }
 
     pub fn iter(&mut self) -> ChildIter {
@@ -362,6 +373,7 @@ impl ChildState {
             baseline_offset: 0.,
             invalid: Region::EMPTY,
             viewport_offset: Vec2::ZERO,
+            parent_data: None,
             is_hot: false,
             is_active: false,
             has_active: false,
@@ -431,6 +443,24 @@ impl ChildState {
 
     pub(crate) fn window_origin(&self) -> Point {
         self.parent_window_origin + self.origin.to_vec2() - self.viewport_offset
+    }
+
+    pub(crate) fn parent_data<T: 'static>(&self) -> Option<&T> {
+        self.parent_data
+            .as_ref()
+            .map(|v| v.downcast_ref())
+            .flatten()
+    }
+
+    pub(crate) fn parent_data_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.parent_data
+            .as_mut()
+            .map(|v| v.downcast_mut())
+            .flatten()
+    }
+
+    pub(crate) fn set_parent_data(&mut self, parent_data: Option<Box<dyn Any>>) {
+        self.parent_data = parent_data;
     }
 }
 
@@ -570,6 +600,20 @@ impl Child {
             .lifecycle(&mut child_ctx, event, &mut self.children);
     }
 
+    pub fn dry_layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints) -> Size {
+        let object_name = self.object.name();
+        let span = tracing::span!(tracing::Level::DEBUG, "dry_layout", ?c, object_name);
+        let _h = span.enter();
+
+        let mut child_ctx = LayoutCtx {
+            context_state: ctx.context_state,
+            child_state: &mut self.state,
+        };
+
+        self.object
+            .dry_layout(&mut child_ctx, c, &mut self.children)
+    }
+
     pub fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints) -> Size {
         let object_name = self.object.name();
         let span = tracing::span!(tracing::Level::DEBUG, "layout", ?c, object_name);
@@ -607,49 +651,6 @@ impl Child {
             ctx.with_child_ctx(visible, |ctx| self.paint_raw(ctx));
         });
     }
-
-    /// Paint a child widget.
-    ///
-    /// Generally called by container widgets as part of their [`Widget::paint`]
-    /// method.
-    ///
-    /// Note that this method does not apply the offset of the layout rect.
-    /// If that is desired, use [`paint`] instead.
-    ///
-    /// [`layout`]: trait.Widget.html#tymethod.layout
-    /// [`Widget::paint`]: trait.Widget.html#tymethod.paint
-    /// [`paint`]: #method.paint
-    pub fn paint_raw(&mut self, ctx: &mut PaintCtx) {
-        let mut inner_ctx = PaintCtx {
-            render_ctx: ctx.render_ctx,
-            context_state: ctx.context_state,
-            region: ctx.region.clone(),
-            child_state: &self.state,
-        };
-        self.object.paint(&mut inner_ctx, &mut self.children);
-
-        debug!("layout rect: {:?}", self.layout_rect());
-        let rect = inner_ctx.size().to_rect();
-
-        const STYLE: StrokeStyle = StrokeStyle::new()
-            .dash_pattern(&[4.0, 2.0])
-            .dash_offset(8.0)
-            .line_join(LineJoin::Round);
-        // inner_ctx.render_ctx.stroke_styled(
-        //     rect,
-        //     &PaintBrush::Color(Color::rgb8(0, 0, 0)),
-        //     1.,
-        //     &STYLE,
-        // );
-    }
-
-    pub(crate) fn needs_update(&self) -> bool {
-        self.state.request_update
-    }
-
-    pub(crate) fn needs_layout(&self) -> bool {
-        self.state.needs_layout
-    }
 }
 
 /// Public API for child nodes.
@@ -671,7 +672,7 @@ impl Child {
         child: &mut dyn AnyRenderObject,
         child_state: &mut ChildState,
         children: &mut Children,
-        context_state: &mut ContextState,
+        context_state: &ContextState,
         rect: Rect,
         mouse_pos: Option<Point>,
     ) -> bool {
@@ -694,5 +695,60 @@ impl Child {
             return true;
         }
         false
+    }
+
+    /// Paint a child widget.
+    ///
+    /// Generally called by container widgets as part of their [`Widget::paint`]
+    /// method.
+    ///
+    /// Note that this method does not apply the offset of the layout rect.
+    /// If that is desired, use [`paint`] instead.
+    ///
+    /// [`layout`]: trait.Widget.html#tymethod.layout
+    /// [`Widget::paint`]: trait.Widget.html#tymethod.paint
+    /// [`paint`]: #method.paint
+    pub(crate) fn paint_raw(&mut self, ctx: &mut PaintCtx) {
+        let mut inner_ctx = PaintCtx {
+            render_ctx: ctx.render_ctx,
+            context_state: ctx.context_state,
+            region: ctx.region.clone(),
+            child_state: &mut self.state,
+        };
+        self.object.paint(&mut inner_ctx, &mut self.children);
+
+        // debug!("layout rect: {:?}", self.layout_rect());
+        // let _rect = inner_ctx.size().to_rect();
+
+        // const STYLE: StrokeStyle = StrokeStyle::new()
+        //     .dash_pattern(&[4.0, 2.0])
+        //     .dash_offset(8.0)
+        //     .line_join(LineJoin::Round);
+        // inner_ctx.render_ctx.stroke_styled(
+        //     rect,
+        //     &PaintBrush::Color(Color::rgb8(0, 0, 0)),
+        //     1.,
+        //     &STYLE,
+        // );
+    }
+
+    pub(crate) fn needs_update(&self) -> bool {
+        self.state.request_update
+    }
+
+    pub(crate) fn needs_layout(&self) -> bool {
+        self.state.needs_layout
+    }
+
+    pub(crate) fn parent_data<T: 'static>(&self) -> Option<&T> {
+        self.state.parent_data()
+    }
+
+    pub(crate) fn parent_data_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.state.parent_data_mut()
+    }
+
+    pub(crate) fn set_parent_data(&mut self, parent_data: Option<Box<dyn Any>>) {
+        self.state.set_parent_data(parent_data)
     }
 }

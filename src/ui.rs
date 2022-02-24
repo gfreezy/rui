@@ -11,16 +11,17 @@ use crate::tree::{Child, Children, State, StateNode};
 
 pub struct Ui<'a> {
     pub(crate) tree: &'a mut Children,
-    context_state: &'a mut ContextState,
+    context_state: &'a ContextState,
     child_counter: &'a mut ChildCounter,
     state_index: usize,
     render_index: usize,
+    parent_data: Option<Box<dyn Any>>,
 }
 
 impl<'a> Ui<'a> {
     pub(crate) fn new(
         tree: &'a mut Children,
-        context_state: &'a mut ContextState,
+        context_state: &'a ContextState,
         child_counter: &'a mut ChildCounter,
     ) -> Self {
         Ui {
@@ -29,7 +30,12 @@ impl<'a> Ui<'a> {
             child_counter,
             state_index: 0,
             render_index: 0,
+            parent_data: None,
         }
+    }
+
+    pub(crate) fn set_parent_data(&mut self, parent_data: Option<Box<dyn Any>>) {
+        self.parent_data = parent_data;
     }
 
     #[track_caller]
@@ -54,10 +60,15 @@ impl<'a> Ui<'a> {
         State::new(raw_box)
     }
 
-    pub fn render_object<P, R, N>(&mut self, caller: Caller, props: P, content: N) -> R::Action
+    pub fn render_object<Props, R, N, ParentData: 'static>(
+        &mut self,
+        caller: Caller,
+        props: Props,
+        content: N,
+    ) -> R::Action
     where
-        P: Properties<Object = R>,
-        R: RenderObject<P> + Any,
+        Props: Properties<ParentData, Object = R>,
+        R: RenderObject<Props, ParentData> + Any,
         N: FnOnce(&mut Ui),
     {
         let mut action = R::Action::default();
@@ -69,6 +80,9 @@ impl<'a> Ui<'a> {
                     child_state: &mut node.state,
                 };
                 action = object.update(&mut ctx, props);
+                let parent_data = self.parent_data.as_ref().and_then(|v| v.downcast_ref());
+
+                object.update_parent_data(&mut ctx, parent_data);
             } else {
                 // TODO: Think of something smart
                 panic!("Wrong node type. Expected {}", std::any::type_name::<R>())
@@ -87,6 +101,8 @@ impl<'a> Ui<'a> {
         self.render_index = index + 1;
 
         let node = &mut self.tree.renders[index];
+        node.set_parent_data(self.parent_data.take());
+
         let mut child_ui = Ui::new(&mut node.children, self.context_state, self.child_counter);
         content(&mut child_ui);
 

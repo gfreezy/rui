@@ -114,7 +114,7 @@ impl TextObject {
     }
 }
 
-impl RenderObject<Text> for TextObject {
+impl RenderObject<Text, ()> for TextObject {
     type Action = ();
 
     fn create(props: Text) -> Self {
@@ -145,6 +145,32 @@ impl RenderObjectInterface for TextObject {
     fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _children: &mut Children) {
     }
 
+    fn dry_layout(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        c: &Constraints,
+        _children: &mut Children,
+    ) -> Size {
+        // tracing::debug!("layout for text {:?}", self.layout.text());
+        let bc: BoxConstraints = c.into();
+        bc.debug_check("Label");
+
+        let width = match self.style.line_breaking {
+            LineBreaking::WordWrap => bc.max().width - LABEL_X_PADDING * 2.0,
+            _ => f64::INFINITY,
+        };
+
+        self.layout.set_wrap_width(width);
+        self.layout.rebuild_if_needed(&mut ctx.text());
+
+        let text_metrics = self.layout.layout_metrics();
+        ctx.set_baseline_offset(text_metrics.size.height - text_metrics.first_baseline);
+        bc.constrain(Size::new(
+            text_metrics.size.width + 2. * LABEL_X_PADDING,
+            text_metrics.size.height,
+        ))
+    }
+
     fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, _children: &mut Children) -> Size {
         // tracing::debug!("layout for text {:?}", self.layout.text());
         let bc: BoxConstraints = c.into();
@@ -156,7 +182,7 @@ impl RenderObjectInterface for TextObject {
         };
 
         self.layout.set_wrap_width(width);
-        self.layout.rebuild_if_needed(ctx.text());
+        self.layout.rebuild_if_needed(&mut ctx.text());
 
         let text_metrics = self.layout.layout_metrics();
         ctx.set_baseline_offset(text_metrics.size.height - text_metrics.first_baseline);

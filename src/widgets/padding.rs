@@ -96,6 +96,26 @@ impl RenderObjectInterface for Padding {
     fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _children: &mut Children) {
     }
 
+    fn dry_layout(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        c: &Constraints,
+        children: &mut Children,
+    ) -> Size {
+        let bc: BoxConstraints = c.into();
+        bc.debug_check("Padding");
+        let child = &mut children[0];
+
+        let hpad = self.left + self.right;
+        let vpad = self.top + self.bottom;
+
+        let child_c = bc.shrink((hpad, vpad)).into();
+        let size = child.dry_layout(ctx, &child_c);
+
+        let my_size = Size::new(size.width + hpad, size.height + vpad);
+        my_size
+    }
+
     fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, children: &mut Children) -> Size {
         let bc: BoxConstraints = c.into();
         bc.debug_check("Padding");

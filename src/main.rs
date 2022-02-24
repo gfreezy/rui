@@ -27,16 +27,12 @@ pub mod window;
 use app::WindowDesc;
 use druid_shell::kurbo::{Insets, Point, Size};
 
-use druid_shell::piet::Color;
 use menu::mac::menu_bar;
 
 use live_style::live_style;
-use style::alignment::HorizontalAlignment;
-use style::{draw, Style};
-use widgets::background::Background;
-use widgets::flex::{self, Flex};
+use style::Style;
+
 use widgets::padding::Padding;
-use widgets::sized_box::SizedBox;
 
 use crate::app::AppLauncher;
 use crate::ui::Ui;
@@ -45,13 +41,10 @@ use crate::widgets::button::Button;
 use crate::widgets::scroll_view::ScrollView;
 use crate::widgets::text::Text;
 
-use crate::widgets::vstack::VStack;
-
 fn win(ui: &mut Ui) {
     // scroll_view(ui, |ui| {
-    let flex_style: Style = live_style(ui, ".flex");
 
-    flex(ui, flex_style, |ui| {
+    flex(ui, ".flex", |ui| {
         let count = ui.state_node(|| 0isize);
         // let text_val = ui.state_node(|| "haha".to_string());
         // TextBox::new((*text_val).clone())
@@ -59,34 +52,40 @@ fn win(ui: &mut Ui) {
         //     .on_changed(move |val| text_val.set(format!("{val}")))
         //     .build(ui);
 
-        let style = live_style(ui, ".text");
-        let _i = 1;
-        for i in 0..(*count as usize) {
-            let count2 = ui.state_node(|| 0isize);
-            text(
-                ui,
-                &format!("label {}, count: {}", i, *count2),
-                style.clone(),
-            );
+        flexible(ui, ".flexible1", |ui| {
+            flex(ui, ".inner-flex", |ui| {
+                let style = live_style(ui, ".text");
+                let _i = 1;
+                for i in 0..(*count as usize) {
+                    let count2 = ui.state_node(|| 0isize);
+                    text(
+                        ui,
+                        &format!("label {}, count: {}", i, *count2),
+                        style.clone(),
+                    );
 
-            button(ui, &format!("button{i}, click to incr你好"), move || {
-                println!("click to incr");
-                count2.update(|c| *c += 1);
-            });
-        }
-
-        button(ui, "incr buttons", move || {
-            count.update(|c| *c += 1);
-            println!("incr buttons");
-        });
-
-        button(ui, "decr buttons", move || {
-            count.update(|c| {
-                if *c > 0 {
-                    *c -= 1
+                    button(ui, &format!("button{i}, click to incr你好"), move || {
+                        println!("click to incr");
+                        count2.update(|c| *c += 1);
+                    });
                 }
             });
-            println!("decr buttons");
+        });
+        flexible(ui, ".flexible2", |ui| {
+            button(ui, "incr buttons", move || {
+                count.update(|c| *c += 1);
+                println!("incr buttons");
+            });
+        });
+        flexible(ui, ".flexible3", |ui| {
+            button(ui, "decr buttons", move || {
+                count.update(|c| {
+                    if *c > 0 {
+                        *c -= 1
+                    }
+                });
+                println!("decr buttons");
+            });
         });
     });
     // });
@@ -96,12 +95,24 @@ fn scroll_view(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
     ScrollView::new(Point::ZERO, Size::new(600., 400.)).build(ui, content);
 }
 
-fn vstack(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
-    VStack::new(10., HorizontalAlignment::Center).build(ui, content);
+fn flex(ui: &mut Ui, style_name: &str, content: impl FnMut(&mut Ui)) {
+    let style = live_style(ui, style_name);
+    widgets::flex::Flex::new(
+        style.axis,
+        style.main_axis_size,
+        style.main_axis_alignment,
+        style.cross_axis_alignment,
+        style.text_direction,
+        style.vertical_direction,
+    )
+    .build(ui, content);
 }
 
-fn flex(ui: &mut Ui, style: Style, content: impl FnMut(&mut Ui)) {
-    Flex::new(style).build(ui, content);
+fn flexible(ui: &mut Ui, style_name: &str, content: impl FnMut(&mut Ui)) {
+    let style = live_style(ui, style_name);
+    let flex = style.flex.value();
+    let flex_fit = style.flex_fit;
+    widgets::flex::Flexible::new(flex, flex_fit).build(ui, content);
 }
 
 fn text(ui: &mut Ui, text: &str, style: Style) {
@@ -113,7 +124,7 @@ fn button<'a>(ui: &'a mut Ui<'_>, text: &str, click: impl FnMut() + 'static) {
 }
 
 fn test(ui: &mut Ui) {
-    let style = live_style(ui, ".text");
+    let _style = live_style(ui, ".text");
     Padding::new(Insets::uniform(100.)).build(ui, |ui| button(ui, "incr buttons", move || {}));
 }
 

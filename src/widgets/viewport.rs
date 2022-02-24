@@ -135,6 +135,15 @@ impl RenderObjectInterface for ViewportObject {
         todo!()
     }
 
+    fn dry_layout(
+        &mut self,
+        _ctx: &mut crate::context::LayoutCtx,
+        _c: &crate::constraints::Constraints,
+        _children: &mut crate::tree::Children,
+    ) -> Size {
+        todo!()
+    }
+
     fn paint(
         &mut self,
         _ctx: &mut crate::context::PaintCtx,
