@@ -1,0 +1,8 @@
+{
+    "explorer.sortOrder": "mixed",
+    "explorer.openEditors.visible": 0,
+    "search.exclude": {
+        "**/Cargo.lock": true,
+        "**/target": true
+    }
+}

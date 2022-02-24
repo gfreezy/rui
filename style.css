@@ -11,10 +11,11 @@
     axis: vertical;
     spacing: 10;
     background: #aaa;
-    horizontal-alignment: center;
     insets: 10;
     width: 400;
     min-height: 300;
+    cross-axis-alignment: start;
+    vertical-direction: up;
 }
 
 .box {

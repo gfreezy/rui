@@ -20,23 +20,15 @@ use druid_shell::{
     piet::{Color, FontFamily, FontStyle, FontWeight, TextAlignment},
 };
 
-use alignment::{
-    parse_horizontal_alignment, parse_vertical_alignment, HorizontalAlignment, VerticalAlignment,
-};
-use arrangement::{
-    parse_horizontal_arrangement, parse_vertical_arrangement, HorizontalArrangement,
-    VerticalArrangement,
-};
-use axis::{parse_axis, Axis};
-use border::{parse_border, Border};
-use draw::{parse_alpha, parse_background, parse_color, Alpha, Background};
-use padding::parse_insets;
-use size::{
-    parse_fill_max_height, parse_fill_max_width, parse_height, parse_max_height, parse_max_width,
-    parse_min_height, parse_min_width, parse_spacing, parse_width, FillMaxHeight, FillMaxWidth,
-    Height, MaxHeight, MaxWidth, MinHeight, MinWidth, Spacing, Width,
-};
-use text::{FontSize, LineBreaking};
+use alignment::*;
+use arrangement::*;
+use axis::*;
+use border::*;
+use draw::*;
+use layout::*;
+use padding::*;
+use size::*;
+use text::*;
 
 use crate::style::{
     alignment::parse_text_alignment,
@@ -44,6 +36,10 @@ use crate::style::{
         parse_font_family, parse_font_size, parse_font_style, parse_font_weight,
         parse_line_breaking,
     },
+};
+
+use self::layout::{
+    CrossAxisAlignment, Flex, FlexFit, Layout, MainAxisAlignment, TextDirection, VerticalDirection,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -74,6 +70,14 @@ pub struct Style {
     pub color: Color,
     pub line_breaking: LineBreaking,
     pub text_alignment: TextAlignment,
+    pub layout: Layout,
+    pub main_axis_size: MainAxisSize,
+    pub main_axis_alignment: MainAxisAlignment,
+    pub cross_axis_alignment: CrossAxisAlignment,
+    pub text_direction: TextDirection,
+    pub vertical_direction: VerticalDirection,
+    pub flex_fit: FlexFit,
+    pub flex: Flex,
 }
 
 impl Default for Style {
@@ -105,6 +109,14 @@ impl Default for Style {
             color: Color::from_hex_str("#000").unwrap(),
             line_breaking: Default::default(),
             text_alignment: Default::default(),
+            layout: Default::default(),
+            main_axis_size: Default::default(),
+            main_axis_alignment: Default::default(),
+            cross_axis_alignment: Default::default(),
+            text_direction: Default::default(),
+            vertical_direction: Default::default(),
+            flex_fit: Default::default(),
+            flex: Default::default(),
         }
     }
 }
@@ -137,7 +149,15 @@ style_parser!(
         font_style => parse_font_style => FontStyle,
         color => parse_color => Color,
         line_breaking => parse_line_breaking => LineBreaking,
-        text_alignment => parse_text_alignment => TextAlignment
+        text_alignment => parse_text_alignment => TextAlignment,
+        layout => parse_layout => Layout,
+        main_axis_size => parse_main_axis_size => MainAxisSize,
+        main_axis_alignment => parse_main_axis_alignment => MainAxisAlignment,
+        cross_axis_alignment => parse_cross_axis_alignment => CrossAxisAlignment,
+        text_direction => parse_text_direction => TextDirection,
+        vertical_direction => parse_vertical_direction => VerticalDirection,
+        flex_fit => parse_flex_fit => FlexFit,
+        flex => parse_flex => Flex,
     ]
 );
 

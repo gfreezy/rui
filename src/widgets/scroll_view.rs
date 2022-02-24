@@ -110,6 +110,15 @@ impl RenderObjectInterface for ScrollViewObject {
     fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _children: &mut Children) {
     }
 
+    fn dry_layout(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        _c: &Constraints,
+        children: &mut Children,
+    ) -> Size {
+        self.viewport
+    }
+
     fn layout(&mut self, ctx: &mut LayoutCtx, _c: &Constraints, children: &mut Children) -> Size {
         self.content_size =
             children[0].layout(ctx, &Constraints::BoxConstraints(BoxConstraints::UNBOUNDED));

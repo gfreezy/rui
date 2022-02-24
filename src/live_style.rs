@@ -1,4 +1,3 @@
-
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
@@ -83,7 +82,7 @@ impl StyleWatcher {
             .unwrap_or_default()
     }
 
-    fn get_or_init(ui: &mut Ui) -> &'static StyleWatcher {
+    fn global(ui: &mut Ui) -> &'static StyleWatcher {
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("style.css");
         static INSTANCE: OnceCell<StyleWatcher> = OnceCell::new();
         INSTANCE.get_or_init(|| StyleWatcher::new(&*path.to_string_lossy(), ui))
@@ -91,6 +90,6 @@ impl StyleWatcher {
 }
 
 pub(crate) fn live_style(ui: &mut Ui, name: &str) -> Style {
-    let instance = StyleWatcher::get_or_init(ui);
+    let instance = StyleWatcher::global(ui);
     instance.get_style(name)
 }

@@ -5,7 +5,6 @@ use druid_shell::{
     piet::{Color, PaintBrush, Piet, RenderContext},
     Region, WindowHandle,
 };
-use tracing::instrument;
 
 use crate::{
     app::{PendingWindow, WindowSizePolicy},
@@ -101,10 +100,10 @@ impl Window {
             text: handle.text(),
         };
 
-        let root_state = ChildState::new(*root_child_id, Some(size.clone()));
+        let mut root_state = ChildState::new(*root_child_id, Some(size.clone()));
         let mut paint_ctx = PaintCtx {
             context_state: &mut context_state,
-            child_state: &root_state,
+            child_state: &mut root_state,
             region: invalid.clone(),
             render_ctx: piet,
         };
@@ -113,7 +112,7 @@ impl Window {
     }
 
     // #[instrument(skip(self))]
-    pub(crate) fn layout(&mut self, command_queue: &mut CommandQueue) {
+    pub(crate) fn layout(&mut self, _command_queue: &mut CommandQueue) {
         let Self {
             handle,
             ext_handle,

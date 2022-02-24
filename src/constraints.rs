@@ -6,6 +6,15 @@ pub enum Constraints {
     SliverConstraints(SliverConstraints),
 }
 
+impl Constraints {
+    pub fn to_box(&self) -> BoxConstraints {
+        self.into()
+    }
+    pub fn to_sliver(&self) -> SliverConstraints {
+        self.into()
+    }
+}
+
 impl From<&Constraints> for BoxConstraints {
     fn from(c: &Constraints) -> Self {
         match c {

@@ -24,6 +24,22 @@ impl RenderObjectInterface for WindowContainer {
         }
     }
 
+    fn dry_layout(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        c: &Constraints,
+        children: &mut Children,
+    ) -> Size {
+        let mut size = Size::ZERO;
+        for child in children {
+            let child_size = child.dry_layout(ctx, c);
+            size = Size::new(
+                child_size.width.max(size.width),
+                child_size.height.max(size.height),
+            );
+        }
+        size
+    }
     fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, children: &mut Children) -> Size {
         let mut size = Size::ZERO;
         for child in children {

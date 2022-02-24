@@ -10,7 +10,7 @@ use druid_shell::{
     Application, IdleToken, KeyEvent, MouseEvent, Region, Scale, TextFieldToken, TimerToken,
     WinHandler, WindowBuilder, WindowHandle,
 };
-use tracing::{debug, instrument};
+use tracing::{debug};
 
 use crate::app::{PendingWindow, WindowConfig};
 use crate::command::{sys as sys_cmd, Command, Target};

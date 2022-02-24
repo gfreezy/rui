@@ -1,4 +1,5 @@
 use std::{
+    any::Any,
     ops::{Deref, DerefMut},
     time::Duration,
 };
@@ -32,30 +33,30 @@ pub(crate) struct ContextState {
 }
 
 pub struct UpdateCtx<'a> {
-    pub(crate) context_state: &'a mut ContextState,
+    pub(crate) context_state: &'a ContextState,
     pub(crate) child_state: &'a mut ChildState,
 }
 
 pub struct EventCtx<'a> {
-    pub(crate) context_state: &'a mut ContextState,
+    pub(crate) context_state: &'a ContextState,
     pub(crate) child_state: &'a mut ChildState,
     pub(crate) is_active: bool,
     pub(crate) is_handled: bool,
 }
 
 pub struct LifeCycleCtx<'a> {
-    pub(crate) context_state: &'a mut ContextState,
+    pub(crate) context_state: &'a ContextState,
     pub(crate) child_state: &'a mut ChildState,
 }
 
 pub struct LayoutCtx<'a> {
-    pub(crate) context_state: &'a mut ContextState,
+    pub(crate) context_state: &'a ContextState,
     pub(crate) child_state: &'a mut ChildState,
 }
 
 pub struct PaintCtx<'a, 'c> {
-    pub(crate) context_state: &'a mut ContextState,
-    pub(crate) child_state: &'a ChildState,
+    pub(crate) context_state: &'a ContextState,
+    pub(crate) child_state: &'a mut ChildState,
     /// The render context for actually painting.
     pub render_ctx: &'a mut Piet<'c>,
     /// The currently visible region.
@@ -81,8 +82,8 @@ impl_context_method!(
         }
 
         /// Get an object which can create text layouts.
-        pub fn text(&mut self) -> &mut PietText {
-            &mut self.context_state.text
+        pub fn text(&mut self) -> PietText {
+            self.context_state.text.clone()
         }
 
         /// The "hot" (aka hover) status of a widget.
@@ -115,6 +116,18 @@ impl_context_method!(
         /// [`set_active`]: struct.EventCtx.html#method.set_active
         pub fn is_active(&self) -> bool {
             self.child_state.is_active
+        }
+
+        pub fn parent_data<T: 'static>(&self) -> Option<&T> {
+            self.child_state.parent_data()
+        }
+
+        pub(crate) fn parent_data_mut<T: 'static>(&mut self) -> Option<&mut T> {
+            self.child_state.parent_data_mut()
+        }
+
+        pub(crate) fn set_parent_data(&mut self, parent_data: Option<Box<dyn Any>>) {
+            self.child_state.set_parent_data(parent_data)
         }
     }
 );

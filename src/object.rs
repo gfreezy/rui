@@ -2,7 +2,6 @@ use std::any::Any;
 
 use druid_shell::kurbo::Size;
 
-use crate::box_constraints::BoxConstraints;
 use crate::constraints::Constraints;
 use crate::lifecycle::LifeCycle;
 use crate::sliver_constraints::SliverConstraints;
@@ -12,29 +11,27 @@ use crate::{
     tree::Children,
 };
 
-pub trait Properties: Sized {
-    type Object: RenderObject<Self>;
+pub trait Properties<ParentData = ()>: Sized {
+    type Object: RenderObject<Self, ParentData>;
 }
 
-pub trait RenderObject<Props>: RenderObjectInterface {
+pub trait RenderObject<Props, ParentData = ()>: RenderObjectInterface {
     type Action: Default;
 
     fn create(props: Props) -> Self;
     fn update(&mut self, ctx: &mut UpdateCtx, props: Props) -> Self::Action;
+    #[allow(unused_variables)]
+    fn update_parent_data(&mut self, ctx: &mut UpdateCtx, parent_data: Option<&ParentData>) {}
 }
 
 pub trait RenderObjectInterface {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children);
     fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children);
-    fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, children: &mut Children) -> Size;
-    fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children);
-}
-
-pub trait BoxRenderObjectInterface {
-    fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children);
-    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children);
-    fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, children: &mut Children)
+    fn dry_layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, children: &mut Children)
         -> Size;
+    fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, children: &mut Children) -> Size {
+        self.dry_layout(ctx, c, children)
+    }
     fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children);
 }
 
@@ -56,7 +53,11 @@ pub trait AnyRenderObject: Any {
 
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children);
     fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children);
-    fn layout(&mut self, ctx: &mut LayoutCtx, bc: &Constraints, children: &mut Children) -> Size;
+    fn dry_layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, children: &mut Children)
+        -> Size;
+    fn layout(&mut self, ctx: &mut LayoutCtx, bc: &Constraints, children: &mut Children) -> Size {
+        self.dry_layout(ctx, bc, children)
+    }
     fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children);
 }
 
@@ -78,6 +79,15 @@ where
 
     fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children) {
         R::lifecycle(self, ctx, event, children)
+    }
+
+    fn dry_layout(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        bc: &Constraints,
+        children: &mut Children,
+    ) -> Size {
+        R::dry_layout(self, ctx, bc, children)
     }
 
     fn layout(&mut self, ctx: &mut LayoutCtx, bc: &Constraints, children: &mut Children) -> Size {
