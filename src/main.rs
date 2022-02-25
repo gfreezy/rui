@@ -108,11 +108,39 @@ fn flex(ui: &mut Ui, style_name: &str, content: impl FnMut(&mut Ui)) {
     .build(ui, content);
 }
 
+fn column(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
+    widgets::flex::Flex::new(
+        style::axis::Axis::Vertical,
+        style::layout::MainAxisSize::Min,
+        style::layout::MainAxisAlignment::Start,
+        style::layout::CrossAxisAlignment::Center,
+        style::layout::TextDirection::Ltr,
+        style::layout::VerticalDirection::Down,
+    )
+    .build(ui, content);
+}
+
+fn row(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
+    widgets::flex::Flex::new(
+        style::axis::Axis::Horizontal,
+        style::layout::MainAxisSize::Min,
+        style::layout::MainAxisAlignment::Start,
+        style::layout::CrossAxisAlignment::Center,
+        style::layout::TextDirection::Ltr,
+        style::layout::VerticalDirection::Down,
+    )
+    .build(ui, content);
+}
+
 fn flexible(ui: &mut Ui, style_name: &str, content: impl FnMut(&mut Ui)) {
     let style = live_style(ui, style_name);
     let flex = style.flex.value();
     let flex_fit = style.flex_fit;
     widgets::flex::Flexible::new(flex, flex_fit).build(ui, content);
+}
+
+fn expand(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
+    widgets::flex::Flexible::new(1.0, style::layout::FlexFit::Tight).build(ui, content);
 }
 
 fn text(ui: &mut Ui, text: &str, style: Style) {
