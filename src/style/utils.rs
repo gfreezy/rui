@@ -1,14 +1,8 @@
 use std::str::FromStr;
 
-
 use nom::{
-    branch::alt,
-    bytes::complete::{tag_no_case},
-    character::complete::{multispace0},
-    combinator::{map},
-    error::ParseError,
-    sequence::{delimited},
-    IResult,
+    branch::alt, bytes::complete::tag_no_case, character::complete::multispace0, combinator::map,
+    error::ParseError, sequence::delimited, IResult,
 };
 
 pub(crate) fn make_error(s: &'static str) -> nom::error::Error<&'static str> {
@@ -37,4 +31,17 @@ pub(crate) fn parse_bool(input: &str) -> IResult<&str, bool> {
             _ => unreachable!(),
         },
     )(input)
+}
+
+pub(crate) fn parse_kebab_case(name: &str) -> impl FnMut(&str) -> nom::IResult<&str, &str> {
+    use convert_case::Casing;
+    let kebab_case = name.to_case(convert_case::Case::Kebab);
+
+    let original = name.to_string();
+    move |input: &str| {
+        nom::branch::alt((
+            nom::bytes::complete::tag_no_case(original.as_str()),
+            nom::bytes::complete::tag_no_case(kebab_case.as_str()),
+        ))(input)
+    }
 }

@@ -1,3 +1,4 @@
+pub mod align;
 pub mod background;
 pub mod button;
 pub mod flex;

@@ -1,35 +1,35 @@
 macro_rules! alt {
-    ($a:expr) => {
+    ($a:expr$(,)?) => {
         $a
     };
-    ($a:expr, $b:expr) => {
+    ($a:expr, $b:expr$(,)?) => {
         nom::branch::alt(($a, $b))
     };
-    ($a:expr, $b:expr, $c:expr) => {
+    ($a:expr, $b:expr, $c:expr$(,)?) => {
         nom::branch::alt(($a, $b, $c))
     };
-    ($a:expr, $b:expr, $c:expr, $d:expr) => {
+    ($a:expr, $b:expr, $c:expr, $d:expr$(,)?) => {
         nom::branch::alt(($a, $b, $c, $d))
     };
-    ($a:expr, $b:expr, $c:expr, $d:expr, $e:expr) => {
+    ($a:expr, $b:expr, $c:expr, $d:expr, $e:expr$(,)?) => {
         nom::branch::alt(($a, $b, $c, $d, $e))
     };
-    ($a:expr, $b:expr, $c:expr, $d:expr, $e:expr, $f:expr) => {
+    ($a:expr, $b:expr, $c:expr, $d:expr, $e:expr, $f:expr$(,)?) => {
         nom::branch::alt(($a, $b, $c, $d, $e, $f))
     };
-    ($a:expr, $b:expr, $c:expr, $d:expr, $e:expr, $f:expr, $g:expr) => {
+    ($a:expr, $b:expr, $c:expr, $d:expr, $e:expr, $f:expr, $g:expr$(,)?) => {
         nom::branch::alt(($a, $b, $c, $d, $e, $f, $g))
     };
-    ($a:expr, $b:expr, $c:expr, $d:expr, $e:expr, $f:expr, $g:expr, $h:expr) => {
+    ($a:expr, $b:expr, $c:expr, $d:expr, $e:expr, $f:expr, $g:expr, $h:expr$(,)?) => {
         nom::branch::alt(($a, $b, $c, $d, $e, $f, $g, $h))
     };
-    ($a:expr, $b:expr, $c:expr, $d:expr, $e:expr, $f:expr, $g:expr, $h:expr, $i:expr) => {
+    ($a:expr, $b:expr, $c:expr, $d:expr, $e:expr, $f:expr, $g:expr, $h:expr, $i:expr$(,)?) => {
         nom::branch::alt(($a, $b, $c, $d, $e, $f, $g, $h, $i))
     };
-    ($a:expr, $b:expr, $c:expr, $d:expr, $e:expr, $f:expr, $g:expr, $h:expr, $i:expr, $j:expr) => {
+    ($a:expr, $b:expr, $c:expr, $d:expr, $e:expr, $f:expr, $g:expr, $h:expr, $i:expr, $j:expr$(,)?) => {
         nom::branch::alt(($a, $b, $c, $d, $e, $f, $g, $h, $i, $j))
     };
-    ($a:expr, $b:expr, $c:expr, $d:expr, $e:expr, $f:expr, $g:expr, $h:expr, $i:expr, $j:expr, $($more:expr),*) => {
+    ($a:expr, $b:expr, $c:expr, $d:expr, $e:expr, $f:expr, $g:expr, $h:expr, $i:expr, $j:expr, $($more:expr),*$(,)?) => {
         alt!(nom::branch::alt(($a, $b, $c, $d, $e, $f, $g, $h, $i, $j)), $($more),*)
     };
 }
@@ -136,22 +136,9 @@ macro_rules! enum_type {
         }
 
         pub(crate) fn $parser_name<'a>(input: &'a str) -> IResult<&'a str, $enum_ty> {
-            fn parse_kebab_case(name: &str) -> impl FnMut(&str) -> nom::IResult<&str, &str> {
-                use convert_case::Casing;
-                let kebab_case = name.to_case(convert_case::Case::Kebab);
-
-                let original = name.to_string();
-                move |input: &str| {
-                    nom::branch::alt((
-                        nom::bytes::complete::tag_no_case(original.as_str()),
-                        nom::bytes::complete::tag_no_case(kebab_case.as_str()),
-                    ))(input)
-                }
-            }
-
             alt!(
                 $(
-                    nom::combinator::map(parse_kebab_case(std::stringify!($variant)), |_| $enum_ty::$variant)
+                    nom::combinator::map(crate::style::utils::parse_kebab_case(std::stringify!($variant)), |_| $enum_ty::$variant)
                 ),*
             )(input)
         }
@@ -165,22 +152,9 @@ macro_rules! enum_type {
 macro_rules! enum_parser {
     ($parser_name:tt, $enum_ty:tt => [$($variant:tt),*$(,)?]) => {
         pub(crate) fn $parser_name<'a>(input: &'a str) -> IResult<&'a str, $enum_ty> {
-            fn parse_kebab_case(name: &str) -> impl FnMut(&str) -> nom::IResult<&str, &str> {
-                use convert_case::Casing;
-                let kebab_case = name.to_case(convert_case::Case::Kebab);
-
-                let original = name.to_string();
-                move |input: &str| {
-                    nom::branch::alt((
-                        nom::bytes::complete::tag_no_case(original.as_str()),
-                        nom::bytes::complete::tag_no_case(kebab_case.as_str()),
-                    ))(input)
-                }
-            }
-
             alt!(
                 $(
-                    nom::combinator::map(parse_kebab_case(std::stringify!($variant)), |_| $enum_ty::$variant)
+                    nom::combinator::map(crate::style::utils::parse_kebab_case(std::stringify!($variant)), |_| $enum_ty::$variant)
                 ),*
             )(input)
         }
