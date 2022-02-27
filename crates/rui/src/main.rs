@@ -33,7 +33,6 @@ use druid_shell::kurbo::{Insets, Point, Size};
 use menu::mac::menu_bar;
 
 use live_style::live_style;
-use qcell::{TCell, TCellOwner};
 use style::Style;
 
 use widgets::padding::Padding;

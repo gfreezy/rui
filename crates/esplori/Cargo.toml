@@ -1,0 +1,12 @@
+[package]
+name = "esplori"
+version = "0.0.0"
+edition = "2021"
+
+
+[dependencies]
+druid-shell = { git = "https://github.com/linebender/druid", rev = "0079ae3", features = [
+    "serde",
+] }
+thiserror = "1.0.30"
+generational-indextree = "1.1.4"

@@ -5,6 +5,7 @@ use druid_shell::{
     piet::{Color, PaintBrush, Piet, RenderContext},
     Region, WindowHandle,
 };
+use generational_indextree::Arena;
 
 use crate::{
     app::{PendingWindow, WindowSizePolicy},

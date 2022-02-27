@@ -10,9 +10,8 @@ use std::{
 
 use bumpalo::Bump;
 use druid_shell::kurbo::{Affine, Insets, Point, Rect, Shape, Size, Vec2};
-use druid_shell::piet::{RenderContext};
+use druid_shell::piet::RenderContext;
 use druid_shell::{Region, TimerToken};
-
 
 use crate::constraints::Constraints;
 use crate::context::{ContextState, EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx};
@@ -78,6 +77,12 @@ impl Drop for StateNode {
         let boxed = unsafe { bumpalo::boxed::Box::from_raw(as_mut) };
         drop(boxed);
     }
+}
+
+pub struct RenderObject {
+    pub(crate) key: Caller,
+    pub(crate) object: Box<dyn AnyRenderObject>,
+    pub(crate) state: ChildState,
 }
 
 pub struct Child {

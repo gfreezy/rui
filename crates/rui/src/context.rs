@@ -4,12 +4,11 @@ use std::{
     time::Duration,
 };
 
+use crate::tree::ChildState;
+use crate::{ext_event::ExtEventSink, id::ChildId};
 use druid_shell::kurbo::{Insets, Rect, Size};
 use druid_shell::piet::{Piet, PietText, RenderContext};
 use druid_shell::{Region, TimerToken, WindowHandle};
-
-use crate::tree::ChildState;
-use crate::{ext_event::ExtEventSink, id::ChildId};
 
 /// A macro for implementing methods on multiple contexts.
 ///
