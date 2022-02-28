@@ -1,4 +1,6 @@
+use super::layout::TextDirection;
 use super::utils::{make_error, parse_kebab_case, ws};
+use druid_shell::kurbo::{Point, Rect, Vec2};
 use druid_shell::piet::TextAlignment;
 use nom::branch::alt;
 use nom::bytes::streaming::tag;
@@ -49,6 +51,18 @@ enum_parser!(parse_vertical_alignment, VerticalAlignment => [
 pub struct Alignment {
     x: f64,
     y: f64,
+}
+
+impl Alignment {
+    pub fn resolve(&self, text_direction: TextDirection) -> Alignment {
+        self.clone()
+    }
+
+    pub fn along_offset(&self, other: Vec2) -> Point {
+        let center_x = other.x / 2.0;
+        let center_y = other.y / 2.0;
+        Point::new(center_x + self.x * center_x, center_y + self.y * center_y)
+    }
 }
 
 impl Default for Alignment {

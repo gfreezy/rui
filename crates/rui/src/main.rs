@@ -24,9 +24,6 @@ pub mod ui;
 pub mod widgets;
 pub mod window;
 
-use std::borrow::Borrow;
-use std::rc::Rc;
-
 use app::WindowDesc;
 use druid_shell::kurbo::{Insets, Point, Size};
 
@@ -35,6 +32,7 @@ use menu::mac::menu_bar;
 use live_style::live_style;
 use style::Style;
 
+use style::alignment::Alignment;
 use widgets::padding::Padding;
 
 use crate::app::AppLauncher;
@@ -61,6 +59,7 @@ fn win(ui: &mut Ui) {
                 let _i = 1;
                 for i in 0..(*count as usize) {
                     let count2 = ui.state_node(|| 0isize);
+
                     text(
                         ui,
                         &format!("label {}, count: {}", i, *count2),
@@ -74,6 +73,10 @@ fn win(ui: &mut Ui) {
                 }
             });
         });
+        align(ui, |ui| {
+            Text::new("hello").build(ui);
+        });
+
         flexible(ui, ".flexible2", |ui| {
             button(ui, "incr buttons", move || {
                 count.update(|c| *c += 1);
@@ -144,6 +147,16 @@ fn flexible(ui: &mut Ui, style_name: &str, content: impl FnMut(&mut Ui)) {
 
 fn expand(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
     widgets::flex::Flexible::new(1.0, style::layout::FlexFit::Tight).build(ui, content);
+}
+
+fn align(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
+    widgets::align::Align::new(
+        Alignment::bottom_center(),
+        None,
+        None,
+        style::layout::TextDirection::Ltr,
+    )
+    .build(ui, content);
 }
 
 fn text(ui: &mut Ui, text: &str, style: Style) {
