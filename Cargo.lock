@@ -270,26 +270,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 
 [[package]]
-name = "esplori"
-version = "0.0.0"
-dependencies = [
- "anymap2",
- "bumpalo",
- "convert_case",
- "druid-shell",
- "generational-indextree 1.1.4",
- "nom",
- "notify",
- "once_cell",
- "serde",
- "thiserror",
- "tracing",
- "tracing-subscriber",
- "unicode-segmentation",
- "xi-unicode",
-]
-
-[[package]]
 name = "field-offset"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -471,38 +451,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "generational-arena"
-version = "0.2.8"
-dependencies = [
- "cfg-if 1.0.0",
-]
-
-[[package]]
-name = "generational-arena"
-version = "0.2.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e1d3b771574f62d0548cee0ad9057857e9fc25d7a3335f140c84f6acd0bf601"
-dependencies = [
- "cfg-if 0.1.10",
-]
-
-[[package]]
-name = "generational-indextree"
-version = "1.1.4"
-dependencies = [
- "generational-arena 0.2.8",
-]
-
-[[package]]
-name = "generational-indextree"
-version = "1.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92e6989b5408068aebddf4d65eb43872499440e27fc8ee1f0c07435a54b088cf"
-dependencies = [
- "generational-arena 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "gio"
 version = "0.14.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -650,6 +598,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6d621efb26863f0e9924c6ac577e8275e5e6b77455db64ffa6c65c904e9e132c"
 dependencies = [
  "unicode-segmentation",
+]
+
+[[package]]
+name = "illicit"
+version = "1.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8b336d323555c6ca57e96f90df894ce3f621a25c3862a9d2d8e67caa31710d3"
+dependencies = [
+ "illicit-macro",
+ "owning_ref",
+ "scopeguard",
+]
+
+[[package]]
+name = "illicit-macro"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e735fac4fa42c34ce6d7fb2f5a729bf1e5db239f3b09aa7bf36f2068147d7d96"
+dependencies = [
+ "proc-macro-error",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -911,6 +881,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da32515d9f6e6e489d7bc9d84c71b060db7247dc035bbe44eac88cf87486d8d5"
 
 [[package]]
+name = "owning_ref"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ff55baddef9e4ad00f88b6c743a2a8062d4c6ade126c2a528644b8e444d52ce"
+dependencies = [
+ "stable_deref_trait",
+]
+
+[[package]]
 name = "pango"
 version = "0.14.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1145,7 +1124,7 @@ dependencies = [
  "bumpalo",
  "convert_case",
  "druid-shell",
- "generational-indextree 1.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "illicit",
  "nom",
  "notify",
  "once_cell",
@@ -1239,6 +1218,12 @@ name = "smallvec"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2dd574626839106c320a323308629dcb1acfc96e32a8cba364ddc61ac23ee83"
+
+[[package]]
+name = "stable_deref_trait"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
 name = "strum"

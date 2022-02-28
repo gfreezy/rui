@@ -1,2 +1,2 @@
 [workspace]
-members = ["crates/rui", "crates/esplori"]
+members = ["crates/rui"]
