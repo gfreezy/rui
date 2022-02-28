@@ -1,0 +1,56 @@
+use druid_shell::kurbo::{Point, Size};
+
+use crate::{
+    constraints::Constraints,
+    context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx},
+    event::Event,
+    lifecycle::LifeCycle,
+    object::RenderInterface,
+};
+
+pub(crate) struct WindowContainer;
+
+impl RenderInterface for WindowContainer {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event) {
+        for child in ctx.children() {
+            child.event(ctx, event);
+        }
+    }
+
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle) {
+        for child in ctx.children() {
+            child.lifecycle(ctx, event)
+        }
+    }
+
+    fn dry_layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints) -> Size {
+        let mut size = Size::ZERO;
+        for child in ctx.children() {
+            let child_size = child.dry_layout(ctx, c);
+            size = Size::new(
+                child_size.width.max(size.width),
+                child_size.height.max(size.height),
+            );
+        }
+        size
+    }
+
+    fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints) -> Size {
+        let mut size = Size::ZERO;
+        for child in ctx.children() {
+            let child_size = child.layout(ctx, c);
+            child.set_origin(ctx, Point::ZERO);
+            size = Size::new(
+                child_size.width.max(size.width),
+                child_size.height.max(size.height),
+            );
+        }
+        size
+    }
+
+    fn paint(&mut self, ctx: &mut PaintCtx) {
+        for child in ctx.children() {
+            child.paint(ctx)
+        }
+    }
+}

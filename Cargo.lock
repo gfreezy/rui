@@ -273,9 +273,20 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 name = "esplori"
 version = "0.0.0"
 dependencies = [
+ "anymap2",
+ "bumpalo",
+ "convert_case",
  "druid-shell",
- "generational-indextree",
+ "generational-indextree 1.1.4",
+ "nom",
+ "notify",
+ "once_cell",
+ "serde",
  "thiserror",
+ "tracing",
+ "tracing-subscriber",
+ "unicode-segmentation",
+ "xi-unicode",
 ]
 
 [[package]]
@@ -462,6 +473,13 @@ dependencies = [
 [[package]]
 name = "generational-arena"
 version = "0.2.8"
+dependencies = [
+ "cfg-if 1.0.0",
+]
+
+[[package]]
+name = "generational-arena"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e1d3b771574f62d0548cee0ad9057857e9fc25d7a3335f140c84f6acd0bf601"
 dependencies = [
@@ -471,10 +489,17 @@ dependencies = [
 [[package]]
 name = "generational-indextree"
 version = "1.1.4"
+dependencies = [
+ "generational-arena 0.2.8",
+]
+
+[[package]]
+name = "generational-indextree"
+version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92e6989b5408068aebddf4d65eb43872499440e27fc8ee1f0c07435a54b088cf"
 dependencies = [
- "generational-arena",
+ "generational-arena 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1120,7 +1145,7 @@ dependencies = [
  "bumpalo",
  "convert_case",
  "druid-shell",
- "generational-indextree",
+ "generational-indextree 1.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom",
  "notify",
  "once_cell",

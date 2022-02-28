@@ -22,3 +22,5 @@ anymap2 = "0.13"
 convert_case = "0.5.0"
 thiserror = "1.0.30"
 generational-indextree = "1.1.4"
+[patch.crates-io]
+generational-indextree = { path = "/Users/feichao/Developer/generational-indextree" }
