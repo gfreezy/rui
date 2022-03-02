@@ -26,7 +26,6 @@ use crate::object::AnyRenderObject;
 pub struct Children {
     pub(crate) states: Vec<StateNode>,
     pub(crate) renders: Vec<Child>,
-    pub(crate) tracked_states: Vec<String>,
     pub(crate) bump: Bump,
 }
 
@@ -151,10 +150,6 @@ impl Children {
     pub(crate) fn new() -> Self {
         Children::default()
     }
-
-    pub(crate) fn track_state(&mut self, state: String) {
-        self.tracked_states.push(state);
-    }
 }
 
 /// Public API for accessing children.
@@ -204,7 +199,7 @@ impl IndexMut<usize> for Children {
 
 /// [`RenderObject`] API for `Child` nodes.
 impl Child {
-    pub(crate) fn new<T>(key: Caller, object: T, id: ChildId) -> Self
+    pub(crate) fn new<T>(key: Caller, object: T) -> Self
     where
         T: AnyRenderObject,
     {
@@ -213,7 +208,7 @@ impl Child {
             key,
             object: Box::new(object),
             children: Children::new(),
-            state: ChildState::new(id, None),
+            state: ChildState::new(ChildId::next(), None),
             dead: false,
         }
     }
@@ -243,6 +238,9 @@ impl Child {
         self.object.as_any()
     }
 
+    pub fn id(&self) -> ChildId {
+        self.state.id
+    }
     /// Set the origin of this widget, in the parent's coordinate space.
     ///
     /// A container widget should call the [`Widget::layout`] method on its children in
@@ -755,5 +753,11 @@ impl Child {
 
     pub(crate) fn set_parent_data(&mut self, parent_data: Option<Box<dyn Any>>) {
         self.state.set_parent_data(parent_data)
+    }
+
+    pub(crate) fn merge_child_states_up(&mut self) {
+        for child in &mut self.children {
+            self.state.merge_up(&mut child.state);
+        }
     }
 }

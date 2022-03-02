@@ -17,7 +17,7 @@ use crate::command::{sys as sys_cmd, Command, Target};
 
 use crate::event::Event;
 use crate::ext_event::{ExtEventHost, ExtEventSink};
-use crate::id::{ChildCounter, WindowId};
+use crate::id::WindowId;
 
 use crate::menu::{MenuItemId, MenuManager};
 use crate::window::Window;
@@ -68,7 +68,6 @@ pub struct InnerAppState {
     root_menu: Option<MenuManager>,
     ext_event_host: ExtEventHost,
     windows: Windows,
-    counter: ChildCounter,
 }
 
 #[derive(Default)]
@@ -79,15 +78,9 @@ struct Windows {
 }
 
 impl Windows {
-    fn connect(
-        &mut self,
-        id: WindowId,
-        handle: WindowHandle,
-        ext_handle: ExtEventSink,
-        counter: ChildCounter,
-    ) {
+    fn connect(&mut self, id: WindowId, handle: WindowHandle, ext_handle: ExtEventSink) {
         if let Some(pending) = self.pending.remove(&id) {
-            let win = Window::new(id, handle, pending, ext_handle, counter);
+            let win = Window::new(id, handle, pending, ext_handle);
             assert!(self.windows.insert(id, win).is_none(), "duplicate window");
         } else {
             tracing::error!("no window for connecting handle {:?}", id);
@@ -127,7 +120,6 @@ impl AppState {
             command_queue: VecDeque::new(),
             windows: Windows::default(),
             ext_event_host,
-            counter: ChildCounter::new(),
         }));
 
         AppState { inner }
@@ -152,12 +144,8 @@ impl InnerAppState {
     }
 
     fn connect(&mut self, id: WindowId, handle: WindowHandle) {
-        self.windows.connect(
-            id,
-            handle,
-            self.ext_event_host.make_sink(),
-            self.counter.clone(),
-        );
+        self.windows
+            .connect(id, handle, self.ext_event_host.make_sink());
 
         // If the external event host has no handle, it cannot wake us
         // when an event arrives.

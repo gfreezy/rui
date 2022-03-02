@@ -5,7 +5,6 @@ use druid_shell::{
     piet::{Color, PaintBrush, Piet, RenderContext},
     Region, WindowHandle,
 };
-use generational_indextree::Arena;
 
 use crate::{
     app::{PendingWindow, WindowSizePolicy},
@@ -14,7 +13,7 @@ use crate::{
     context::{ContextState, EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx},
     event::Event,
     ext_event::ExtEventSink,
-    id::{ChildCounter, ChildId, WindowId},
+    id::{ChildId, WindowId},
     lifecycle::LifeCycle,
     menu::{MenuItemId, MenuManager},
     perf::FPSCounter,
@@ -31,10 +30,9 @@ pub struct Window {
     pub(crate) handle: WindowHandle,
     app: Box<dyn FnMut(&mut Ui)>,
     root: Child,
-    root_child_id: ChildId,
+    phatom_root_id: ChildId,
     invalid: Region,
     pub(crate) menu: Option<MenuManager>,
-    child_counter: ChildCounter,
     ext_handle: ExtEventSink,
     fps_counter: FPSCounter,
 }
@@ -45,24 +43,18 @@ impl Window {
         handle: WindowHandle,
         pending: PendingWindow,
         ext_handle: ExtEventSink,
-        counter: ChildCounter,
     ) -> Self {
         Window {
             id,
             size: Size::ZERO,
             size_policy: pending.size_policy,
             handle,
-            root_child_id: counter.generate_id(),
             app: pending.root,
             menu: pending.menu,
-            root: Child::new(
-                Location::caller().into(),
-                WindowContainer,
-                counter.generate_id(),
-            ),
+            phatom_root_id: ChildId::next(),
+            root: Child::new(Location::caller().into(), WindowContainer),
             invalid: Region::EMPTY,
             ext_handle,
-            child_counter: counter,
             fps_counter: FPSCounter::new(),
         }
     }
@@ -88,8 +80,8 @@ impl Window {
         let Self {
             handle,
             ext_handle,
+            phatom_root_id,
             root,
-            root_child_id,
             size,
             ..
         } = self;
@@ -101,7 +93,7 @@ impl Window {
             text: handle.text(),
         };
 
-        let mut root_state = ChildState::new(*root_child_id, Some(size.clone()));
+        let mut root_state = ChildState::new(*phatom_root_id, Some(size.clone()));
         let mut paint_ctx = PaintCtx {
             context_state: &mut context_state,
             child_state: &mut root_state,
@@ -118,7 +110,7 @@ impl Window {
             handle,
             ext_handle,
             root,
-            root_child_id,
+            phatom_root_id,
             size,
             invalid,
             ..
@@ -129,7 +121,7 @@ impl Window {
             ext_handle: ext_handle.clone(),
             text: handle.text(),
         };
-        let mut root_state = ChildState::new(*root_child_id, Some(size.clone()));
+        let mut root_state = ChildState::new(*phatom_root_id, Some(size.clone()));
 
         let mut layout_ctx = LayoutCtx {
             context_state: &mut context_state,
@@ -158,7 +150,7 @@ impl Window {
         let Self {
             handle,
             ext_handle,
-            root_child_id,
+            phatom_root_id,
             size,
             invalid,
             ..
@@ -169,7 +161,7 @@ impl Window {
             ext_handle: ext_handle.clone(),
             text: handle.text(),
         };
-        let mut root_state = ChildState::new(*root_child_id, Some(size.clone()));
+        let mut root_state = ChildState::new(*phatom_root_id, Some(size.clone()));
 
         let mut event_ctx = EventCtx {
             context_state: &mut context_state,
@@ -199,7 +191,7 @@ impl Window {
             handle,
             ext_handle,
             root,
-            root_child_id,
+            phatom_root_id,
             size,
             invalid,
             ..
@@ -210,7 +202,7 @@ impl Window {
             ext_handle: ext_handle.clone(),
             text: handle.text(),
         };
-        let mut root_state = ChildState::new(*root_child_id, Some(size.clone()));
+        let mut root_state = ChildState::new(*phatom_root_id, Some(size.clone()));
 
         let mut ctx = LifeCycleCtx {
             child_state: &mut root_state,
@@ -228,7 +220,6 @@ impl Window {
             ext_handle,
             root,
             app,
-            child_counter,
             ..
         } = self;
 
@@ -237,15 +228,10 @@ impl Window {
             ext_handle: ext_handle.clone(),
             text: handle.text(),
         };
-        let mut cx = Ui::new(&mut root.children, &mut context_state, child_counter);
+        let mut cx = Ui::new(&mut root.children, &mut context_state);
         app(&mut cx);
-
-        // merge children state up to root
-        for child in &mut root.children {
-            root.state.merge_up(&mut child.state);
-        }
-
-        // println!("{:#?}", root.debug_state());
+        cx.cleanup_tree();
+        root.merge_child_states_up();
     }
 
     pub(crate) fn invalidate_and_finalize(&mut self) {

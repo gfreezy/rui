@@ -4,7 +4,6 @@ use std::panic::Location;
 
 use crate::context::{ContextState, UpdateCtx};
 use crate::ext_event::ExtEventSink;
-use crate::id::ChildCounter;
 use crate::key::Caller;
 use crate::object::{AnyRenderObject, Properties, RenderObject};
 use crate::tree::{Child, Children, State, StateNode};
@@ -12,22 +11,16 @@ use crate::tree::{Child, Children, State, StateNode};
 pub struct Ui<'a> {
     pub(crate) tree: &'a mut Children,
     context_state: &'a ContextState,
-    child_counter: &'a mut ChildCounter,
     state_index: usize,
     render_index: usize,
     parent_data: Option<Box<dyn Any>>,
 }
 
 impl<'a> Ui<'a> {
-    pub(crate) fn new(
-        tree: &'a mut Children,
-        context_state: &'a ContextState,
-        child_counter: &'a mut ChildCounter,
-    ) -> Self {
+    pub(crate) fn new(tree: &'a mut Children, context_state: &'a ContextState) -> Self {
         Ui {
             tree,
             context_state,
-            child_counter,
             state_index: 0,
             render_index: 0,
             parent_data: None,
@@ -100,38 +93,14 @@ impl<'a> Ui<'a> {
         let node = &mut self.tree.renders[index];
         node.set_parent_data(self.parent_data.take());
 
-        let mut child_ui = Ui::new(&mut node.children, self.context_state, self.child_counter);
+        let mut child_ui = Ui::new(&mut node.children, self.context_state);
         content(&mut child_ui);
 
-        let mut request_layout = false;
-        let child_states = &mut child_ui.tree.states;
-        let child_renders = &mut child_ui.tree.renders;
-        if child_states.len() > child_ui.state_index {
-            child_states.truncate(child_ui.state_index);
-            request_layout = true;
-        }
-        if child_states.iter().any(|s| s.dead) {
-            child_states.retain(|s| !s.dead);
-            request_layout = true;
-        }
-        if child_renders.len() > child_ui.render_index {
-            child_renders.truncate(child_ui.render_index);
-            request_layout = true;
-        }
-        if child_renders.iter().any(|s| s.dead) {
-            child_renders.retain(|c| !c.dead);
-            request_layout = true;
-        }
-
-        if request_layout {
+        if child_ui.cleanup_tree() {
             node.request_layout();
         }
 
-        // let node_name = node.name();
-        for child in &mut node.children {
-            // debug!("merge from {} to {}", child.name(), node_name);
-            node.state.merge_up(&mut child.state);
-        }
+        node.merge_child_states_up();
 
         action
     }
@@ -170,15 +139,33 @@ impl Ui<'_> {
     }
 
     fn insert_render_object(&mut self, caller: Caller, object: impl AnyRenderObject) -> usize {
-        self.tree.renders.insert(
-            self.render_index,
-            Child::new(caller, object, self.child_counter.generate_id()),
-        );
+        self.tree
+            .renders
+            .insert(self.render_index, Child::new(caller, object));
         self.render_index
     }
 
-    pub fn track_state(&mut self, state_name: String) {
-        self.tree.track_state(state_name);
+    pub(crate) fn cleanup_tree(&mut self) -> bool {
+        let mut request_layout = false;
+        let states = &mut self.tree.states;
+        let renders = &mut self.tree.renders;
+        if states.len() > self.state_index {
+            states.truncate(self.state_index);
+            request_layout = true;
+        }
+        if states.iter().any(|s| s.dead) {
+            states.retain(|s| !s.dead);
+            request_layout = true;
+        }
+        if renders.len() > self.render_index {
+            renders.truncate(self.render_index);
+            request_layout = true;
+        }
+        if renders.iter().any(|s| s.dead) {
+            renders.retain(|c| !c.dead);
+            request_layout = true;
+        }
+        request_layout
     }
 
     pub fn ext_handle(&self) -> &ExtEventSink {
