@@ -11,17 +11,17 @@ use crate::{
     tree::Children,
 };
 
-pub trait Properties<ParentData = ()>: Sized {
-    type Object: RenderObject<Self, ParentData>;
+pub trait Properties: Sized {
+    type Object: RenderObject<Self>;
 }
 
-pub trait RenderObject<Props, ParentData = ()>: RenderObjectInterface {
+pub trait RenderObject<Props>: RenderObjectInterface {
     type Action: Default;
 
     fn create(props: Props) -> Self;
     fn update(&mut self, ctx: &mut UpdateCtx, props: Props) -> Self::Action;
     #[allow(unused_variables)]
-    fn update_parent_data(&mut self, ctx: &mut UpdateCtx, parent_data: Option<&ParentData>) {}
+    fn update_parent_data(&mut self, ctx: &mut UpdateCtx, parent_data: Option<Box<dyn Any>>) {}
 }
 
 pub trait RenderObjectInterface {

@@ -114,7 +114,7 @@ impl TextObject {
     }
 }
 
-impl RenderObject<Text, ()> for TextObject {
+impl RenderObject<Text> for TextObject {
     type Action = ();
 
     fn create(props: Text) -> Self {

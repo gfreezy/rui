@@ -60,15 +60,15 @@ impl<'a> Ui<'a> {
         State::new(raw_box)
     }
 
-    pub fn render_object<Props, R, N, ParentData: 'static>(
+    pub fn render_object<Props, R, N>(
         &mut self,
         caller: Caller,
         props: Props,
         content: N,
     ) -> R::Action
     where
-        Props: Properties<ParentData, Object = R>,
-        R: RenderObject<Props, ParentData> + Any,
+        Props: Properties<Object = R>,
+        R: RenderObject<Props> + Any,
         N: FnOnce(&mut Ui),
     {
         let mut action = R::Action::default();
@@ -80,9 +80,6 @@ impl<'a> Ui<'a> {
                     child_state: &mut node.state,
                 };
                 action = object.update(&mut ctx, props);
-                let parent_data = self.parent_data.as_ref().and_then(|v| v.downcast_ref());
-
-                object.update_parent_data(&mut ctx, parent_data);
             } else {
                 // TODO: Think of something smart
                 panic!("Wrong node type. Expected {}", std::any::type_name::<R>())

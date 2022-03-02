@@ -73,11 +73,12 @@ fn win(ui: &mut Ui) {
                 }
             });
         });
-        align(ui, |ui| {
-            Text::new("hello").build(ui);
-        });
 
         flexible(ui, ".flexible2", |ui| {
+            // align(ui, |ui| {
+            //     Text::new("hello").build(ui);
+            // });
+
             button(ui, "incr buttons", move || {
                 count.update(|c| *c += 1);
                 println!("incr buttons");

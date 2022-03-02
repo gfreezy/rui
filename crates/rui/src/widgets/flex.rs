@@ -15,6 +15,7 @@ use crate::{
     ui::Ui,
 };
 use druid_shell::kurbo::{Point, Size};
+use std::any::Any;
 use std::panic::Location;
 
 struct LayoutSize {
@@ -34,7 +35,7 @@ pub(crate) struct Flex {
     vertical_direction: VerticalDirection,
 }
 
-impl Properties<FlexParentData> for Flex {
+impl Properties for Flex {
     type Object = RenderFlex;
 }
 
@@ -275,7 +276,7 @@ impl RenderFlex {
     }
 }
 
-impl RenderObject<Flex, FlexParentData> for RenderFlex {
+impl RenderObject<Flex> for RenderFlex {
     type Action = ();
 
     fn create(props: Flex) -> Self {
@@ -306,14 +307,10 @@ impl RenderObject<Flex, FlexParentData> for RenderFlex {
         }
     }
 
-    fn update_parent_data(&mut self, ctx: &mut UpdateCtx, parent_data: Option<&FlexParentData>) {
-        let old_parent_data = ctx
-            .child_state
-            .parent_data
-            .as_ref()
-            .map(|v| v.downcast_ref::<FlexParentData>())
-            .flatten();
-        if old_parent_data != parent_data {
+    fn update_parent_data(&mut self, ctx: &mut UpdateCtx, parent_data: Option<Box<dyn Any>>) {
+        let old_parent_data = ctx.parent_data::<FlexParentData>();
+        if old_parent_data != parent_data.as_ref().map(|v| v.downcast_ref()).flatten() {
+            ctx.set_parent_data(parent_data);
             ctx.request_layout();
         }
     }
