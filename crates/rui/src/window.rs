@@ -18,7 +18,7 @@ use crate::{
     menu::{MenuItemId, MenuManager},
     perf::FPSCounter,
     text::layout::TextLayout,
-    tree::{Child, ChildState},
+    tree::{Element, ElementState},
     ui::Ui,
     widgets::window_container::WindowContainer,
 };
@@ -29,7 +29,7 @@ pub struct Window {
     size_policy: WindowSizePolicy,
     pub(crate) handle: WindowHandle,
     app: Box<dyn FnMut(&mut Ui)>,
-    root: Child,
+    root: Element,
     phatom_root_id: ChildId,
     invalid: Region,
     pub(crate) menu: Option<MenuManager>,
@@ -52,7 +52,7 @@ impl Window {
             app: pending.root,
             menu: pending.menu,
             phatom_root_id: ChildId::next(),
-            root: Child::new(Location::caller().into(), WindowContainer),
+            root: Element::new(Location::caller().into(), WindowContainer),
             invalid: Region::EMPTY,
             ext_handle,
             fps_counter: FPSCounter::new(),
@@ -93,7 +93,7 @@ impl Window {
             text: handle.text(),
         };
 
-        let mut root_state = ChildState::new(*phatom_root_id, Some(size.clone()));
+        let mut root_state = ElementState::new(*phatom_root_id, Some(size.clone()));
         let mut paint_ctx = PaintCtx {
             context_state: &mut context_state,
             child_state: &mut root_state,
@@ -121,7 +121,7 @@ impl Window {
             ext_handle: ext_handle.clone(),
             text: handle.text(),
         };
-        let mut root_state = ChildState::new(*phatom_root_id, Some(size.clone()));
+        let mut root_state = ElementState::new(*phatom_root_id, Some(size.clone()));
 
         let mut layout_ctx = LayoutCtx {
             context_state: &mut context_state,
@@ -161,7 +161,7 @@ impl Window {
             ext_handle: ext_handle.clone(),
             text: handle.text(),
         };
-        let mut root_state = ChildState::new(*phatom_root_id, Some(size.clone()));
+        let mut root_state = ElementState::new(*phatom_root_id, Some(size.clone()));
 
         let mut event_ctx = EventCtx {
             context_state: &mut context_state,
@@ -202,7 +202,7 @@ impl Window {
             ext_handle: ext_handle.clone(),
             text: handle.text(),
         };
-        let mut root_state = ChildState::new(*phatom_root_id, Some(size.clone()));
+        let mut root_state = ElementState::new(*phatom_root_id, Some(size.clone()));
 
         let mut ctx = LifeCycleCtx {
             child_state: &mut root_state,

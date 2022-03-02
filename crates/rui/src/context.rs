@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use crate::tree::ChildState;
+use crate::tree::ElementState;
 use crate::{ext_event::ExtEventSink, id::ChildId};
 use druid_shell::kurbo::{Insets, Rect, Size};
 use druid_shell::piet::{Piet, PietText, RenderContext};
@@ -33,29 +33,29 @@ pub(crate) struct ContextState {
 
 pub struct UpdateCtx<'a> {
     pub(crate) context_state: &'a ContextState,
-    pub(crate) child_state: &'a mut ChildState,
+    pub(crate) child_state: &'a mut ElementState,
 }
 
 pub struct EventCtx<'a> {
     pub(crate) context_state: &'a ContextState,
-    pub(crate) child_state: &'a mut ChildState,
+    pub(crate) child_state: &'a mut ElementState,
     pub(crate) is_active: bool,
     pub(crate) is_handled: bool,
 }
 
 pub struct LifeCycleCtx<'a> {
     pub(crate) context_state: &'a ContextState,
-    pub(crate) child_state: &'a mut ChildState,
+    pub(crate) child_state: &'a mut ElementState,
 }
 
 pub struct LayoutCtx<'a> {
     pub(crate) context_state: &'a ContextState,
-    pub(crate) child_state: &'a mut ChildState,
+    pub(crate) child_state: &'a mut ElementState,
 }
 
 pub struct PaintCtx<'a, 'c> {
     pub(crate) context_state: &'a ContextState,
-    pub(crate) child_state: &'a mut ChildState,
+    pub(crate) child_state: &'a mut ElementState,
     /// The render context for actually painting.
     pub render_ctx: &'a mut Piet<'c>,
     /// The currently visible region.
@@ -210,7 +210,7 @@ impl_context_method!(
 );
 
 impl ContextState {
-    fn request_timer(&self, child_state: &mut ChildState, deadline: Duration) -> TimerToken {
+    fn request_timer(&self, child_state: &mut ElementState, deadline: Duration) -> TimerToken {
         let timer_token = self.window.request_timer(deadline);
         child_state.add_timer(timer_token);
         timer_token

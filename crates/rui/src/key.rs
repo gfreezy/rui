@@ -9,9 +9,9 @@ use std::panic::Location;
 /// so we can use it as a key in various contexts; the traits we
 /// want are not implemented on the inner type.
 #[derive(Clone, Copy, Debug)]
-pub struct Caller(&'static Location<'static>);
+pub struct Key(&'static Location<'static>);
 
-impl Caller {
+impl Key {
     /// The pointer to the location metadata
     ///
     /// Unique locations are expected to have unique pointers. This
@@ -22,34 +22,34 @@ impl Caller {
     }
 }
 
-impl PartialEq for Caller {
-    fn eq(&self, other: &Caller) -> bool {
+impl PartialEq for Key {
+    fn eq(&self, other: &Key) -> bool {
         self.as_ptr() == other.as_ptr()
     }
 }
 
-impl Eq for Caller {}
+impl Eq for Key {}
 
-impl Hash for Caller {
+impl Hash for Key {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.as_ptr().hash(state)
     }
 }
 
-impl PartialOrd for Caller {
+impl PartialOrd for Key {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.as_ptr().partial_cmp(&other.as_ptr())
     }
 }
 
-impl Ord for Caller {
+impl Ord for Key {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.as_ptr().cmp(&other.as_ptr())
     }
 }
 
-impl From<&'static Location<'static>> for Caller {
+impl From<&'static Location<'static>> for Key {
     fn from(inner: &'static Location<'static>) -> Self {
-        Caller(inner)
+        Key(inner)
     }
 }

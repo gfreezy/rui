@@ -18,14 +18,14 @@ use crate::context::{ContextState, EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx};
 use crate::debug_state::DebugState;
 use crate::event::Event;
 use crate::id::ChildId;
-use crate::key::Caller;
+use crate::key::Key;
 use crate::lifecycle::LifeCycle;
 use crate::object::AnyRenderObject;
 
 #[derive(Default)]
 pub struct Children {
     pub(crate) states: Vec<StateNode>,
-    pub(crate) renders: Vec<Child>,
+    pub(crate) renders: Vec<Element>,
     pub(crate) bump: Bump,
 }
 
@@ -65,7 +65,7 @@ impl<T: 'static> Deref for State<T> {
 }
 
 pub struct StateNode {
-    pub(crate) key: Caller,
+    pub(crate) key: Key,
     pub(crate) state: *mut dyn Any,
     pub(crate) dead: bool,
 }
@@ -78,22 +78,16 @@ impl Drop for StateNode {
     }
 }
 
-pub struct RenderObject {
-    pub(crate) key: Caller,
-    pub(crate) object: Box<dyn AnyRenderObject>,
-    pub(crate) state: ChildState,
-}
-
-pub struct Child {
+pub struct Element {
     pub(crate) name: &'static str,
-    pub(crate) key: Caller,
+    pub(crate) key: Key,
     pub(crate) object: Box<dyn AnyRenderObject>,
     pub(crate) children: Children,
-    pub(crate) state: ChildState,
+    pub(crate) state: ElementState,
     pub(crate) dead: bool,
 }
 
-pub struct ChildState {
+pub struct ElementState {
     pub(crate) id: ChildId,
 
     /// The size of the child; this is the value returned by the child's layout
@@ -162,19 +156,19 @@ impl Children {
         self.len() == 0
     }
 
-    pub fn get(&self, index: usize) -> Option<&Child> {
+    pub fn get(&self, index: usize) -> Option<&Element> {
         self.renders.get(index)
     }
 
-    pub fn get_mut(&mut self, index: usize) -> Option<&mut Child> {
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut Element> {
         self.renders.get_mut(index)
     }
 
-    pub fn first(&self) -> Option<&Child> {
+    pub fn first(&self) -> Option<&Element> {
         self.renders.first()
     }
 
-    pub fn last(&self) -> Option<&Child> {
+    pub fn last(&self) -> Option<&Element> {
         self.renders.last()
     }
 
@@ -184,7 +178,7 @@ impl Children {
 }
 
 impl Index<usize> for Children {
-    type Output = Child;
+    type Output = Element;
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.renders[index]
@@ -198,17 +192,17 @@ impl IndexMut<usize> for Children {
 }
 
 /// [`RenderObject`] API for `Child` nodes.
-impl Child {
-    pub(crate) fn new<T>(key: Caller, object: T) -> Self
+impl Element {
+    pub(crate) fn new<T>(key: Key, object: T) -> Self
     where
         T: AnyRenderObject,
     {
-        Child {
+        Element {
             name: type_name::<T>(),
             key,
             object: Box::new(object),
             children: Children::new(),
-            state: ChildState::new(ChildId::next(), None),
+            state: ElementState::new(ChildId::next(), None),
             dead: false,
         }
     }
@@ -233,7 +227,7 @@ impl Child {
 }
 
 /// Public API for child nodes.
-impl Child {
+impl Element {
     pub fn as_any(&mut self) -> &mut dyn Any {
         self.object.as_any()
     }
@@ -339,12 +333,12 @@ pub struct ChildIter<'a> {
 }
 
 impl<'a> Iterator for ChildIter<'a> {
-    type Item = &'a mut Child;
+    type Item = &'a mut Element;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.index += 1;
         self.children.renders.get(self.index - 1).map(|node| {
-            let node_p = node as *const Child as *mut Child;
+            let node_p = node as *const Element as *mut Element;
             // This is save because each child can only be accessed once.
             unsafe { &mut *node_p }
         })
@@ -356,7 +350,7 @@ impl<'a> Iterator for ChildIter<'a> {
 }
 
 impl<'a> IntoIterator for &'a mut Children {
-    type Item = &'a mut Child;
+    type Item = &'a mut Element;
     type IntoIter = ChildIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -367,9 +361,9 @@ impl<'a> IntoIterator for &'a mut Children {
     }
 }
 
-impl ChildState {
+impl ElementState {
     pub(crate) fn new(id: ChildId, size: Option<Size>) -> Self {
-        ChildState {
+        ElementState {
             id,
             origin: Point::ORIGIN,
             size: size.unwrap_or_default(),
@@ -412,7 +406,7 @@ impl ChildState {
     /// This will also clear some requests in the child state.
     ///
     /// This method is idempotent and can be called multiple times.
-    pub fn merge_up(&mut self, child_state: &mut ChildState) {
+    pub fn merge_up(&mut self, child_state: &mut ElementState) {
         let clip = self
             .layout_rect()
             .with_origin(Point::ORIGIN)
@@ -468,7 +462,7 @@ impl ChildState {
 }
 
 /// [`RenderObject`] API for `Child` nodes.
-impl Child {
+impl Element {
     pub fn event(&mut self, ctx: &mut EventCtx, event: &Event) {
         let object_name = self.object.name();
         let span = tracing::span!(tracing::Level::DEBUG, "event", object_name);
@@ -493,7 +487,7 @@ impl Child {
                 true
             }
             Event::MouseDown(mouse_event) => {
-                Child::set_hot_state(
+                Element::set_hot_state(
                     self.object.as_mut(),
                     &mut self.state,
                     &mut self.children,
@@ -511,7 +505,7 @@ impl Child {
                 }
             }
             Event::MouseUp(mouse_event) => {
-                Child::set_hot_state(
+                Element::set_hot_state(
                     self.object.as_mut(),
                     &mut self.state,
                     &mut self.children,
@@ -529,7 +523,7 @@ impl Child {
                 }
             }
             Event::MouseMove(mouse_event) => {
-                let hot_changed = Child::set_hot_state(
+                let hot_changed = Element::set_hot_state(
                     self.object.as_mut(),
                     &mut self.state,
                     &mut self.children,
@@ -547,7 +541,7 @@ impl Child {
                 }
             }
             Event::Wheel(mouse_event) => {
-                Child::set_hot_state(
+                Element::set_hot_state(
                     &mut *self.object,
                     &mut self.state,
                     &mut self.children,
@@ -657,7 +651,7 @@ impl Child {
 }
 
 /// Public API for child nodes.
-impl Child {
+impl Element {
     pub fn size(&self) -> Size {
         self.state.size()
     }
@@ -673,7 +667,7 @@ impl Child {
     /// The provided `child_state` should be merged up if this returns `true`.
     fn set_hot_state(
         child: &mut dyn AnyRenderObject,
-        child_state: &mut ChildState,
+        child_state: &mut ElementState,
         children: &mut Children,
         context_state: &ContextState,
         rect: Rect,

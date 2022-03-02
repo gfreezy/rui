@@ -4,9 +4,9 @@ use std::panic::Location;
 
 use crate::context::{ContextState, UpdateCtx};
 use crate::ext_event::ExtEventSink;
-use crate::key::Caller;
+use crate::key::Key;
 use crate::object::{AnyRenderObject, Properties, RenderObject};
-use crate::tree::{Child, Children, State, StateNode};
+use crate::tree::{Children, Element, State, StateNode};
 
 pub struct Ui<'a> {
     pub(crate) tree: &'a mut Children,
@@ -53,12 +53,7 @@ impl<'a> Ui<'a> {
         State::new(raw_box)
     }
 
-    pub fn render_object<Props, R, N>(
-        &mut self,
-        caller: Caller,
-        props: Props,
-        content: N,
-    ) -> R::Action
+    pub fn render_object<Props, R, N>(&mut self, caller: Key, props: Props, content: N) -> R::Action
     where
         Props: Properties<Object = R>,
         R: RenderObject<Props> + Any,
@@ -107,7 +102,7 @@ impl<'a> Ui<'a> {
 }
 
 impl Ui<'_> {
-    fn find_state_node(&mut self, caller: Caller) -> Option<usize> {
+    fn find_state_node(&mut self, caller: Key) -> Option<usize> {
         let mut ix = self.state_index;
         for node in &mut self.tree.states[ix..] {
             if node.key == caller {
@@ -118,7 +113,7 @@ impl Ui<'_> {
         None
     }
 
-    fn insert_state_node(&mut self, caller: Caller, state: *mut dyn Any) -> usize {
+    fn insert_state_node(&mut self, caller: Key, state: *mut dyn Any) -> usize {
         let key = caller;
         let dead = false;
         self.tree
@@ -127,7 +122,7 @@ impl Ui<'_> {
         self.state_index
     }
 
-    fn find_render_object(&mut self, caller: Caller) -> Option<usize> {
+    fn find_render_object(&mut self, caller: Key) -> Option<usize> {
         let mut ix = self.render_index;
         for node in &mut self.tree.renders[ix..] {
             if node.key == caller {
@@ -138,10 +133,10 @@ impl Ui<'_> {
         None
     }
 
-    fn insert_render_object(&mut self, caller: Caller, object: impl AnyRenderObject) -> usize {
+    fn insert_render_object(&mut self, caller: Key, object: impl AnyRenderObject) -> usize {
         self.tree
             .renders
-            .insert(self.render_index, Child::new(caller, object));
+            .insert(self.render_index, Element::new(caller, object));
         self.render_index
     }
 

@@ -5,7 +5,7 @@ use crate::style::axis::Axis;
 use crate::style::layout::{
     CrossAxisAlignment, FlexFit, MainAxisAlignment, MainAxisSize, TextDirection, VerticalDirection,
 };
-use crate::tree::Child;
+use crate::tree::Element;
 use crate::{
     context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx},
     event::Event,
@@ -145,7 +145,7 @@ impl RenderFlex {
         ctx: &mut LayoutCtx,
         constraints: &BoxConstraints,
         children: &mut Children,
-        mut layout_child: impl FnMut(&mut LayoutCtx, &mut Child, &BoxConstraints) -> Size,
+        mut layout_child: impl FnMut(&mut LayoutCtx, &mut Element, &BoxConstraints) -> Size,
     ) -> LayoutSize {
         let mut total_flex = 0.0;
         let max_main_size = match self.direction {
@@ -268,7 +268,7 @@ impl RenderFlex {
         }
     }
 
-    fn get_flex(&self, child: &Child) -> f64 {
+    fn get_flex(&self, child: &Element) -> f64 {
         child
             .parent_data::<FlexParentData>()
             .map(|d| d.flex)
