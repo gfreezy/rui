@@ -11,28 +11,28 @@
     axis: vertical;
     spacing: 10;
     background: #aaa;
-    height: 300;
-    width: 300;
+    height: 800;
+    width: 800;
     insets: 10;
     main-axis-size: max;
     cross-axis-alignment: start;
     vertical-direction: down;
 }
 
-
-/*
 .flexible1 {
-    flex: 1;
-}
-
-.flexible2 {
     flex: 1;
     flex-fit: tight;
 }
 
+.flexible2 {
+    flex: 3;
+    flex-fit: tight;
+}
+
 .flexible3 {
-    flex: 2;
-} */
+    flex: 3;
+    flex-fit: tight;
+}
 
 .box {
     min-width: 20;

@@ -47,11 +47,6 @@ fn win(ui: &mut Ui) {
 
     flex(ui, ".flex", |ui| {
         let count = ui.state_node(|| 0isize);
-        // let text_val = ui.state_node(|| "haha".to_string());
-        // TextBox::new((*text_val).clone())
-        //     .text_size(20.)
-        //     .on_changed(move |val| text_val.set(format!("{val}")))
-        //     .build(ui);
 
         flexible(ui, ".flexible1", |ui| {
             flex(ui, ".inner-flex", |ui| {
@@ -166,11 +161,6 @@ fn text(ui: &mut Ui, text: &str, style: Style) {
 
 fn button<'a>(ui: &'a mut Ui<'_>, text: &str, click: impl FnMut() + 'static) {
     Button::new().labeled(ui, text, click);
-}
-
-fn test(ui: &mut Ui) {
-    let _style = live_style(ui, ".text");
-    Padding::new(Insets::uniform(100.)).build(ui, |ui| button(ui, "incr buttons", move || {}));
 }
 
 fn main() {

@@ -461,7 +461,7 @@ impl ElementState {
     }
 }
 
-/// [`RenderObject`] API for `Child` nodes.
+/// [`RenderObject`] API for `Element` nodes.
 impl Element {
     pub fn event(&mut self, ctx: &mut EventCtx, event: &Event) {
         let object_name = self.object.name();

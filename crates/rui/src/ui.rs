@@ -33,12 +33,12 @@ impl<'a> Ui<'a> {
 
     #[track_caller]
     pub fn state_node<T: 'static>(&mut self, init: impl FnOnce() -> T) -> State<T> {
-        let caller = Location::caller().into();
-        let idx = self.find_state_node(caller);
+        let key = Location::caller().into();
+        let idx = self.find_state_node(key);
         let index = match idx {
             None => {
                 let init_value: *mut dyn Any = self.tree.bump.alloc(init());
-                self.insert_state_node(caller, init_value)
+                self.insert_state_node(key, init_value)
             }
             Some(index) => index,
         };
@@ -53,14 +53,14 @@ impl<'a> Ui<'a> {
         State::new(raw_box)
     }
 
-    pub fn render_object<Props, R, N>(&mut self, caller: Key, props: Props, content: N) -> R::Action
+    pub fn render_object<Props, R, N>(&mut self, key: Key, props: Props, content: N) -> R::Action
     where
         Props: Properties<Object = R>,
         R: RenderObject<Props> + Any,
         N: FnOnce(&mut Ui),
     {
         let mut action = R::Action::default();
-        let index = if let Some(index) = self.find_render_object(caller) {
+        let index = if let Some(index) = self.find_render_object(key) {
             let node = &mut self.tree.renders[index];
             if let Some(object) = node.object.as_any().downcast_mut::<R>() {
                 let mut ctx = UpdateCtx {
@@ -75,7 +75,7 @@ impl<'a> Ui<'a> {
             index
         } else {
             let object = R::create(props);
-            let index = self.insert_render_object(caller, object);
+            let index = self.insert_render_object(key, object);
             let node = &mut self.tree.renders[index];
             node.request_layout();
             index
@@ -102,10 +102,10 @@ impl<'a> Ui<'a> {
 }
 
 impl Ui<'_> {
-    fn find_state_node(&mut self, caller: Key) -> Option<usize> {
+    fn find_state_node(&mut self, key: Key) -> Option<usize> {
         let mut ix = self.state_index;
         for node in &mut self.tree.states[ix..] {
-            if node.key == caller {
+            if node.key == key {
                 return Some(ix);
             }
             ix += 1;
@@ -113,8 +113,8 @@ impl Ui<'_> {
         None
     }
 
-    fn insert_state_node(&mut self, caller: Key, state: *mut dyn Any) -> usize {
-        let key = caller;
+    fn insert_state_node(&mut self, key: Key, state: *mut dyn Any) -> usize {
+        let key = key;
         let dead = false;
         self.tree
             .states
@@ -122,10 +122,10 @@ impl Ui<'_> {
         self.state_index
     }
 
-    fn find_render_object(&mut self, caller: Key) -> Option<usize> {
+    fn find_render_object(&mut self, key: Key) -> Option<usize> {
         let mut ix = self.render_index;
         for node in &mut self.tree.renders[ix..] {
-            if node.key == caller {
+            if node.key == key {
                 return Some(ix);
             }
             ix += 1;
@@ -133,10 +133,10 @@ impl Ui<'_> {
         None
     }
 
-    fn insert_render_object(&mut self, caller: Key, object: impl AnyRenderObject) -> usize {
+    fn insert_render_object(&mut self, key: Key, object: impl AnyRenderObject) -> usize {
         self.tree
             .renders
-            .insert(self.render_index, Element::new(caller, object));
+            .insert(self.render_index, Element::new(key, object));
         self.render_index
     }
 
