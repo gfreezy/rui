@@ -5,7 +5,7 @@ use std::panic::Location;
 use crate::context::{ContextState, UpdateCtx};
 use crate::ext_event::ExtEventSink;
 use crate::key::Key;
-use crate::object::{AnyRenderObject, Properties, RenderObject};
+use crate::object::{AnyParentData, AnyRenderObject, Properties, RenderObject};
 use crate::tree::{Children, Element, State, StateNode};
 
 pub struct Ui<'a> {
@@ -13,7 +13,7 @@ pub struct Ui<'a> {
     context_state: &'a ContextState,
     state_index: usize,
     render_index: usize,
-    parent_data: Option<Box<dyn Any>>,
+    parent_data: Option<Box<dyn AnyParentData>>,
 }
 
 impl<'a> Ui<'a> {
@@ -27,7 +27,7 @@ impl<'a> Ui<'a> {
         }
     }
 
-    pub(crate) fn set_parent_data(&mut self, parent_data: Option<Box<dyn Any>>) {
+    pub(crate) fn set_parent_data(&mut self, parent_data: Option<Box<dyn AnyParentData>>) {
         self.parent_data = parent_data;
     }
 
@@ -86,7 +86,11 @@ impl<'a> Ui<'a> {
         self.render_index = index + 1;
 
         let node = &mut self.tree.renders[index];
-        node.set_parent_data(self.parent_data.take());
+
+        let changed = node.set_parent_data(self.parent_data.take());
+        if changed {
+            node.request_layout();
+        }
 
         let mut child_ui = Ui::new(&mut node.children, self.context_state);
         content(&mut child_ui);

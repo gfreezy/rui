@@ -4,8 +4,8 @@ use std::{
     time::Duration,
 };
 
-use crate::tree::ElementState;
 use crate::{ext_event::ExtEventSink, id::ChildId};
+use crate::{object::AnyParentData, tree::ElementState};
 use druid_shell::kurbo::{Insets, Rect, Size};
 use druid_shell::piet::{Piet, PietText, RenderContext};
 use druid_shell::{Region, TimerToken, WindowHandle};
@@ -125,7 +125,10 @@ impl_context_method!(
             self.child_state.parent_data_mut()
         }
 
-        pub(crate) fn set_parent_data(&mut self, parent_data: Option<Box<dyn Any>>) {
+        pub(crate) fn set_parent_data(
+            &mut self,
+            parent_data: Option<Box<dyn AnyParentData>>,
+        ) -> bool {
             self.child_state.set_parent_data(parent_data)
         }
     }

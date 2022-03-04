@@ -20,8 +20,6 @@ pub trait RenderObject<Props>: RenderObjectInterface {
 
     fn create(props: Props) -> Self;
     fn update(&mut self, ctx: &mut UpdateCtx, props: Props) -> Self::Action;
-    #[allow(unused_variables)]
-    fn update_parent_data(&mut self, ctx: &mut UpdateCtx, parent_data: Option<Box<dyn Any>>) {}
 }
 
 pub trait RenderObjectInterface {
@@ -96,5 +94,25 @@ where
 
     fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children) {
         R::paint(self, ctx, children)
+    }
+}
+
+pub trait AnyParentData {
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+
+    fn eql(&self, other: &dyn AnyParentData) -> bool;
+}
+
+impl<T: PartialEq + 'static> AnyParentData for T {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn eql(&self, other: &dyn AnyParentData) -> bool {
+        Some(self) == other.as_any().downcast_ref::<T>()
     }
 }

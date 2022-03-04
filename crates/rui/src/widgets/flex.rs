@@ -306,14 +306,6 @@ impl RenderObject<Flex> for RenderFlex {
             ctx.request_layout();
         }
     }
-
-    fn update_parent_data(&mut self, ctx: &mut UpdateCtx, parent_data: Option<Box<dyn Any>>) {
-        let old_parent_data = ctx.parent_data::<FlexParentData>();
-        if old_parent_data != parent_data.as_ref().map(|v| v.downcast_ref()).flatten() {
-            ctx.set_parent_data(parent_data);
-            ctx.request_layout();
-        }
-    }
 }
 
 impl RenderObjectInterface for RenderFlex {

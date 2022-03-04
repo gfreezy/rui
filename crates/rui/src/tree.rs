@@ -20,7 +20,7 @@ use crate::event::Event;
 use crate::id::ChildId;
 use crate::key::Key;
 use crate::lifecycle::LifeCycle;
-use crate::object::AnyRenderObject;
+use crate::object::{AnyParentData, AnyRenderObject};
 
 #[derive(Default)]
 pub struct Children {
@@ -102,7 +102,7 @@ pub struct ElementState {
     pub(crate) parent_window_origin: Point,
 
     /// The origin of the parent in the window coordinate space;
-    pub(crate) parent_data: Option<Box<dyn Any>>,
+    pub(crate) parent_data: Option<Box<dyn AnyParentData>>,
 
     /// The insets applied to the layout rect to generate the paint rect.
     /// In general, these will be zero; the exception is for things like
@@ -445,19 +445,26 @@ impl ElementState {
     pub(crate) fn parent_data<T: 'static>(&self) -> Option<&T> {
         self.parent_data
             .as_ref()
-            .map(|v| v.downcast_ref())
+            .map(|v| v.as_any().downcast_ref())
             .flatten()
     }
 
     pub(crate) fn parent_data_mut<T: 'static>(&mut self) -> Option<&mut T> {
         self.parent_data
             .as_mut()
-            .map(|v| v.downcast_mut())
+            .map(|v| v.as_any_mut().downcast_mut())
             .flatten()
     }
 
-    pub(crate) fn set_parent_data(&mut self, parent_data: Option<Box<dyn Any>>) {
+    pub(crate) fn set_parent_data(&mut self, parent_data: Option<Box<dyn AnyParentData>>) -> bool {
+        let changed = match (&self.parent_data, &parent_data) {
+            (None, None) => false,
+            (None, Some(_)) => true,
+            (Some(_), None) => true,
+            (Some(l), Some(r)) => l.eql(r.deref()),
+        };
         self.parent_data = parent_data;
+        changed
     }
 }
 
@@ -745,7 +752,8 @@ impl Element {
         self.state.parent_data_mut()
     }
 
-    pub(crate) fn set_parent_data(&mut self, parent_data: Option<Box<dyn Any>>) {
+    /// return whether parent is changed
+    pub(crate) fn set_parent_data(&mut self, parent_data: Option<Box<dyn AnyParentData>>) -> bool {
         self.state.set_parent_data(parent_data)
     }
 
