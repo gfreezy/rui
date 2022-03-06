@@ -67,6 +67,34 @@ pub enum ScrollDirection {
     Reverse,
 }
 
+impl ScrollDirection {
+    pub fn flip(&self) -> ScrollDirection {
+        match self {
+            ScrollDirection::Forward => ScrollDirection::Reverse,
+            ScrollDirection::Idle => ScrollDirection::Idle,
+            ScrollDirection::Reverse => ScrollDirection::Forward,
+        }
+    }
+}
+/// Flips the [ScrollDirection] if the [GrowthDirection] is [GrowthDirection.reverse].
+///
+/// Specifically, returns `scrollDirection` if `scrollDirection` is
+/// [GrowthDirection.forward], otherwise returns [flipScrollDirection] applied to
+/// `scrollDirection`.
+///
+/// This function is useful in [RenderSliver] subclasses that are given both an
+/// [ScrollDirection] and a [GrowthDirection] and wish to compute the
+/// [ScrollDirection] in which growth will occur.
+pub fn apply_growth_direction_to_scroll_direction(
+    scroll_direction: ScrollDirection,
+    growth_direction: GrowthDirection,
+) -> ScrollDirection {
+    match growth_direction {
+        GrowthDirection::Forward => scroll_direction,
+        GrowthDirection::Reverse => scroll_direction.flip(),
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub enum CacheExtent {
     Pixel(f32),

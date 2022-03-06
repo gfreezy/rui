@@ -120,17 +120,6 @@ impl_context_method!(
         pub fn parent_data<T: 'static>(&self) -> Option<&T> {
             self.child_state.parent_data()
         }
-
-        pub(crate) fn parent_data_mut<T: 'static>(&mut self) -> Option<&mut T> {
-            self.child_state.parent_data_mut()
-        }
-
-        pub(crate) fn set_parent_data(
-            &mut self,
-            parent_data: Option<Box<dyn AnyParentData>>,
-        ) -> bool {
-            self.child_state.set_parent_data(parent_data)
-        }
     }
 );
 

@@ -1,5 +1,7 @@
 use nom::{number::complete::double, IResult};
 
+use crate::sliver_constraints::{axis_direction_to_axis, AxisDirection};
+
 enum_type!(Layout => [Flex, Default], Default, parse_layout);
 
 simple_type!([Flex, f64, 1.0]);
@@ -28,6 +30,15 @@ enum_type!(TextDirection => [
     Ltr,
     Rtl
 ], Ltr, parse_text_direction);
+
+impl TextDirection {
+    pub fn to_axis_direction(&self) -> AxisDirection {
+        match self {
+            TextDirection::Ltr => AxisDirection::Right,
+            TextDirection::Rtl => AxisDirection::Left,
+        }
+    }
+}
 
 enum_type!(VerticalDirection => [
     Up,

@@ -33,7 +33,7 @@ pub trait RenderObjectInterface {
     fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children);
 }
 
-pub trait SliverRenderObjectInterface {
+pub trait RenderSliverInterface {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children);
     fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children);
     fn layout(
@@ -54,6 +54,29 @@ pub trait AnyRenderObject: Any {
     fn dry_layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, children: &mut Children)
         -> Size;
     fn layout(&mut self, ctx: &mut LayoutCtx, bc: &Constraints, children: &mut Children) -> Size {
+        self.dry_layout(ctx, bc, children)
+    }
+    fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children);
+}
+
+pub trait AnyRenderSliver: Any {
+    fn as_any(&mut self) -> &mut dyn Any;
+    fn name(&self) -> &'static str;
+
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children);
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children);
+    fn dry_layout(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        c: &SliverConstraints,
+        children: &mut Children,
+    ) -> Size;
+    fn layout(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        bc: &SliverConstraints,
+        children: &mut Children,
+    ) -> Size {
         self.dry_layout(ctx, bc, children)
     }
     fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children);
@@ -89,6 +112,49 @@ where
     }
 
     fn layout(&mut self, ctx: &mut LayoutCtx, bc: &Constraints, children: &mut Children) -> Size {
+        R::layout(self, ctx, bc, children)
+    }
+
+    fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children) {
+        R::paint(self, ctx, children)
+    }
+}
+
+impl<R> AnyRenderSliver for R
+where
+    R: RenderSliverInterface + Any,
+{
+    fn as_any(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children) {
+        R::event(self, ctx, event, children)
+    }
+
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children) {
+        R::lifecycle(self, ctx, event, children)
+    }
+
+    fn dry_layout(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        bc: &SliverConstraints,
+        children: &mut Children,
+    ) -> Size {
+        R::dry_layout(self, ctx, bc, children)
+    }
+
+    fn layout(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        bc: &SliverConstraints,
+        children: &mut Children,
+    ) -> Size {
         R::layout(self, ctx, bc, children)
     }
 
