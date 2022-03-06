@@ -105,7 +105,7 @@ pub enum CacheExtent {
 pub struct SliverConstraints {
     /// The direction in which the [scrollOffset] and [remainingPaintExtent]
     /// increase.
-    axis_direction: AxisDirection,
+    pub axis_direction: AxisDirection,
 
     /// The direction in which the contents of slivers are ordered, relative to
     /// the [axisDirection].
@@ -128,7 +128,7 @@ pub struct SliverConstraints {
     ///
     /// Normally, the absolute zero offset is determined by the viewport's
     /// [RenderViewport.center] and [RenderViewport.anchor] properties.
-    growth_direction: GrowthDirection,
+    pub growth_direction: GrowthDirection,
 
     /// The direction in which the user is attempting to scroll, relative to the
     /// [axisDirection] and [growthDirection].
@@ -146,7 +146,7 @@ pub struct SliverConstraints {
     /// scroll offset. For example, [RenderSliverFloatingPersistentHeader] will
     /// only expand a floating app bar when the [userScrollDirection] is in the
     /// positive scroll offset direction.
-    user_scroll_direction: ScrollDirection,
+    pub user_scroll_direction: ScrollDirection,
 
     /// The scroll offset, in this sliver's coordinate system, that corresponds to
     /// the earliest visible part of this sliver in the [AxisDirection] if
@@ -174,7 +174,7 @@ pub struct SliverConstraints {
     ///
     /// Whether this corresponds to the beginning or the end of the sliver's
     /// contents depends on the [growthDirection].
-    scroll_offset: f32,
+    pub scroll_offset: f64,
 
     /// The scroll distance that has been consumed by all [RenderSliver]s that
     /// came before this [RenderSliver].
@@ -197,7 +197,7 @@ pub struct SliverConstraints {
     /// content forever without reaching the end. For any [RenderSliver]s that
     /// appear after the infinite [RenderSliver], the [precedingScrollExtent] will
     /// be [double.infinity].
-    preceding_scroll_extent: f32,
+    pub preceding_scroll_extent: f64,
 
     /// The number of pixels from where the pixels corresponding to the
     /// [scrollOffset] will be painted up to the first pixel that has not yet been
@@ -209,7 +209,7 @@ pub struct SliverConstraints {
     ///
     /// This is typically ignored unless the sliver is itself going to be pinned
     /// or floating and wants to avoid doing so under the previous sliver.
-    overlap: f32,
+    pub overlap: f64,
 
     /// The number of pixels of content that the sliver should consider providing.
     /// (Providing more pixels than this is inefficient.)
@@ -222,23 +222,23 @@ pub struct SliverConstraints {
     ///
     /// This value may be 0.0, for example if the sliver is scrolled off the
     /// bottom of a downwards vertical viewport.
-    remaining_paint_extent: f64,
+    pub remaining_paint_extent: f64,
 
     /// The number of pixels in the cross-axis.
     ///
     /// For a vertical list, this is the width of the sliver.
-    cross_axis_extent: f64,
+    pub cross_axis_extent: f64,
 
     /// The direction in which children should be placed in the cross axis.
     ///
     /// Typically used in vertical lists to describe whether the ambient
     /// [TextDirection] is [TextDirection.rtl] or [TextDirection.ltr].
-    cross_axis_direction: AxisDirection,
+    pub cross_axis_direction: AxisDirection,
 
     /// The number of pixels the viewport can display in the main axis.
     ///
     /// For a vertical list, this is the height of the viewport.
-    viewport_main_axis_extent: f64,
+    pub viewport_main_axis_extent: f64,
 
     /// Where the cache area starts relative to the [scrollOffset].
     ///
@@ -261,7 +261,7 @@ pub struct SliverConstraints {
     /// See also:
     ///
     ///  * [RenderViewport.cacheExtent] for a description of a viewport's cache area.
-    cache_origin: f64,
+    pub cache_origin: f64,
 
     /// Describes how much content the sliver should provide starting from the
     /// [cacheOrigin].
@@ -280,7 +280,7 @@ pub struct SliverConstraints {
     /// See also:
     ///
     ///  * [RenderViewport.cacheExtent] for a description of a viewport's cache area.
-    remaining_cache_extent: f64,
+    pub remaining_cache_extent: f64,
 }
 
 pub fn axis_direction_to_axis(axis_direction: AxisDirection) -> Axis {
@@ -354,7 +354,7 @@ pub struct SliverGeometry {
     ///
     /// This value must be accurate if the [paintExtent] is less than the
     /// [SliverConstraints.remainingPaintExtent] provided during layout.
-    scroll_extent: f32,
+    pub scroll_extent: f64,
 
     /// The visual location of the first visible part of this sliver relative to
     /// its layout position.
@@ -380,7 +380,7 @@ pub struct SliverGeometry {
     ///
     /// Defaults to 0.0, which means slivers start painting at their layout
     /// position by default.
-    paint_origin: f32,
+    pub paint_origin: f64,
 
     /// The amount of currently visible visual space that was taken by the sliver
     /// to render the subset of the sliver that covers all or part of the
@@ -400,7 +400,7 @@ pub struct SliverGeometry {
     ///
     /// This contributes to the calculation for the next sliver's
     /// [SliverConstraints.overlap].
-    paint_extent: f32,
+    pub paint_extent: f64,
 
     /// The distance from the first visible part of this sliver to the first
     /// visible part of the next sliver, assuming the next sliver's
@@ -413,7 +413,7 @@ pub struct SliverGeometry {
     /// viewport unless the sliver wants to achieve a special effect and push
     /// down the layout start position of subsequent slivers before the sliver is
     /// even scrolled into the viewport.
-    layout_extent: f64,
+    pub layout_extent: f64,
 
     /// The (estimated) total paint extent that this sliver would be able to
     /// provide if the [SliverConstraints.remainingPaintExtent] was infinite.
@@ -443,7 +443,7 @@ pub struct SliverGeometry {
     ///
     /// By default, this is true if [paintExtent] is greater than zero, and
     /// false if [paintExtent] is zero.
-    visible: bool,
+    pub visible: bool,
 
     /// Whether this sliver has visual overflow.
     ///
@@ -466,7 +466,7 @@ pub struct SliverGeometry {
     /// If the parent is also a [RenderSliver], it must propagate this value
     /// in its own [RenderSliver.geometry] property until a viewport which adjusts
     /// its offset based on this value.
-    scroll_offset_correction: f64,
+    pub scroll_offset_correction: f64,
 
     /// How many pixels the sliver has consumed in the
     /// [SliverConstraints.remainingCacheExtent].
@@ -479,7 +479,7 @@ pub struct SliverGeometry {
     /// See also:
     ///
     ///  * [RenderViewport.cacheExtent] for a description of a viewport's cache area.
-    cache_extent: f64,
+    pub cache_extent: f64,
 }
 
 impl SliverGeometry {
