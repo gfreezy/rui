@@ -6,7 +6,7 @@ use druid_shell::kurbo::{Point, Size};
 use druid_shell::piet::RenderContext;
 
 use crate::box_constraints::BoxConstraints;
-use crate::constraints::Constraints;
+
 use crate::context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx};
 use crate::event::Event;
 use crate::lifecycle::LifeCycle;
@@ -145,14 +145,13 @@ impl RenderObjectInterface for TextObject {
     fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _children: &mut Children) {
     }
 
-    fn dry_layout(
+    fn dry_layout_box(
         &mut self,
         ctx: &mut LayoutCtx,
-        c: &Constraints,
+        bc: &BoxConstraints,
         _children: &mut Children,
     ) -> Size {
         // tracing::debug!("layout for text {:?}", self.layout.text());
-        let bc: BoxConstraints = c.into();
         bc.debug_check("Label");
 
         let width = match self.style.line_breaking {
@@ -171,9 +170,13 @@ impl RenderObjectInterface for TextObject {
         ))
     }
 
-    fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, _children: &mut Children) -> Size {
+    fn layout_box(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        bc: &BoxConstraints,
+        _children: &mut Children,
+    ) -> Size {
         // tracing::debug!("layout for text {:?}", self.layout.text());
-        let bc: BoxConstraints = c.into();
         bc.debug_check("Label");
 
         let width = match self.style.line_breaking {

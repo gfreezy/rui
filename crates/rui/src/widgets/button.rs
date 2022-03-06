@@ -6,7 +6,7 @@ use druid_shell::MouseButton;
 use tracing::debug;
 
 use crate::box_constraints::BoxConstraints;
-use crate::constraints::Constraints;
+
 use crate::lifecycle::LifeCycle;
 use crate::{
     context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx},
@@ -144,13 +144,17 @@ impl RenderObjectInterface for ButtonObject {
         }
     }
 
-    fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, children: &mut Children) -> Size {
-        let bc: BoxConstraints = c.into();
+    fn layout_box(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        bc: &BoxConstraints,
+        children: &mut Children,
+    ) -> Size {
         bc.debug_check("Button");
 
         let padding = Size::new(2.0, 2.0);
-        let label_c: Constraints = bc.loosen().shrink(padding).into();
-        self.label_size = children[0].layout(ctx, &label_c);
+        let label_c = bc.loosen().shrink(padding);
+        self.label_size = children[0].layout_box(ctx, &label_c);
 
         let required_size = self.label_size + padding;
         let size = bc.constrain(required_size);
@@ -181,18 +185,17 @@ impl RenderObjectInterface for ButtonObject {
         children[0].paint(ctx);
     }
 
-    fn dry_layout(
+    fn dry_layout_box(
         &mut self,
         ctx: &mut LayoutCtx,
-        c: &Constraints,
+        bc: &BoxConstraints,
         children: &mut Children,
     ) -> Size {
-        let bc: BoxConstraints = c.into();
         bc.debug_check("Button");
 
         let padding = Size::new(2.0, 2.0);
-        let label_c: Constraints = bc.loosen().shrink(padding).into();
-        let label_size = children[0].dry_layout(ctx, &label_c);
+        let label_c = bc.loosen().shrink(padding);
+        let label_size = children[0].dry_layout_box(ctx, &label_c);
 
         let required_size = label_size + padding;
         let size = bc.constrain(required_size);

@@ -334,7 +334,8 @@ impl SliverConstraints {
     }
 }
 
-struct SliverGeometry {
+#[derive(Debug, PartialEq, Default, Clone)]
+pub struct SliverGeometry {
     /// The (estimated) total scrollable extent that this sliver has content for.
     ///
     /// This is the amount of scrolling the user needs to do to get from the
@@ -479,4 +480,10 @@ struct SliverGeometry {
     ///
     ///  * [RenderViewport.cacheExtent] for a description of a viewport's cache area.
     cache_extent: f64,
+}
+
+impl SliverGeometry {
+    pub fn new() -> Self {
+        Default::default()
+    }
 }

@@ -5,7 +5,7 @@ use std::panic::Location;
 use druid_shell::kurbo::{Insets, Point, Size};
 
 use crate::box_constraints::BoxConstraints;
-use crate::constraints::Constraints;
+
 use crate::{
     context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx},
     event::Event,
@@ -96,13 +96,12 @@ impl RenderObjectInterface for Padding {
     fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _children: &mut Children) {
     }
 
-    fn dry_layout(
+    fn dry_layout_box(
         &mut self,
         ctx: &mut LayoutCtx,
-        c: &Constraints,
+        bc: &BoxConstraints,
         children: &mut Children,
     ) -> Size {
-        let bc: BoxConstraints = c.into();
         bc.debug_check("Padding");
         let child = &mut children[0];
 
@@ -110,14 +109,18 @@ impl RenderObjectInterface for Padding {
         let vpad = self.top + self.bottom;
 
         let child_c = bc.shrink((hpad, vpad)).into();
-        let size = child.dry_layout(ctx, &child_c);
+        let size = child.dry_layout_box(ctx, &child_c);
 
         let my_size = Size::new(size.width + hpad, size.height + vpad);
         my_size
     }
 
-    fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, children: &mut Children) -> Size {
-        let bc: BoxConstraints = c.into();
+    fn layout_box(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        bc: &BoxConstraints,
+        children: &mut Children,
+    ) -> Size {
         bc.debug_check("Padding");
         let child = &mut children[0];
 
@@ -125,7 +128,7 @@ impl RenderObjectInterface for Padding {
         let vpad = self.top + self.bottom;
 
         let child_c = bc.shrink((hpad, vpad)).into();
-        let size = child.layout(ctx, &child_c);
+        let size = child.layout_box(ctx, &child_c);
         let origin = Point::new(self.left, self.top);
         child.set_origin(ctx, origin);
 

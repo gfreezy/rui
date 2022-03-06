@@ -91,13 +91,12 @@ impl RenderObjectInterface for RenderAlign {
         children[0].lifecycle(ctx, event)
     }
 
-    fn dry_layout(
+    fn dry_layout_box(
         &mut self,
         ctx: &mut crate::context::LayoutCtx,
-        c: &crate::constraints::Constraints,
+        bc: &crate::constraints::BoxConstraints,
         children: &mut crate::tree::Children,
     ) -> druid_shell::kurbo::Size {
-        let bc = c.to_box();
         let shrink_wrap_width = self.width_factor.is_some() || bc.max_width().is_infinite();
         let shrink_wrap_height = self.height_factor.is_some() || bc.max_height().is_infinite();
         if children.is_empty() {
@@ -110,7 +109,7 @@ impl RenderObjectInterface for RenderAlign {
                 },
             ));
         }
-        let child_size = children[0].dry_layout(ctx, &bc.loosen().into());
+        let child_size = children[0].dry_layout_box(ctx, &bc.loosen().into());
         bc.constrain(Size::new(
             if shrink_wrap_width {
                 child_size.width * self.width_factor.unwrap_or(1.0)
@@ -125,13 +124,12 @@ impl RenderObjectInterface for RenderAlign {
         ))
     }
 
-    fn layout(
+    fn layout_box(
         &mut self,
         ctx: &mut crate::context::LayoutCtx,
-        c: &crate::constraints::Constraints,
+        bc: &crate::constraints::BoxConstraints,
         children: &mut crate::tree::Children,
     ) -> Size {
-        let bc = c.to_box();
         let shrink_wrap_width = self.width_factor.is_some() || bc.max_width().is_infinite();
         let shrink_wrap_height = self.height_factor.is_some() || bc.max_height().is_infinite();
         if children.is_empty() {
@@ -145,7 +143,7 @@ impl RenderObjectInterface for RenderAlign {
             ));
         }
 
-        let child_size = children[0].layout(ctx, &bc.loosen().into());
+        let child_size = children[0].layout_box(ctx, &bc.loosen().into());
         let size = bc.constrain(Size::new(
             if shrink_wrap_width {
                 child_size.width * self.width_factor.unwrap_or(1.0)

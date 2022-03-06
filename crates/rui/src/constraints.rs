@@ -1,4 +1,4 @@
-use crate::{box_constraints::BoxConstraints, sliver_constraints::SliverConstraints};
+pub use crate::{box_constraints::BoxConstraints, sliver_constraints::SliverConstraints};
 
 #[derive(Clone, Debug)]
 pub enum Constraints {

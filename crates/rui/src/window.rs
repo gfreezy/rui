@@ -128,7 +128,7 @@ impl Window {
             child_state: &mut root_state,
         };
 
-        root_state.size = root.layout(
+        root_state.size = root.layout_box(
             &mut layout_ctx,
             &(BoxConstraints::new(Size::ZERO, self.size).into()),
         );

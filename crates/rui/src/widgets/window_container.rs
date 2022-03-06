@@ -1,7 +1,7 @@
 use druid_shell::kurbo::{Point, Size};
 
 use crate::{
-    constraints::Constraints,
+    box_constraints::BoxConstraints,
     context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx},
     event::Event,
     lifecycle::LifeCycle,
@@ -24,15 +24,15 @@ impl RenderObjectInterface for WindowContainer {
         }
     }
 
-    fn dry_layout(
+    fn dry_layout_box(
         &mut self,
         ctx: &mut LayoutCtx,
-        c: &Constraints,
+        bc: &BoxConstraints,
         children: &mut Children,
     ) -> Size {
         let mut size = Size::ZERO;
         for child in children {
-            let child_size = child.dry_layout(ctx, c);
+            let child_size = child.dry_layout_box(ctx, bc);
             size = Size::new(
                 child_size.width.max(size.width),
                 child_size.height.max(size.height),
@@ -40,10 +40,16 @@ impl RenderObjectInterface for WindowContainer {
         }
         size
     }
-    fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, children: &mut Children) -> Size {
+
+    fn layout_box(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        bc: &BoxConstraints,
+        children: &mut Children,
+    ) -> Size {
         let mut size = Size::ZERO;
         for child in children {
-            let child_size = child.layout(ctx, c);
+            let child_size = child.layout_box(ctx, bc);
             child.set_origin(ctx, Point::ZERO);
             size = Size::new(
                 child_size.width.max(size.width),

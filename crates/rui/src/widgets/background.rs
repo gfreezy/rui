@@ -3,7 +3,7 @@ use std::panic::Location;
 use druid_shell::kurbo::Size;
 use druid_shell::piet::{Color, PaintBrush, RenderContext};
 
-use crate::constraints::Constraints;
+use crate::box_constraints::BoxConstraints;
 use crate::style::draw;
 use crate::{
     context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx},
@@ -68,12 +68,12 @@ impl RenderObjectInterface for Background {
         children[0].paint(ctx);
     }
 
-    fn dry_layout(
+    fn dry_layout_box(
         &mut self,
         ctx: &mut LayoutCtx,
-        c: &Constraints,
+        bc: &BoxConstraints,
         children: &mut Children,
     ) -> Size {
-        children[0].layout(ctx, c)
+        children[0].layout_box(ctx, bc)
     }
 }

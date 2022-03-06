@@ -6,7 +6,7 @@ use druid_shell::kurbo::Size;
 use tracing::debug;
 
 use crate::box_constraints::BoxConstraints;
-use crate::constraints::Constraints;
+
 use crate::context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx};
 use crate::event::Event;
 use crate::lifecycle::LifeCycle;
@@ -139,13 +139,12 @@ impl RenderObjectInterface for SizedBoxObject {
     fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _children: &mut Children) {
     }
 
-    fn dry_layout(
+    fn dry_layout_box(
         &mut self,
         ctx: &mut LayoutCtx,
-        c: &Constraints,
+        bc: &BoxConstraints,
         children: &mut Children,
     ) -> Size {
-        let bc: BoxConstraints = c.into();
         bc.debug_check("SizedBox");
         let props = &self.props;
         let new_bc = child_constraints(
@@ -159,7 +158,7 @@ impl RenderObjectInterface for SizedBoxObject {
         );
         let child_bc = new_bc.loosen();
         let size = if !children.is_empty() {
-            children[0].dry_layout(ctx, &(child_bc.into()))
+            children[0].dry_layout_box(ctx, &(child_bc.into()))
         } else {
             Size::ZERO
         };
@@ -173,8 +172,12 @@ impl RenderObjectInterface for SizedBoxObject {
         new_size
     }
 
-    fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, children: &mut Children) -> Size {
-        let bc: BoxConstraints = c.into();
+    fn layout_box(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        bc: &BoxConstraints,
+        children: &mut Children,
+    ) -> Size {
         bc.debug_check("SizedBox");
         let props = &self.props;
         let new_bc = child_constraints(
@@ -188,7 +191,7 @@ impl RenderObjectInterface for SizedBoxObject {
         );
         let child_bc = new_bc.loosen();
         let size = if !children.is_empty() {
-            children[0].layout(ctx, &(child_bc.into()))
+            children[0].layout_box(ctx, &(child_bc.into()))
         } else {
             Size::ZERO
         };

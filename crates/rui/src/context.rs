@@ -1,11 +1,10 @@
 use std::{
-    any::Any,
     ops::{Deref, DerefMut},
     time::Duration,
 };
 
 use crate::{ext_event::ExtEventSink, id::ChildId};
-use crate::{object::AnyParentData, tree::ElementState};
+use crate::{tree::ElementState};
 use druid_shell::kurbo::{Insets, Rect, Size};
 use druid_shell::piet::{Piet, PietText, RenderContext};
 use druid_shell::{Region, TimerToken, WindowHandle};

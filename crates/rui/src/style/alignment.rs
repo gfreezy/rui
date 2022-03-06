@@ -1,9 +1,9 @@
 use super::layout::TextDirection;
 use super::utils::{make_error, parse_kebab_case, ws};
-use druid_shell::kurbo::{Point, Rect, Vec2};
+use druid_shell::kurbo::{Point, Vec2};
 use druid_shell::piet::TextAlignment;
-use nom::branch::alt;
-use nom::bytes::streaming::tag;
+
+
 use nom::combinator::map;
 use nom::{combinator::map_res, multi::many1, number::complete::double, IResult};
 
@@ -54,7 +54,7 @@ pub struct Alignment {
 }
 
 impl Alignment {
-    pub fn resolve(&self, text_direction: TextDirection) -> Alignment {
+    pub fn resolve(&self, _text_direction: TextDirection) -> Alignment {
         self.clone()
     }
 

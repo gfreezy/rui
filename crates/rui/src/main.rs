@@ -25,7 +25,7 @@ pub mod widgets;
 pub mod window;
 
 use app::WindowDesc;
-use druid_shell::kurbo::{Insets, Point, Size};
+use druid_shell::kurbo::{Point, Size};
 
 use menu::mac::menu_bar;
 
@@ -33,7 +33,7 @@ use live_style::live_style;
 use style::Style;
 
 use style::alignment::Alignment;
-use widgets::padding::Padding;
+
 
 use crate::app::AppLauncher;
 use crate::ui::Ui;

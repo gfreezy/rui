@@ -1,5 +1,5 @@
 use crate::box_constraints::BoxConstraints;
-use crate::constraints::Constraints;
+
 use crate::context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx};
 use crate::event::Event;
 use crate::lifecycle::LifeCycle;
@@ -268,14 +268,12 @@ impl RenderObjectInterface for TextBoxObject {
     fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _children: &mut Children) {
     }
 
-    fn dry_layout(
+    fn dry_layout_box(
         &mut self,
         ctx: &mut LayoutCtx,
-        c: &Constraints,
+        bc: &BoxConstraints,
         _children: &mut Children,
     ) -> Size {
-        let bc: BoxConstraints = c.into();
-
         let width = self.width.unwrap_or(f64::INFINITY);
 
         self.placeholder.rebuild_if_needed(&mut ctx.text());
@@ -303,9 +301,12 @@ impl RenderObjectInterface for TextBoxObject {
         size
     }
 
-    fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, _children: &mut Children) -> Size {
-        let bc: BoxConstraints = c.into();
-
+    fn layout_box(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        bc: &BoxConstraints,
+        _children: &mut Children,
+    ) -> Size {
         let width = 200.0;
         let text_insets = Insets::uniform(3.0);
 

@@ -1,6 +1,6 @@
 use nom::{number::complete::double, IResult};
 
-use crate::sliver_constraints::{axis_direction_to_axis, AxisDirection};
+use crate::sliver_constraints::{AxisDirection};
 
 enum_type!(Layout => [Flex, Default], Default, parse_layout);
 

@@ -1,5 +1,4 @@
 use crate::box_constraints::BoxConstraints;
-use crate::constraints::Constraints;
 
 use crate::style::axis::Axis;
 use crate::style::layout::{
@@ -15,7 +14,7 @@ use crate::{
     ui::Ui,
 };
 use druid_shell::kurbo::{Point, Size};
-use std::any::Any;
+
 use std::panic::Location;
 
 struct LayoutSize {
@@ -318,15 +317,14 @@ impl RenderObjectInterface for RenderFlex {
     fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _children: &mut Children) {
     }
 
-    fn dry_layout(
+    fn dry_layout_box(
         &mut self,
         ctx: &mut LayoutCtx,
-        c: &Constraints,
+        bc: &BoxConstraints,
         children: &mut Children,
     ) -> Size {
-        let bc = c.to_box();
         let sizes = self.compute_sizes(ctx, &bc, children, |ctx, child, bc| {
-            child.dry_layout(ctx, &bc.into())
+            child.dry_layout_box(ctx, &bc)
         });
         match self.direction {
             Axis::Horizontal => bc.constrain(Size::new(sizes.main_size, sizes.cross_size)),
@@ -334,15 +332,19 @@ impl RenderObjectInterface for RenderFlex {
         }
     }
 
-    fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints, children: &mut Children) -> Size {
-        let constraints: BoxConstraints = c.into();
-        constraints.debug_check("Flex");
+    fn layout_box(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        bc: &BoxConstraints,
+        children: &mut Children,
+    ) -> Size {
+        bc.debug_check("Flex");
         let LayoutSize {
             allocated_size,
             main_size: mut actual_size,
             mut cross_size,
-        } = self.compute_sizes(ctx, &constraints, children, |ctx, child, bc| {
-            child.layout(ctx, &bc.into())
+        } = self.compute_sizes(ctx, &bc, children, |ctx, child, bc| {
+            child.layout_box(ctx, &bc)
         });
 
         if self.cross_axis_alignment == CrossAxisAlignment::Baseline {
@@ -351,13 +353,13 @@ impl RenderObjectInterface for RenderFlex {
 
         let size = match self.direction {
             Axis::Horizontal => {
-                let size = constraints.constrain(Size::new(actual_size, cross_size));
+                let size = bc.constrain(Size::new(actual_size, cross_size));
                 actual_size = size.width;
                 cross_size = size.height;
                 size
             }
             Axis::Vertical => {
-                let size = constraints.constrain(Size::new(cross_size, actual_size));
+                let size = bc.constrain(Size::new(cross_size, actual_size));
                 actual_size = size.height;
                 cross_size = size.width;
                 size

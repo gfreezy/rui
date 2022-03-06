@@ -13,7 +13,8 @@ use druid_shell::kurbo::{Affine, Insets, Point, Rect, Shape, Size, Vec2};
 use druid_shell::piet::RenderContext;
 use druid_shell::{Region, TimerToken};
 
-use crate::constraints::Constraints;
+use crate::box_constraints::BoxConstraints;
+
 use crate::context::{ContextState, EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx};
 use crate::debug_state::DebugState;
 use crate::event::Event;
@@ -21,6 +22,7 @@ use crate::id::ChildId;
 use crate::key::Key;
 use crate::lifecycle::LifeCycle;
 use crate::object::{AnyParentData, AnyRenderObject};
+use crate::sliver_constraints::{SliverConstraints, SliverGeometry};
 
 #[derive(Default)]
 pub struct Children {
@@ -90,9 +92,13 @@ pub struct Element {
 pub struct ElementState {
     pub(crate) id: ChildId,
 
-    /// The size of the child; this is the value returned by the child's layout
+    /// The size of the box child; this is the value returned by the child's `layout_box`
     /// method.
     pub(crate) size: Size,
+
+    /// The geometry of the sliver child; this is the value returned by the child's `layout_sliver`
+    /// method.
+    pub(crate) geometry: SliverGeometry,
 
     /// The origin of the child in the parent's coordinate space; together with
     /// `size` these constitute the child's layout rect.
@@ -367,6 +373,7 @@ impl ElementState {
             id,
             origin: Point::ORIGIN,
             size: size.unwrap_or_default(),
+            geometry: SliverGeometry::new(),
             baseline_offset: 0.,
             invalid: Region::EMPTY,
             viewport_offset: Vec2::ZERO,
@@ -604,7 +611,7 @@ impl Element {
             .lifecycle(&mut child_ctx, event, &mut self.children);
     }
 
-    pub fn dry_layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints) -> Size {
+    pub fn dry_layout_box(&mut self, ctx: &mut LayoutCtx, c: &BoxConstraints) -> Size {
         let object_name = self.object.name();
         let span = tracing::span!(tracing::Level::DEBUG, "dry_layout", ?c, object_name);
         let _h = span.enter();
@@ -618,9 +625,9 @@ impl Element {
             .dry_layout(&mut child_ctx, c, &mut self.children)
     }
 
-    pub fn layout(&mut self, ctx: &mut LayoutCtx, c: &Constraints) -> Size {
+    pub fn layout_box(&mut self, ctx: &mut LayoutCtx, c: &BoxConstraints) -> Size {
         let object_name = self.object.name();
-        let span = tracing::span!(tracing::Level::DEBUG, "layout", ?c, object_name);
+        let span = tracing::span!(tracing::Level::DEBUG, "layout_box", ?c, object_name);
         let _h = span.enter();
 
         // if !self.state.needs_layout {
@@ -634,11 +641,38 @@ impl Element {
             child_state: &mut self.state,
         };
 
-        let new_size = self.object.layout(&mut child_ctx, c, &mut self.children);
+        let new_size = self
+            .object
+            .layout_box(&mut child_ctx, c, &mut self.children);
 
         self.state.size = new_size;
 
         new_size
+    }
+
+    pub fn layout_sliver(&mut self, ctx: &mut LayoutCtx, c: &SliverConstraints) -> SliverGeometry {
+        let object_name = self.object.name();
+        let span = tracing::span!(tracing::Level::DEBUG, "layout_sliver", ?c, object_name);
+        let _h = span.enter();
+
+        // if !self.state.needs_layout {
+        //     return self.state.size;
+        // }
+
+        self.state.needs_layout = false;
+
+        let mut child_ctx = LayoutCtx {
+            context_state: ctx.context_state,
+            child_state: &mut self.state,
+        };
+
+        let new_geometry = self
+            .object
+            .layout_sliver(&mut child_ctx, c, &mut self.children);
+
+        self.state.geometry = new_geometry.clone();
+
+        new_geometry
     }
 
     pub fn paint(&mut self, ctx: &mut PaintCtx) {

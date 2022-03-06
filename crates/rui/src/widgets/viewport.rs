@@ -4,10 +4,7 @@ use druid_shell::kurbo::Size;
 
 use crate::context::LayoutCtx;
 use crate::key::Key;
-use crate::sliver_constraints::{
-    apply_growth_direction_to_scroll_direction, AxisDirection, CacheExtent, GrowthDirection,
-    ScrollDirection, SliverConstraints,
-};
+use crate::sliver_constraints::{AxisDirection, CacheExtent, GrowthDirection, ScrollDirection};
 use crate::style::layout::TextDirection;
 use crate::tree::Children;
 use crate::{
@@ -140,17 +137,17 @@ impl ViewportObject {
     /// function repeatedly until it returns 0.0.
     fn layout_child_sequence(
         self,
-        ctx: &mut LayoutCtx,
-        children: &mut Children,
-        scroll_offset: f64,
-        overlap: f64,
-        layout_offset: f64,
-        remaining_paint_extent: f64,
-        main_axis_extent: f64,
-        cross_axis_extent: f64,
-        groth_direction: GrowthDirection,
-        remainting_cache_extent: f64,
-        cache_origin: f64,
+        _ctx: &mut LayoutCtx,
+        _children: &mut Children,
+        _scroll_offset: f64,
+        _overlap: f64,
+        _layout_offset: f64,
+        _remaining_paint_extent: f64,
+        _main_axis_extent: f64,
+        _cross_axis_extent: f64,
+        _groth_direction: GrowthDirection,
+        _remainting_cache_extent: f64,
+        _cache_origin: f64,
     ) -> f64 {
         //     assert!(scroll_offset.is_finite());
         //     assert!(scroll_offset >= 0.0);
@@ -249,22 +246,22 @@ impl RenderObjectInterface for ViewportObject {
     ) {
     }
 
-    fn layout(
+    fn layout_box(
         &mut self,
-        ctx: &mut crate::context::LayoutCtx,
-        c: &crate::constraints::Constraints,
-        children: &mut crate::tree::Children,
+        _ctx: &mut crate::context::LayoutCtx,
+        _c: &crate::constraints::BoxConstraints,
+        _children: &mut crate::tree::Children,
     ) -> Size {
         Size::ZERO
     }
 
-    fn dry_layout(
+    fn dry_layout_box(
         &mut self,
         _ctx: &mut crate::context::LayoutCtx,
-        c: &crate::constraints::Constraints,
+        bc: &crate::constraints::BoxConstraints,
         _children: &mut crate::tree::Children,
     ) -> Size {
-        c.to_box().max()
+        bc.max()
     }
 
     fn paint(
