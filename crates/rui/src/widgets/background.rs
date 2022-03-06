@@ -9,7 +9,7 @@ use crate::{
     context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx},
     event::Event,
     lifecycle::LifeCycle,
-    object::{RenderObject, RenderObjectInterface},
+    object::{Properties, RenderObject, RenderObjectInterface},
     tree::Children,
     ui::Ui,
 };
@@ -17,6 +17,10 @@ use crate::{
 #[derive(Debug, Clone, PartialEq)]
 pub struct Background {
     background: draw::Background,
+}
+
+impl Properties for Background {
+    type Object = Self;
 }
 
 impl Background {
@@ -27,12 +31,11 @@ impl Background {
     #[track_caller]
     pub fn build(self, ui: &mut Ui, content: impl FnOnce(&mut Ui)) {
         let caller = Location::caller().into();
-        ui.render_object::<_, Background, _>(caller, self, content);
+        ui.render_object(caller, self, content);
     }
 }
 
-impl RenderObject for Background {
-    type Props = Background;
+impl RenderObject<Background> for Background {
     type Action = ();
 
     fn create(props: Background) -> Self {

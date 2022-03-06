@@ -11,7 +11,7 @@ use crate::lifecycle::LifeCycle;
 use crate::{
     context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx},
     event::Event,
-    object::{RenderObject, RenderObjectInterface},
+    object::{Properties, RenderObject, RenderObjectInterface},
     tree::Children,
     ui::Ui,
     widgets::text::Text,
@@ -26,6 +26,10 @@ impl PartialEq for Button {
     fn eq(&self, other: &Self) -> bool {
         self.disabled == other.disabled
     }
+}
+
+impl Properties for Button {
+    type Object = ButtonObject;
 }
 
 impl Button {
@@ -49,7 +53,7 @@ impl Button {
     #[track_caller]
     pub fn labeled(self, ui: &mut Ui, label: impl Into<String>, handler: impl FnMut() + 'static) {
         let caller = Location::caller().into();
-        ui.render_object::<_, ButtonObject, _>(caller, self.handler(handler), |ui| {
+        ui.render_object(caller, self.handler(handler), |ui| {
             Text::new(label).build(ui);
         })
     }
@@ -62,7 +66,7 @@ impl Button {
         content: impl FnOnce(&mut Ui),
     ) {
         let caller = Location::caller().into();
-        ui.render_object::<_, ButtonObject, _>(caller, self.handler(handler), content);
+        ui.render_object(caller, self.handler(handler), content);
     }
 }
 
@@ -77,8 +81,7 @@ pub struct ButtonObject {
     background_color: Color,
 }
 
-impl RenderObject for ButtonObject {
-    type Props = Button;
+impl RenderObject<Button> for ButtonObject {
     type Action = ();
 
     fn create(props: Button) -> Self {

@@ -5,7 +5,7 @@ use std::panic::Location;
 use crate::context::{ContextState, UpdateCtx};
 use crate::ext_event::ExtEventSink;
 use crate::key::Key;
-use crate::object::{AnyParentData, AnyRenderObject, RenderObject};
+use crate::object::{AnyParentData, AnyRenderObject, Properties, RenderObject};
 use crate::tree::{Children, Element, State, StateNode};
 
 pub struct Ui<'a> {
@@ -55,7 +55,8 @@ impl<'a> Ui<'a> {
 
     pub fn render_object<Props, R, N>(&mut self, key: Key, props: Props, content: N) -> R::Action
     where
-        R: RenderObject<Props = Props> + Any,
+        Props: Properties<Object = R>,
+        R: RenderObject<Props> + Any,
         N: FnOnce(&mut Ui),
     {
         let mut action = R::Action::default();

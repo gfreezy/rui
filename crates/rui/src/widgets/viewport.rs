@@ -11,7 +11,7 @@ use crate::sliver_constraints::{
 use crate::style::layout::TextDirection;
 use crate::tree::Children;
 use crate::{
-    object::{RenderObject, RenderObjectInterface},
+    object::{Properties, RenderObject, RenderObjectInterface},
     ui::Ui,
 };
 
@@ -54,8 +54,12 @@ impl Viewport {
     #[track_caller]
     pub fn build(self, cx: &mut Ui, content: impl FnOnce(&mut Ui)) {
         let caller = Location::caller().into();
-        cx.render_object::<_, ViewportObject, _>(caller, self, content);
+        cx.render_object(caller, self, content);
     }
+}
+
+impl Properties for Viewport {
+    type Object = ViewportObject;
 }
 
 pub struct ViewportObject {
@@ -194,8 +198,7 @@ impl ViewportObject {
     }
 }
 
-impl RenderObject for ViewportObject {
-    type Props = Viewport;
+impl RenderObject<Viewport> for ViewportObject {
     type Action = ();
 
     fn create(props: Viewport) -> Self {

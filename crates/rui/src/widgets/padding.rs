@@ -10,7 +10,7 @@ use crate::{
     context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx},
     event::Event,
     lifecycle::LifeCycle,
-    object::{RenderObject, RenderObjectInterface},
+    object::{Properties, RenderObject, RenderObjectInterface},
     tree::Children,
     ui::Ui,
 };
@@ -22,6 +22,10 @@ pub struct Padding {
     right: f64,
     top: f64,
     bottom: f64,
+}
+
+impl Properties for Padding {
+    type Object = Self;
 }
 
 impl Padding {
@@ -65,12 +69,11 @@ impl Padding {
     #[track_caller]
     pub fn build(self, ui: &mut Ui, content: impl FnOnce(&mut Ui)) {
         let caller = Location::caller().into();
-        ui.render_object::<_, Padding, _>(caller, self, content);
+        ui.render_object(caller, self, content);
     }
 }
 
-impl RenderObject for Padding {
-    type Props = Padding;
+impl RenderObject<Padding> for Padding {
     type Action = ();
 
     fn create(props: Padding) -> Self {

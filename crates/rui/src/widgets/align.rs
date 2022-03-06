@@ -3,7 +3,7 @@ use std::panic::Location;
 use druid_shell::kurbo::Size;
 
 use crate::{
-    object::{RenderObject, RenderObjectInterface},
+    object::{Properties, RenderObject, RenderObjectInterface},
     style::{alignment::Alignment, layout::TextDirection},
     ui::Ui,
 };
@@ -33,8 +33,12 @@ impl Align {
 
     #[track_caller]
     pub fn build(self, ui: &mut Ui, content: impl FnMut(&mut Ui)) {
-        ui.render_object::<_, RenderAlign, _>(Location::caller().into(), self, content)
+        ui.render_object(Location::caller().into(), self, content)
     }
+}
+
+impl Properties for Align {
+    type Object = RenderAlign;
 }
 
 #[derive(PartialEq)]
@@ -47,8 +51,7 @@ pub struct RenderAlign {
 
 impl RenderAlign {}
 
-impl RenderObject for RenderAlign {
-    type Props = Align;
+impl RenderObject<Align> for RenderAlign {
     type Action = ();
 
     fn create(props: Align) -> Self {

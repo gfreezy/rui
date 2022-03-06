@@ -3,7 +3,7 @@ use crate::constraints::Constraints;
 use crate::context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx};
 use crate::event::Event;
 use crate::lifecycle::LifeCycle;
-use crate::object::{RenderObject, RenderObjectInterface};
+use crate::object::{Properties, RenderObject, RenderObjectInterface};
 use crate::text::editor::Editor;
 use crate::text::layout::{LayoutMetrics, TextLayout};
 use crate::text::selection::Selection;
@@ -67,8 +67,12 @@ impl TextBox {
 
     pub fn build(self, ui: &mut Ui) -> bool {
         let caller = Location::caller().into();
-        ui.render_object::<_, TextBoxObject, _>(caller, self, |_| {})
+        ui.render_object(caller, self, |_| {})
     }
+}
+
+impl Properties for TextBox {
+    type Object = TextBoxObject;
 }
 
 pub struct TextBoxObject {
@@ -111,8 +115,7 @@ impl TextBoxObject {
     }
 }
 
-impl RenderObject for TextBoxObject {
-    type Props = TextBox;
+impl RenderObject<TextBox> for TextBoxObject {
     type Action = bool;
 
     fn create(props: TextBox) -> Self {

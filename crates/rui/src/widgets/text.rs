@@ -10,7 +10,7 @@ use crate::constraints::Constraints;
 use crate::context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx};
 use crate::event::Event;
 use crate::lifecycle::LifeCycle;
-use crate::object::{RenderObject, RenderObjectInterface};
+use crate::object::{Properties, RenderObject, RenderObjectInterface};
 use crate::style::text::LineBreaking;
 use crate::style::Style;
 use crate::text::font_descriptor::FontDescriptor;
@@ -33,6 +33,10 @@ pub struct Text {
     style: Style,
 }
 
+impl Properties for Text {
+    type Object = TextObject;
+}
+
 impl Text {
     /// Create a new `Label`.
     pub fn new(text: impl Into<String>) -> Self {
@@ -50,7 +54,7 @@ impl Text {
     #[track_caller]
     pub fn build(self, ui: &mut Ui) {
         let caller = Location::caller().into();
-        ui.render_object::<_, TextObject, _>(caller, self, |_| {});
+        ui.render_object(caller, self, |_| {});
     }
 }
 
@@ -110,8 +114,7 @@ impl TextObject {
     }
 }
 
-impl RenderObject for TextObject {
-    type Props = Text;
+impl RenderObject<Text> for TextObject {
     type Action = ();
 
     fn create(props: Text) -> Self {

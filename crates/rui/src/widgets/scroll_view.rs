@@ -8,7 +8,7 @@ use crate::constraints::Constraints;
 use crate::context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx};
 use crate::event::Event;
 use crate::lifecycle::LifeCycle;
-use crate::object::{RenderObject, RenderObjectInterface};
+use crate::object::{Properties, RenderObject, RenderObjectInterface};
 use crate::tree::Children;
 use crate::ui::Ui;
 
@@ -29,8 +29,12 @@ impl ScrollView {
     #[track_caller]
     pub fn build(self, cx: &mut Ui, content: impl FnOnce(&mut Ui)) {
         let caller = Location::caller().into();
-        cx.render_object::<_, ScrollViewObject, _>(caller, self, content);
+        cx.render_object(caller, self, content);
     }
+}
+
+impl Properties for ScrollView {
+    type Object = ScrollViewObject;
 }
 
 pub struct ScrollViewObject {
@@ -70,8 +74,7 @@ impl ScrollViewObject {
     }
 }
 
-impl RenderObject for ScrollViewObject {
-    type Props = ScrollView;
+impl RenderObject<ScrollView> for ScrollViewObject {
     type Action = ();
 
     fn create(props: ScrollView) -> Self {
