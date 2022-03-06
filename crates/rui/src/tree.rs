@@ -20,7 +20,7 @@ use crate::event::Event;
 use crate::id::ChildId;
 use crate::key::Key;
 use crate::lifecycle::LifeCycle;
-use crate::object::{AnyParentData, AnyRenderObject};
+use crate::object::{AnyParentData, AnyRenderObject, RenderObjectInterface};
 
 #[derive(Default)]
 pub struct Children {
@@ -81,7 +81,7 @@ impl Drop for StateNode {
 pub struct Element {
     pub(crate) name: &'static str,
     pub(crate) key: Key,
-    pub(crate) object: Box<dyn AnyRenderObject>,
+    pub(crate) object: Box<dyn AnyRenderObject + 'static>,
     pub(crate) children: Children,
     pub(crate) state: ElementState,
     pub(crate) dead: bool,
@@ -102,7 +102,7 @@ pub struct ElementState {
     pub(crate) parent_window_origin: Point,
 
     /// The origin of the parent in the window coordinate space;
-    pub(crate) parent_data: Option<Box<dyn AnyParentData>>,
+    pub(crate) parent_data: Option<Box<dyn AnyParentData + 'static>>,
 
     /// The insets applied to the layout rect to generate the paint rect.
     /// In general, these will be zero; the exception is for things like
@@ -218,7 +218,7 @@ impl Element {
         map.insert("origin".to_string(), format!("{:?}", self.state.origin));
         map.insert("size".to_string(), format!("{:?}", self.state.size));
         DebugState {
-            display_name: self.name().to_string(),
+            display_name: self.name.to_string(),
             children,
             other_values: map,
             ..Default::default()
@@ -445,7 +445,7 @@ impl ElementState {
     pub(crate) fn parent_data<T: 'static>(&self) -> Option<&T> {
         self.parent_data
             .as_ref()
-            .map(|v| v.as_any().downcast_ref())
+            .map(|v| (*v).as_any().downcast_ref())
             .flatten()
     }
 
@@ -586,6 +586,9 @@ impl Element {
             inner_ctx.child_state.has_active = false;
 
             self.object
+                .as_any()
+                .downcast_mut::<&mut dyn RenderObjectInterface>()
+                .unwrap()
                 .event(&mut inner_ctx, inner_event, &mut self.children);
 
             inner_ctx.child_state.has_active |= inner_ctx.child_state.is_active;
@@ -601,6 +604,9 @@ impl Element {
         };
 
         self.object
+            .as_any()
+            .downcast_mut::<&mut dyn RenderObjectInterface>()
+            .unwrap()
             .lifecycle(&mut child_ctx, event, &mut self.children);
     }
 
@@ -615,6 +621,9 @@ impl Element {
         };
 
         self.object
+            .as_any()
+            .downcast_mut::<&mut dyn RenderObjectInterface>()
+            .unwrap()
             .dry_layout(&mut child_ctx, c, &mut self.children)
     }
 
@@ -634,7 +643,12 @@ impl Element {
             child_state: &mut self.state,
         };
 
-        let new_size = self.object.layout(&mut child_ctx, c, &mut self.children);
+        let new_size = self
+            .object
+            .as_any()
+            .downcast_mut::<&mut dyn RenderObjectInterface>()
+            .unwrap()
+            .layout(&mut child_ctx, c, &mut self.children);
 
         self.state.size = new_size;
 
@@ -691,7 +705,11 @@ impl Element {
                 context_state,
                 child_state,
             };
-            child.lifecycle(&mut child_ctx, &hot_changed_event, children);
+            child
+                .as_any()
+                .downcast_mut::<&mut dyn RenderObjectInterface>()
+                .unwrap()
+                .lifecycle(&mut child_ctx, &hot_changed_event, children);
             // if hot changes and we're showing widget ids, always repaint
             // if env.get(Env::DEBUG_WIDGET_ID) {
             //     child_ctx.request_paint();
@@ -719,7 +737,11 @@ impl Element {
             region: ctx.region.clone(),
             child_state: &mut self.state,
         };
-        self.object.paint(&mut inner_ctx, &mut self.children);
+        self.object
+            .as_any()
+            .downcast_mut::<&mut dyn RenderObjectInterface>()
+            .unwrap()
+            .paint(&mut inner_ctx, &mut self.children);
 
         // debug!("layout rect: {:?}", self.layout_rect());
         // let _rect = inner_ctx.size().to_rect();

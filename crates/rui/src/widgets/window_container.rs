@@ -5,12 +5,29 @@ use crate::{
     context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx},
     event::Event,
     lifecycle::LifeCycle,
-    object::RenderObjectInterface,
+    object::{RenderObject, RenderObjectInterface},
     tree::Children,
 };
 
 pub(crate) struct WindowContainer;
 
+impl RenderObject for WindowContainer {
+    type Props = ();
+
+    type Action = ();
+
+    fn create(_props: Self::Props) -> Self {
+        Self
+    }
+
+    fn update(
+        &mut self,
+        _ctx: &mut crate::context::UpdateCtx,
+        _propss: Self::Props,
+    ) -> Self::Action {
+        ()
+    }
+}
 impl RenderObjectInterface for WindowContainer {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children) {
         for child in children {

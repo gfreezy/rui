@@ -10,7 +10,7 @@ use crate::{
     context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx},
     event::Event,
     lifecycle::LifeCycle,
-    object::{Properties, RenderObject, RenderObjectInterface},
+    object::{RenderObject, RenderObjectInterface},
     tree::Children,
     ui::Ui,
 };
@@ -35,10 +35,6 @@ pub(crate) struct Flex {
     vertical_direction: VerticalDirection,
 }
 
-impl Properties for Flex {
-    type Object = RenderFlex;
-}
-
 impl Flex {
     pub fn new(
         direction: Axis,
@@ -60,7 +56,7 @@ impl Flex {
 
     #[track_caller]
     pub fn build(self, ui: &mut Ui, content: impl FnOnce(&mut Ui)) {
-        ui.render_object(Location::caller().into(), self, content);
+        ui.render_object::<_, RenderFlex, _>(Location::caller().into(), self, content);
     }
 }
 
@@ -276,7 +272,8 @@ impl RenderFlex {
     }
 }
 
-impl RenderObject<Flex> for RenderFlex {
+impl RenderObject for RenderFlex {
+    type Props = Flex;
     type Action = ();
 
     fn create(props: Flex) -> Self {

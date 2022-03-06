@@ -10,7 +10,7 @@ use crate::constraints::Constraints;
 use crate::context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx};
 use crate::event::Event;
 use crate::lifecycle::LifeCycle;
-use crate::object::{Properties, RenderObject, RenderObjectInterface};
+use crate::object::{RenderObject, RenderObjectInterface};
 use crate::style::size::{Height, MaxHeight, MaxWidth, MinHeight, MinWidth, Width};
 use crate::tree::Children;
 use crate::ui::Ui;
@@ -33,10 +33,6 @@ pub struct SizedBox {
     min_height: MinHeight,
     max_height: MaxHeight,
     clip: bool,
-}
-
-impl Properties for SizedBox {
-    type Object = SizedBoxObject;
 }
 
 impl SizedBox {
@@ -63,7 +59,7 @@ impl SizedBox {
     #[track_caller]
     pub fn build(self, ui: &mut Ui, content: impl FnOnce(&mut Ui)) {
         let caller = Location::caller().into();
-        ui.render_object(caller, self, content);
+        ui.render_object::<_, SizedBoxObject, _>(caller, self, content);
     }
 
     /// Clip area.
@@ -113,7 +109,8 @@ fn child_constraints(
     BoxConstraints::new(min_size, max_size)
 }
 
-impl RenderObject<SizedBox> for SizedBoxObject {
+impl RenderObject for SizedBoxObject {
+    type Props = SizedBox;
     type Action = ();
 
     fn create(props: SizedBox) -> Self {
