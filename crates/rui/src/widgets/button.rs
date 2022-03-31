@@ -7,6 +7,7 @@ use tracing::debug;
 
 use crate::box_constraints::BoxConstraints;
 
+use crate::key::Key;
 use crate::lifecycle::LifeCycle;
 use crate::{
     context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx},
@@ -52,8 +53,7 @@ impl Button {
 
     #[track_caller]
     pub fn labeled(self, ui: &mut Ui, label: impl Into<String>, handler: impl FnMut() + 'static) {
-        let caller = Location::caller().into();
-        ui.render_object(caller, self.handler(handler), |ui| {
+        ui.render_object(Key::current(), self.handler(handler), |ui| {
             Text::new(label).build(ui);
         })
     }
@@ -65,8 +65,7 @@ impl Button {
         handler: impl FnMut() + 'static,
         content: impl FnOnce(&mut Ui),
     ) {
-        let caller = Location::caller().into();
-        ui.render_object(caller, self.handler(handler), content);
+        ui.render_object(crate::key::Key::current(), self.handler(handler), content);
     }
 }
 

@@ -3,6 +3,7 @@ use std::panic::Location;
 use druid_shell::kurbo::Size;
 
 use crate::{
+    key::Key,
     object::{Properties, RenderObject, RenderObjectInterface},
     style::{alignment::Alignment, layout::TextDirection},
     ui::Ui,
@@ -33,7 +34,7 @@ impl Align {
 
     #[track_caller]
     pub fn build(self, ui: &mut Ui, content: impl FnMut(&mut Ui)) {
-        ui.render_object(Location::caller().into(), self, content)
+        ui.render_object(Key::current(), self, content)
     }
 }
 

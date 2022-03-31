@@ -62,7 +62,7 @@ impl SizedBox {
 
     #[track_caller]
     pub fn build(self, ui: &mut Ui, content: impl FnOnce(&mut Ui)) {
-        let caller = Location::caller().into();
+        let caller = crate::key::Key::current();
         ui.render_object(caller, self, content);
     }
 

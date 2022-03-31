@@ -28,7 +28,7 @@ impl ScrollView {
 
     #[track_caller]
     pub fn build(self, cx: &mut Ui, content: impl FnOnce(&mut Ui)) {
-        let caller = Location::caller().into();
+        let caller = crate::key::Key::current();
         cx.render_object(caller, self, content);
     }
 }

@@ -4,6 +4,7 @@ use druid_shell::kurbo::Size;
 use druid_shell::piet::{Color, PaintBrush, RenderContext};
 
 use crate::box_constraints::BoxConstraints;
+use crate::key::Key;
 use crate::style::draw;
 use crate::{
     context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx},
@@ -30,8 +31,7 @@ impl Background {
 
     #[track_caller]
     pub fn build(self, ui: &mut Ui, content: impl FnOnce(&mut Ui)) {
-        let caller = Location::caller().into();
-        ui.render_object(caller, self, content);
+        ui.render_object(Key::current(), self, content);
     }
 }
 

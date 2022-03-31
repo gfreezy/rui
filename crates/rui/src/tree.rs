@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Deref;
 
+use std::time::Instant;
 use std::{
     any::Any,
     ops::{Index, IndexMut},
@@ -10,7 +11,7 @@ use std::{
 
 use bumpalo::Bump;
 use druid_shell::kurbo::{Affine, Insets, Point, Rect, Shape, Size, Vec2};
-use druid_shell::piet::RenderContext;
+use druid_shell::piet::{Color, LineJoin, PaintBrush, RenderContext, StrokeStyle};
 use druid_shell::{Region, TimerToken};
 
 use crate::box_constraints::BoxConstraints;
@@ -19,8 +20,8 @@ use crate::context::{ContextState, EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx};
 use crate::debug_state::DebugState;
 use crate::event::Event;
 use crate::id::ChildId;
-use crate::key::Key;
-use crate::lifecycle::LifeCycle;
+use crate::key::{Key, LocalKey};
+use crate::lifecycle::{InternalLifeCycle, LifeCycle};
 use crate::object::{AnyParentData, AnyRenderObject};
 use crate::sliver_constraints::{SliverConstraints, SliverGeometry};
 
@@ -83,6 +84,7 @@ impl Drop for StateNode {
 pub struct Element {
     pub(crate) name: &'static str,
     pub(crate) key: Key,
+    pub(crate) custom_key: LocalKey,
     pub(crate) object: Box<dyn AnyRenderObject>,
     pub(crate) children: Children,
     pub(crate) state: ElementState,
@@ -107,6 +109,11 @@ pub struct ElementState {
     /// The origin of the parent in the window coordinate space;
     pub(crate) parent_window_origin: Point,
 
+    // The part of this widget that is visible on the screen is offset by this
+    // much. This will be non-zero for widgets that are children of `Scroll`, or
+    // similar, and it is used for propagating invalid regions.
+    pub(crate) viewport_offset: Vec2,
+
     /// The origin of the parent in the window coordinate space;
     pub(crate) parent_data: Option<Box<dyn AnyParentData>>,
 
@@ -125,10 +132,7 @@ pub struct ElementState {
     // The region that needs to be repainted, relative to the widget's bounds.
     pub(crate) invalid: Region,
 
-    // The part of this widget that is visible on the screen is offset by this
-    // much. This will be non-zero for widgets that are children of `Scroll`, or
-    // similar, and it is used for propagating invalid regions.
-    pub(crate) viewport_offset: Vec2,
+    pub(crate) visible: bool,
 
     // TODO: consider using bitflags for the booleans.
     // hover state
@@ -174,12 +178,32 @@ impl Children {
         self.renders.first()
     }
 
+    pub(crate) fn first_mut(&mut self) -> Option<&mut Element> {
+        self.renders.first_mut()
+    }
+
     pub fn last(&self) -> Option<&Element> {
         self.renders.last()
     }
 
     pub fn iter(&mut self) -> ChildIter {
         self.into_iter()
+    }
+
+    /// Should only be used when `Element` need to change their child lists.
+    /// Used by `sliver_list`.
+    /// Calling this in other cases will lead to an inconsistent tree and probably cause crashes.
+    pub fn remove_element(&mut self, index: usize) -> Option<Element> {
+        if index >= self.renders.len() {
+            return None;
+        }
+        let mut el = self.renders.remove(index);
+        el.set_parent_data(None);
+        Some(el)
+    }
+
+    pub fn insert(&mut self, index: usize, child: Element) {
+        self.renders.insert(index, child);
     }
 }
 
@@ -206,6 +230,7 @@ impl Element {
         Element {
             name: type_name::<T>(),
             key,
+            custom_key: "".to_string(),
             object: Box::new(object),
             children: Children::new(),
             state: ElementState::new(ChildId::next(), None),
@@ -219,9 +244,16 @@ impl Element {
     pub(crate) fn debug_state(&mut self) -> DebugState {
         let children = self.children.iter().map(|c| c.debug_state()).collect();
         let mut map = HashMap::new();
-        map.insert("key".to_string(), format!("{:?}", self.key));
         map.insert("id".to_string(), format!("{:?}", self.state.id));
         map.insert("origin".to_string(), format!("{:?}", self.state.origin));
+        map.insert(
+            "paint_rect".to_string(),
+            format!("{:?}", self.state.paint_rect()),
+        );
+        map.insert(
+            "window_origin".to_string(),
+            format!("{:?}", self.state.window_origin()),
+        );
         map.insert("size".to_string(), format!("{:?}", self.state.size));
         DebugState {
             display_name: self.name().to_string(),
@@ -253,12 +285,15 @@ impl Element {
     /// [`Rect`]: struct.Rect.html
     /// [`Size`]: struct.Size.html
     /// [`LifeCycle::Size`]: enum.LifeCycle.html#variant.Size
-    pub fn set_origin(&mut self, _ctx: &mut LayoutCtx, origin: Point) {
+    pub fn set_origin(&mut self, ctx: &mut LayoutCtx, origin: Point) {
         self.state.origin = origin;
     }
 
     pub fn origin(&self) -> Point {
         self.state.origin
+    }
+    pub fn set_paint_insets(&mut self, insets: Insets) {
+        self.state.paint_insets = insets;
     }
 
     /// Returns the layout [`Rect`].
@@ -274,42 +309,25 @@ impl Element {
         self.state.layout_rect()
     }
 
-    /// Set the viewport offset.
+    /// The paint region for this widget.
     ///
-    /// This is relevant only for children of a scroll view (or similar). It must
-    /// be set by the parent widget whenever it modifies the position of its child
-    /// while painting it and propagating events. As a rule of thumb, you need this
-    /// if and only if you `Affine::translate` the paint context before painting
-    /// your child. For an example, see the implentation of [`Scroll`].
+    /// For more information, see [`WidgetPod::paint_rect`].
     ///
-    /// [`Scroll`]: widget/struct.Scroll.html
-    pub fn set_viewport_offset(&mut self, offset: Vec2) {
-        if offset != self.state.viewport_offset {
-            // We need the parent_window_origin recalculated.
-            // It should be possible to just trigger the InternalLifeCycle::ParentWindowOrigin here,
-            // instead of full layout. Would need more management in WidgetState.
-            self.state.needs_layout = true;
-        }
-        self.state.viewport_offset = offset;
-    }
-
-    /// The viewport offset.
-    ///
-    /// This will be the same value as set by [`set_viewport_offset`].
-    ///
-    /// [`set_viewport_offset`]: #method.viewport_offset
-    pub fn viewport_offset(&self) -> Vec2 {
-        self.state.viewport_offset
+    /// [`WidgetPod::paint_rect`]: struct.WidgetPod.html#method.paint_rect
+    pub fn paint_rect(&self) -> Rect {
+        self.state.paint_rect()
     }
 
     pub fn request_update(&mut self) {
         self.state.request_update = true;
     }
 
-    // #[track_caller]
+    #[track_caller]
     pub fn request_layout(&mut self) {
-        // let caller = Location::caller();
-        // debug!("{} request layout: {caller:?}", self.name());
+        tracing::debug!(
+            "request_layout, caller: {:?}",
+            std::panic::Location::caller()
+        );
         self.state.needs_layout = true;
     }
 
@@ -355,6 +373,17 @@ impl<'a> Iterator for ChildIter<'a> {
     }
 }
 
+impl<'a> DoubleEndedIterator for ChildIter<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.index -= 1;
+        self.children.renders.get(self.index - 1).map(|node| {
+            let node_p = node as *const Element as *mut Element;
+            // This is save because each child can only be accessed once.
+            unsafe { &mut *node_p }
+        })
+    }
+}
+
 impl<'a> IntoIterator for &'a mut Children {
     type Item = &'a mut Element;
     type IntoIter = ChildIter<'a>;
@@ -372,11 +401,11 @@ impl ElementState {
         ElementState {
             id,
             origin: Point::ORIGIN,
+            viewport_offset: Vec2::ZERO,
             size: size.unwrap_or_default(),
-            geometry: SliverGeometry::new(),
+            geometry: SliverGeometry::ZERO,
             baseline_offset: 0.,
             invalid: Region::EMPTY,
-            viewport_offset: Vec2::ZERO,
             parent_data: None,
             is_hot: false,
             is_active: false,
@@ -384,6 +413,7 @@ impl ElementState {
             needs_layout: true,
             paint_insets: Insets::ZERO,
             parent_window_origin: Point::ORIGIN,
+            visible: true,
             request_update: false,
         }
     }
@@ -427,12 +457,12 @@ impl ElementState {
         }
 
         if !child_state.invalid.is_empty() {
-            tracing::debug!(
-                "merge up: child invalid: {:?}, parent invalid: {:?}, clip: {:?}",
-                child_state.invalid,
-                self.invalid,
-                clip
-            );
+            // tracing::debug!(
+            //     "merge up: child invalid: {:?}, parent invalid: {:?}, clip: {:?}",
+            //     child_state.invalid,
+            //     self.invalid,
+            //     clip
+            // );
         }
         // Clearing the invalid rects here is less fragile than doing it while painting. The
         // problem is that widgets (for example, Either) might choose not to paint certain
@@ -447,6 +477,32 @@ impl ElementState {
 
     pub(crate) fn window_origin(&self) -> Point {
         self.parent_window_origin + self.origin.to_vec2() - self.viewport_offset
+    }
+
+    /// Set the viewport offset.
+    ///
+    /// This is relevant only for children of a scroll view (or similar). It must
+    /// be set by the parent widget whenever it modifies the position of its child
+    /// while painting it and propagating events. As a rule of thumb, you need this
+    /// if and only if you `Affine::translate` the paint context before painting
+    /// your child. For an example, see the implentation of [`Scroll`].
+    ///
+    /// [`Scroll`]: widget/struct.Scroll.html
+    pub fn set_viewport_offset(&mut self, offset: Vec2) {
+        if offset != self.viewport_offset {
+            // We need the parent_window_origin recalculated.
+            // It should be possible to just trigger the InternalLifeCycle::ParentWindowOrigin here,
+            // instead of full layout. Would need more management in WidgetState.
+            self.needs_layout = true;
+        }
+        self.viewport_offset = offset;
+    }
+
+    pub(crate) fn take_parent_data<T: 'static>(&mut self) -> Option<Box<T>> {
+        self.parent_data
+            .take()
+            .map(|v| v.to_any_box().downcast().ok())
+            .flatten()
     }
 
     pub(crate) fn parent_data<T: 'static>(&self) -> Option<&T> {
@@ -468,8 +524,15 @@ impl ElementState {
             (None, None) => false,
             (None, Some(_)) => true,
             (Some(_), None) => true,
-            (Some(l), Some(r)) => l.eql(r.deref()),
+            (Some(l), Some(r)) => !l.eql(r.deref()),
         };
+        if changed {
+            tracing::debug!(
+                "set parent data, old: {:?}, new: {:?}",
+                self.parent_data,
+                parent_data
+            );
+        }
         self.parent_data = parent_data;
         changed
     }
@@ -479,8 +542,9 @@ impl ElementState {
 impl Element {
     pub fn event(&mut self, ctx: &mut EventCtx, event: &Event) {
         let object_name = self.object.name();
-        let span = tracing::span!(tracing::Level::DEBUG, "event", object_name);
-        let _h = span.enter();
+        let instant = Instant::now();
+        // let span = tracing::span!(tracing::Level::DEBUG, "event", object_name);
+        // let _h = span.enter();
 
         if ctx.is_handled {
             // This function is called by containers to propagate an event from
@@ -599,9 +663,26 @@ impl Element {
             ctx.is_handled |= inner_ctx.is_handled;
         }
         ctx.child_state.merge_up(&mut self.state);
+
+        // tracing::debug!(
+        //     "{} event took {}",
+        //     object_name,
+        //     instant.elapsed().as_millis()
+        // );
     }
 
     pub fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle) {
+        let object_name = self.object.name();
+        let instant = Instant::now();
+        match event {
+            LifeCycle::Internal(internal) => match internal {
+                InternalLifeCycle::ParentWindowOrigin => {
+                    self.state.parent_window_origin = ctx.child_state.window_origin();
+                }
+            },
+            _ => {}
+        }
+
         let mut child_ctx = LifeCycleCtx {
             context_state: ctx.context_state,
             child_state: &mut self.state,
@@ -609,6 +690,12 @@ impl Element {
 
         self.object
             .lifecycle(&mut child_ctx, event, &mut self.children);
+
+        // tracing::debug!(
+        //     "{} lifecycle took {}",
+        //     object_name,
+        //     instant.elapsed().as_millis()
+        // );
     }
 
     pub fn dry_layout_box(&mut self, ctx: &mut LayoutCtx, c: &BoxConstraints) -> Size {
@@ -627,8 +714,9 @@ impl Element {
 
     pub fn layout_box(&mut self, ctx: &mut LayoutCtx, c: &BoxConstraints) -> Size {
         let object_name = self.object.name();
-        let span = tracing::span!(tracing::Level::DEBUG, "layout_box", ?c, object_name);
-        let _h = span.enter();
+        let instant = Instant::now();
+        // let span = tracing::span!(tracing::Level::DEBUG, "layout_box", ?c, object_name);
+        // let _h = span.enter();
 
         // if !self.state.needs_layout {
         //     return self.state.size;
@@ -645,19 +733,25 @@ impl Element {
             .object
             .layout_box(&mut child_ctx, c, &mut self.children);
 
+        // tracing::debug!(
+        //     "{} layout_box took {}",
+        //     object_name,
+        //     instant.elapsed().as_millis()
+        // );
         self.state.size = new_size;
 
         new_size
     }
 
-    pub fn layout_sliver(&mut self, ctx: &mut LayoutCtx, c: &SliverConstraints) -> SliverGeometry {
+    pub fn layout_sliver(&mut self, ctx: &mut LayoutCtx, sc: &SliverConstraints) -> SliverGeometry {
         let object_name = self.object.name();
-        let span = tracing::span!(tracing::Level::DEBUG, "layout_sliver", ?c, object_name);
-        let _h = span.enter();
+        let instant = Instant::now();
+        // let span = tracing::span!(tracing::Level::DEBUG, "layout_sliver", ?c, object_name);
+        // let _h = span.enter();
 
-        // if !self.state.needs_layout {
-        //     return self.state.size;
-        // }
+        if !self.state.needs_layout {
+            return self.state.geometry.clone();
+        }
 
         self.state.needs_layout = false;
 
@@ -666,28 +760,47 @@ impl Element {
             child_state: &mut self.state,
         };
 
-        let new_geometry = self
+        let geometry = self
             .object
-            .layout_sliver(&mut child_ctx, c, &mut self.children);
+            .layout_sliver(&mut child_ctx, sc, &mut self.children);
 
-        self.state.geometry = new_geometry.clone();
+        self.state.size = match sc.axis() {
+            crate::style::axis::Axis::Horizontal => {
+                Size::new(geometry.scroll_extent, sc.cross_axis_extent)
+            }
+            crate::style::axis::Axis::Vertical => {
+                Size::new(sc.cross_axis_extent, geometry.scroll_extent)
+            }
+        };
+        self.state.geometry = geometry.clone();
 
-        new_geometry
+        // tracing::debug!(
+        //     "{} layout_sliver took {}",
+        //     object_name,
+        //     instant.elapsed().as_millis()
+        // );
+        geometry
     }
 
     pub fn paint(&mut self, ctx: &mut PaintCtx) {
         let object_name = self.object.name();
-        let span = tracing::span!(tracing::Level::DEBUG, "paint", object_name);
-        let _h = span.enter();
+        let instant = Instant::now();
+        // let span = tracing::span!(tracing::Level::DEBUG, "paint", object_name);
+        // let _h = span.enter();
 
         ctx.with_save(|ctx| {
-            let layout_origin = self.layout_rect().origin().to_vec2();
-            ctx.transform(Affine::translate(layout_origin));
+            let origin = self.paint_rect().origin().to_vec2();
+            ctx.transform(Affine::translate(origin));
             let mut visible = ctx.region().clone();
             visible.intersect_with(self.state.paint_rect());
-            visible -= layout_origin;
+            visible -= origin;
             ctx.with_child_ctx(visible, |ctx| self.paint_raw(ctx));
         });
+        // tracing::debug!(
+        //     "{} paint took {} us",
+        //     object_name,
+        //     instant.elapsed().as_micros()
+        // );
     }
 }
 
@@ -756,18 +869,18 @@ impl Element {
         self.object.paint(&mut inner_ctx, &mut self.children);
 
         // debug!("layout rect: {:?}", self.layout_rect());
-        // let _rect = inner_ctx.size().to_rect();
+        let rect = inner_ctx.size().to_rect();
 
-        // const STYLE: StrokeStyle = StrokeStyle::new()
-        //     .dash_pattern(&[4.0, 2.0])
-        //     .dash_offset(8.0)
-        //     .line_join(LineJoin::Round);
-        // inner_ctx.render_ctx.stroke_styled(
-        //     rect,
-        //     &PaintBrush::Color(Color::rgb8(0, 0, 0)),
-        //     1.,
-        //     &STYLE,
-        // );
+        const STYLE: StrokeStyle = StrokeStyle::new()
+            .dash_pattern(&[4.0, 2.0])
+            .dash_offset(8.0)
+            .line_join(LineJoin::Round);
+        inner_ctx.render_ctx.stroke_styled(
+            rect,
+            &PaintBrush::Color(Color::rgb8(0, 0, 0)),
+            1.,
+            &STYLE,
+        );
     }
 
     pub(crate) fn needs_update(&self) -> bool {
@@ -776,6 +889,10 @@ impl Element {
 
     pub(crate) fn needs_layout(&self) -> bool {
         self.state.needs_layout
+    }
+
+    pub(crate) fn take_parent_data<T: 'static>(&mut self) -> Option<Box<T>> {
+        self.state.take_parent_data()
     }
 
     pub(crate) fn parent_data<T: 'static>(&self) -> Option<&T> {

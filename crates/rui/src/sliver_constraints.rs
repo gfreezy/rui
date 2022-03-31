@@ -1,32 +1,6 @@
 use druid_shell::kurbo::Size;
 
-use crate::box_constraints::BoxConstraints;
-
-/// The two cardinal directions in two dimensions.
-///
-/// The axis is always relative to the current coordinate space. This means, for
-/// example, that a [horizontal] axis might actually be diagonally from top
-/// right to bottom left, due to some local [Transform] applied to the scene.
-///
-/// See also:
-///
-///  * [AxisDirection], which is a directional version of this enum (with values
-///    light left and right, rather than just horizontal).
-///  * [TextDirection], which disambiguates between left-to-right horizontal
-///    content and right-to-left horizontal content.
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum Axis {
-    /// Left and right.
-    ///
-    /// See also:
-    ///
-    ///  * [TextDirection], which disambiguates between left-to-right horizontal
-    ///    content and right-to-left horizontal content.
-    Horizontal,
-
-    /// Up and down.
-    Vertical,
-}
+use crate::{box_constraints::BoxConstraints, style::axis::Axis};
 
 /// The direction in which a sliver's contents are ordered, relative to the
 /// scroll offset axis.
@@ -54,10 +28,34 @@ pub enum GrowthDirection {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum AxisDirection {
+    Up,
+    Right,
     Down,
     Left,
-    Right,
-    Up,
+}
+
+impl Default for AxisDirection {
+    fn default() -> Self {
+        AxisDirection::Down
+    }
+}
+
+impl AxisDirection {
+    pub fn flip(&self) -> AxisDirection {
+        match self {
+            AxisDirection::Down => AxisDirection::Up,
+            AxisDirection::Left => AxisDirection::Right,
+            AxisDirection::Right => AxisDirection::Left,
+            AxisDirection::Up => AxisDirection::Down,
+        }
+    }
+
+    pub fn is_reversed(&self) -> bool {
+        match self {
+            AxisDirection::Up | AxisDirection::Left => true,
+            AxisDirection::Right | AxisDirection::Down => false,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -65,6 +63,12 @@ pub enum ScrollDirection {
     Forward,
     Idle,
     Reverse,
+}
+
+impl Default for ScrollDirection {
+    fn default() -> Self {
+        ScrollDirection::Idle
+    }
 }
 
 impl ScrollDirection {
@@ -94,11 +98,19 @@ pub fn apply_growth_direction_to_scroll_direction(
         GrowthDirection::Reverse => scroll_direction.flip(),
     }
 }
-
+pub fn apply_growth_direction_to_axis_direction(
+    axisDirection: AxisDirection,
+    growthDirection: GrowthDirection,
+) -> AxisDirection {
+    match growthDirection {
+        GrowthDirection::Forward => axisDirection,
+        GrowthDirection::Reverse => axisDirection.flip(),
+    }
+}
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub enum CacheExtent {
-    Pixel(f32),
-    Viewport(f32),
+    Pixel(f64),
+    Viewport(f64),
 }
 
 #[derive(Clone, Debug)]
@@ -421,7 +433,7 @@ pub struct SliverGeometry {
     /// This is used by viewports that implement shrink-wrapping.
     ///
     /// By definition, this cannot be less than [paintExtent].
-    max_paint_extent: f64,
+    pub max_paint_extent: f64,
 
     /// The maximum extent by which this sliver can reduce the area in which
     /// content can scroll if the sliver were pinned at the edge.
@@ -431,13 +443,13 @@ pub struct SliverGeometry {
     /// A pinned app bar is an example for a sliver that would use this setting:
     /// When the app bar is pinned to the top, the area in which content can
     /// actually scroll is reduced by the height of the app bar.
-    max_scroll_obstruction_extent: f64,
+    pub max_scroll_obstruction_extent: f64,
 
     /// The distance from where this sliver started painting to the bottom of
     /// where it should accept hits.
     ///
     /// This must be between zero and [paintExtent]. It defaults to [paintExtent].
-    hit_test_extent: f64,
+    pub hit_test_extent: f64,
 
     /// Whether this sliver should be painted.
     ///
@@ -450,7 +462,7 @@ pub struct SliverGeometry {
     /// By default, this is false, which means the viewport does not need to clip
     /// its children. If any slivers have visual overflow, the viewport will apply
     /// a clip to its children.
-    has_visual_overflow: bool,
+    pub has_visual_overflow: bool,
 
     /// If this is non-zero after [RenderSliver.performLayout] returns, the scroll
     /// offset will be adjusted by the parent and then the entire layout of the
@@ -483,6 +495,20 @@ pub struct SliverGeometry {
 }
 
 impl SliverGeometry {
+    pub const ZERO: SliverGeometry = SliverGeometry {
+        scroll_extent: 0.,
+        paint_origin: 0.,
+        paint_extent: 0.0,
+        layout_extent: 0.0,
+        max_paint_extent: 0.0,
+        max_scroll_obstruction_extent: 0.0,
+        hit_test_extent: 0.0,
+        visible: false,
+        has_visual_overflow: false,
+        scroll_offset_correction: 0.0,
+        cache_extent: 0.0,
+    };
+
     pub fn new() -> Self {
         Default::default()
     }

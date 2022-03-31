@@ -66,7 +66,7 @@ impl TextBox {
     }
 
     pub fn build(self, ui: &mut Ui) -> bool {
-        let caller = Location::caller().into();
+        let caller = crate::key::Key::current();
         ui.render_object(caller, self, |_| {})
     }
 }

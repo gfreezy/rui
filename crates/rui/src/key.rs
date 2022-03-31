@@ -3,6 +3,8 @@
 use std::hash::Hash;
 use std::panic::Location;
 
+pub type LocalKey = String;
+
 /// A unique call location.
 ///
 /// These come from `#[track_caller]` annotations. It is a newtype
@@ -19,6 +21,11 @@ impl Key {
     /// it's hard to imagine how it can be implemented otherwise.
     fn as_ptr(&self) -> *const Location<'static> {
         self.0
+    }
+
+    #[track_caller]
+    pub fn current() -> Self {
+        Location::caller().into()
     }
 }
 
@@ -51,5 +58,11 @@ impl Ord for Key {
 impl From<&'static Location<'static>> for Key {
     fn from(inner: &'static Location<'static>) -> Self {
         Key(inner)
+    }
+}
+
+impl From<Key> for (Key, LocalKey) {
+    fn from(key: Key) -> Self {
+        (key, String::new())
     }
 }

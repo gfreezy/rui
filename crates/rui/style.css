@@ -1,6 +1,6 @@
 .text {
     font-family: monospace;
-    font-size: 21;
+    font-size: 20;
     font-weight: bold;
     color: rgb(238, 193, 95);
     line-breaking: clip;
@@ -11,8 +11,6 @@
     axis: vertical;
     spacing: 10;
     background: #aaa;
-    height: 800;
-    width: 800;
     insets: 10;
     main-axis-size: max;
     cross-axis-alignment: start;

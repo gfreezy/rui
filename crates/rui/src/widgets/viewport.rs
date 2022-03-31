@@ -1,33 +1,104 @@
+mod scroll_metrics;
+
 use std::panic::Location;
 
-use druid_shell::kurbo::Size;
+use druid_shell::kurbo::{Insets, Point, Size, Vec2};
+use druid_shell::piet::RenderContext;
+use druid_shell::MouseEvent;
 
 use crate::context::LayoutCtx;
-use crate::key::Key;
+use crate::event::Event;
+use crate::key::{Key, LocalKey};
+use crate::physics::tolerance::{near_equal, Tolerance};
 use crate::sliver_constraints::{
-    apply_growth_direction_to_scroll_direction, AxisDirection, CacheExtent, GrowthDirection,
-    ScrollDirection, SliverConstraints,
+    apply_growth_direction_to_axis_direction, apply_growth_direction_to_scroll_direction,
+    axis_direction_to_axis, AxisDirection, CacheExtent, GrowthDirection, ScrollDirection,
+    SliverConstraints, SliverGeometry,
 };
+use crate::style::axis::Axis;
 use crate::style::layout::TextDirection;
-use crate::tree::Children;
+use crate::tree::{Children, Element};
 use crate::{
     object::{Properties, RenderObject, RenderObjectInterface},
     ui::Ui,
 };
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+use self::scroll_metrics::{IScrollMetrics, ScrollMetrics};
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct ViewportOffset {
-    pixels: f32,
-    user_scroll_direction: ScrollDirection,
+    scroll_metrics: ScrollMetrics,
+    did_change_viewport_dimension_or_receive_correction: bool,
+    axis: Axis,
+    last_axis: Axis,
+    has_dimensions: bool,
+    pending_dimensions: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+impl ViewportOffset {
+    pub fn new() -> Self {
+        Self {
+            scroll_metrics: Default::default(),
+            did_change_viewport_dimension_or_receive_correction: false,
+            axis: Axis::Vertical,
+            last_axis: Axis::Vertical,
+            has_dimensions: false,
+            pending_dimensions: false,
+        }
+    }
+}
+
+impl IScrollMetrics for ViewportOffset {
+    fn base(&self) -> &dyn IScrollMetrics {
+        &self.scroll_metrics
+    }
+
+    fn base_mut(&mut self) -> &mut dyn IScrollMetrics {
+        &mut self.scroll_metrics
+    }
+}
+
+impl ViewportOffset {
+    pub fn apply_viewport_dimension(&mut self, viewport_dimension: f64) -> bool {
+        if self.scroll_metrics.viewport_dimension != viewport_dimension {
+            self.scroll_metrics.viewport_dimension = viewport_dimension;
+        }
+        true
+    }
+
+    pub fn apply_content_dimensions(
+        &mut self,
+        min_scroll_extent: f64,
+        max_scroll_extent: f64,
+    ) -> bool {
+        if !near_equal(
+            self.scroll_metrics.min_scroll_extent,
+            min_scroll_extent,
+            Tolerance::DEFAULT.distance,
+        ) || !near_equal(
+            self.scroll_metrics.max_scroll_extent,
+            max_scroll_extent,
+            Tolerance::DEFAULT.distance,
+        ) || self.did_change_viewport_dimension_or_receive_correction
+            || self.last_axis != self.axis
+        {
+            self.scroll_metrics.min_scroll_extent = min_scroll_extent;
+            self.scroll_metrics.max_scroll_extent = max_scroll_extent;
+            self.last_axis = self.axis;
+            return true;
+            // todo: more logics
+        }
+        true
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Viewport {
     axis_direction: AxisDirection,
     cross_axis_direction: AxisDirection,
-    anchor: f32,
+    anchor: f64,
     offset: ViewportOffset,
-    center: Key,
+    center: Option<LocalKey>,
     cache_extent: CacheExtent,
 }
 
@@ -35,9 +106,8 @@ impl Viewport {
     pub fn new(
         axis_direction: AxisDirection,
         cross_axis_direction: AxisDirection,
-        anchor: f32,
-        offset: ViewportOffset,
-        center: Key,
+        anchor: f64,
+        center: Option<LocalKey>,
         cache_extent: CacheExtent,
     ) -> Self {
         assert!(anchor >= 0. && anchor <= 1.);
@@ -45,7 +115,7 @@ impl Viewport {
             axis_direction,
             cross_axis_direction,
             anchor,
-            offset,
+            offset: ViewportOffset::new(),
             center,
             cache_extent,
         }
@@ -53,7 +123,7 @@ impl Viewport {
 
     #[track_caller]
     pub fn build(self, cx: &mut Ui, content: impl FnOnce(&mut Ui)) {
-        let caller = Location::caller().into();
+        let caller = crate::key::Key::current();
         cx.render_object(caller, self, content);
     }
 }
@@ -65,9 +135,9 @@ impl Properties for Viewport {
 pub struct ViewportObject {
     axis_direction: AxisDirection,
     cross_axis_direction: AxisDirection,
-    anchor: f32,
     offset: ViewportOffset,
-    center: Key,
+    anchor: f64,
+    center: Option<LocalKey>,
     cache_extent: CacheExtent,
 
     /// This value is set during layout based on the [CacheExtentStyle].
@@ -75,7 +145,12 @@ pub struct ViewportObject {
     /// When the style is [CacheExtentStyle.viewport], it is the main axis extent
     /// of the viewport multiplied by the requested cache extent, which is still
     /// expressed in pixels.
-    calculated_cache_extent: Option<f64>,
+    calculated_cache_extent: f64,
+
+    // Out-of-band data computed during layout.
+    min_scroll_extent: f64,
+    max_scroll_extent: f64,
+    has_visual_overflow: bool,
 }
 
 ///
@@ -138,10 +213,10 @@ impl ViewportObject {
     /// Returns the first non-zero [SliverGeometry.scrollOffsetCorrection]
     /// encountered, if any. Otherwise returns 0.0. Typical callers will call this
     /// function repeatedly until it returns 0.0.
-    fn layout_child_sequence(
-        self,
+    fn layout_child_sequence<'a, T: Iterator<Item = &'a mut Element>>(
+        &mut self,
         ctx: &mut LayoutCtx,
-        children: &mut Children,
+        children: T,
         mut scroll_offset: f64,
         overlap: f64,
         mut layout_offset: f64,
@@ -154,13 +229,14 @@ impl ViewportObject {
     ) -> f64 {
         assert!(scroll_offset.is_finite());
         assert!(scroll_offset >= 0.0);
+        let self_size = ctx.child_state.size();
         let initial_layout_offset = layout_offset;
         let adjusted_user_scroll_direction = apply_growth_direction_to_scroll_direction(
-            self.offset.user_scroll_direction,
+            self.offset.user_scroll_direction(),
             growth_direction,
         );
         let mut max_paint_offset = layout_offset + overlap;
-        let mut preceing_scroll_extent: f64 = 0.;
+        let mut preceding_scroll_extent: f64 = 0.;
         for child in children {
             let sliver_scroll_offset = scroll_offset.max(0.);
             let corrected_cache_origin = cache_origin.max(-sliver_scroll_offset);
@@ -178,7 +254,7 @@ impl ViewportObject {
                     growth_direction,
                     user_scroll_direction: adjusted_user_scroll_direction,
                     scroll_offset: sliver_scroll_offset,
-                    preceding_scroll_extent: preceing_scroll_extent,
+                    preceding_scroll_extent,
                     overlap: max_paint_offset - layout_offset,
                     remaining_paint_extent: (remaining_paint_extent - layout_offset
                         + initial_layout_offset)
@@ -197,18 +273,28 @@ impl ViewportObject {
 
             let effective_layout_offset = layout_offset + child_layout_geometry.paint_origin;
             if child_layout_geometry.visible || scroll_offset > 0.0 {
-                self.update_child_layout_offset(child, effective_layout_offset, growth_direction);
+                self.update_child_layout_offset(
+                    ctx,
+                    child,
+                    self_size,
+                    effective_layout_offset,
+                    child_layout_geometry.paint_extent,
+                    growth_direction,
+                );
             } else {
                 self.update_child_layout_offset(
+                    ctx,
                     child,
+                    self_size,
                     -scroll_offset + initial_layout_offset,
+                    child_layout_geometry.paint_extent,
                     growth_direction,
                 );
             }
             max_paint_offset = (effective_layout_offset + child_layout_geometry.paint_extent)
                 .max(max_paint_offset);
             scroll_offset -= child_layout_geometry.scroll_extent;
-            preceing_scroll_extent += child_layout_geometry.scroll_extent;
+            preceding_scroll_extent += child_layout_geometry.scroll_extent;
             layout_offset += child_layout_geometry.layout_extent;
             if child_layout_geometry.cache_extent != 0.0 {
                 remainting_cache_extent -=
@@ -221,21 +307,177 @@ impl ViewportObject {
         0.0
     }
 
+    /// Called during `layout_child_sequence` to store the layout offset for the
+    /// given child.
+    ///
+    /// Different subclasses using different representations for their children's
+    /// layout offset (e.g., logical or physical coordinates). This function lets
+    /// subclasses transform the child's layout offset before storing it in the
+    /// child's parent data.
     pub(crate) fn update_child_layout_offset(
         &self,
-        _child: &mut crate::tree::Element,
-        _effective_layout_offset: f64,
-        _growth_direction: GrowthDirection,
+        ctx: &mut LayoutCtx,
+        child: &mut Element,
+        self_size: Size,
+        layout_offset: f64,
+        paint_extent: f64,
+        growth_direction: GrowthDirection,
     ) {
-        todo!()
+        let (origin, insets) =
+            match apply_growth_direction_to_axis_direction(self.axis_direction, growth_direction) {
+                AxisDirection::Down => (
+                    Point::new(0.0, layout_offset),
+                    Insets::new(0.0, 0.0, 0.0, paint_extent),
+                ),
+                AxisDirection::Left => (
+                    Point::new(
+                        self_size.width - (layout_offset + child.paint_rect().width()),
+                        0.0,
+                    ),
+                    Insets::new(paint_extent, 0.0, 0.0, 0.0),
+                ),
+                AxisDirection::Right => (
+                    Point::new(layout_offset, 0.0),
+                    Insets::new(0.0, 0.0, paint_extent, 0.0),
+                ),
+                AxisDirection::Up => (
+                    Point::new(
+                        0.0,
+                        self_size.height - (layout_offset + child.layout_rect().height()),
+                    ),
+                    Insets::new(0.0, paint_extent, 0.0, 0.0),
+                ),
+            };
+        child.set_origin(ctx, origin);
+        child.set_paint_insets(insets);
     }
 
     pub(crate) fn update_out_of_band_data(
-        &self,
-        _growth_direction: GrowthDirection,
-        _child_layout_geometry: crate::sliver_constraints::SliverGeometry,
+        &mut self,
+        growth_direction: GrowthDirection,
+        child_layout_geometry: crate::sliver_constraints::SliverGeometry,
     ) {
-        todo!()
+        match growth_direction {
+            GrowthDirection::Forward => {
+                self.max_scroll_extent += child_layout_geometry.scroll_extent;
+            }
+            GrowthDirection::Reverse => {
+                self.min_scroll_extent -= child_layout_geometry.scroll_extent;
+            }
+        }
+        if child_layout_geometry.has_visual_overflow {
+            self.has_visual_overflow = true
+        }
+    }
+
+    fn axis(&self) -> Axis {
+        axis_direction_to_axis(self.axis_direction)
+    }
+
+    fn pointer_signal_event_delta(&self, wheel_delta: Vec2) -> f64 {
+        let mut delta = match self.axis() {
+            Axis::Horizontal => wheel_delta.x,
+            Axis::Vertical => wheel_delta.y,
+        };
+        if self.axis_direction.is_reversed() {
+            delta *= -1.;
+        }
+        delta
+    }
+
+    fn target_scroll_offset_for_pointer_scroll(&self, delta: f64) -> f64 {
+        ((self.offset.pixels() + delta).max(self.offset.min_scroll_extent()))
+            .min(self.offset.max_scroll_extent())
+    }
+
+    fn handle_pointer_scroll(&mut self, event: &MouseEvent) {
+        let delta = self.pointer_signal_event_delta(event.wheel_delta);
+        let target_scroll_offset = self.target_scroll_offset_for_pointer_scroll(delta);
+        if delta != 0.0 && target_scroll_offset != self.offset.pixels() {
+            self.offset.pointer_scroll(delta);
+        }
+    }
+
+    pub(crate) fn attempt_layout(
+        &mut self,
+        main_axis_extent: f64,
+        cross_axis_extent: f64,
+        corrected_offset: f64,
+        ctx: &mut LayoutCtx,
+        children: &mut Children,
+    ) -> f64 {
+        assert!(main_axis_extent >= 0.);
+        assert!(cross_axis_extent.is_finite());
+        assert!(cross_axis_extent >= 0.0);
+        assert!(corrected_offset.is_finite());
+
+        self.min_scroll_extent = 0.0;
+        self.max_scroll_extent = 0.0;
+        self.has_visual_overflow = false;
+
+        // centerOffset is the offset from the leading edge of the RenderViewport
+        // to the zero scroll offset (the line between the forward slivers and the
+        // reverse slivers).
+        let center_offset = main_axis_extent * self.anchor - corrected_offset;
+        let reverse_direction_remaining_paint_extent = center_offset.clamp(0.0, main_axis_extent);
+        let forward_direction_remaining_paint_extent =
+            (main_axis_extent - center_offset).clamp(0.0, main_axis_extent);
+
+        self.calculated_cache_extent = match self.cache_extent {
+            CacheExtent::Pixel(cache_extent) => cache_extent,
+            CacheExtent::Viewport(cache_extent) => main_axis_extent * cache_extent,
+        };
+
+        let full_cache_extent = main_axis_extent + 2.0 * self.calculated_cache_extent;
+        let center_cache_offset = center_offset + self.calculated_cache_extent;
+        let reverse_direction_remaining_cache_extent =
+            center_cache_offset.clamp(0.0, full_cache_extent);
+        let forward_direction_remaining_cache_extent =
+            (full_cache_extent - center_cache_offset).clamp(0.0, full_cache_extent);
+
+        let mut leading_negative_children: Vec<_> = children
+            .iter()
+            .take_while(|c| Some(&c.custom_key) != self.center.as_ref())
+            .collect();
+        leading_negative_children.reverse();
+
+        let result = self.layout_child_sequence(
+            ctx,
+            leading_negative_children.into_iter(),
+            main_axis_extent.max(center_offset) - main_axis_extent,
+            0.0,
+            forward_direction_remaining_paint_extent,
+            reverse_direction_remaining_paint_extent,
+            main_axis_extent,
+            cross_axis_extent,
+            GrowthDirection::Reverse,
+            reverse_direction_remaining_cache_extent,
+            (main_axis_extent - center_offset).clamp(-self.calculated_cache_extent, 0.0),
+        );
+        if result != 0.0 {
+            return -result;
+        }
+        let following_children: Vec<_> = children
+            .iter()
+            .skip_while(|c| Some(&c.custom_key) != self.center.as_ref())
+            .collect();
+        return self.layout_child_sequence(
+            ctx,
+            following_children.into_iter(),
+            (-center_offset).max(0.0),
+            (-center_offset).min(0.0),
+            if center_offset >= main_axis_extent {
+                center_offset
+            } else {
+                reverse_direction_remaining_paint_extent
+            },
+            forward_direction_remaining_paint_extent,
+            main_axis_extent,
+            cross_axis_extent,
+            GrowthDirection::Forward,
+            forward_direction_remaining_cache_extent,
+            center_offset.clamp(-self.calculated_cache_extent, 0.0),
+        );
     }
 }
 
@@ -250,7 +492,10 @@ impl RenderObject<Viewport> for ViewportObject {
             offset: props.offset,
             center: props.center,
             cache_extent: props.cache_extent,
-            calculated_cache_extent: None,
+            calculated_cache_extent: 0.0,
+            min_scroll_extent: 0.,
+            max_scroll_extent: 0.,
+            has_visual_overflow: false,
         }
     }
 
@@ -261,7 +506,6 @@ impl RenderObject<Viewport> for ViewportObject {
             axis_direction,
             cross_axis_direction,
             anchor,
-            offset,
             center,
             cache_extent
         ) {
@@ -277,6 +521,19 @@ impl RenderObjectInterface for ViewportObject {
         event: &crate::event::Event,
         children: &mut crate::tree::Children,
     ) {
+        match event {
+            Event::Wheel(mouse_event) => {
+                self.handle_pointer_scroll(mouse_event);
+                // for child in children {
+                //     child.state.set_viewport_offset(self.offset.scroll_offset());
+                // }
+                // tracing::debug!("scroll offset: {}, children len: {}", self.offset.pixels(), children.len());
+                ctx.request_layout();
+                ctx.set_handled();
+                return;
+            }
+            _ => {}
+        }
         for child in children {
             child.event(ctx, event);
         }
@@ -284,19 +541,13 @@ impl RenderObjectInterface for ViewportObject {
 
     fn lifecycle(
         &mut self,
-        _ctx: &mut crate::context::LifeCycleCtx,
-        _event: &crate::lifecycle::LifeCycle,
-        _children: &mut crate::tree::Children,
+        ctx: &mut crate::context::LifeCycleCtx,
+        event: &crate::lifecycle::LifeCycle,
+        children: &mut crate::tree::Children,
     ) {
-    }
-
-    fn layout_box(
-        &mut self,
-        _ctx: &mut crate::context::LayoutCtx,
-        _c: &crate::constraints::BoxConstraints,
-        _children: &mut crate::tree::Children,
-    ) -> Size {
-        Size::ZERO
+        for child in children {
+            child.lifecycle(ctx, event);
+        }
     }
 
     fn dry_layout_box(
@@ -308,11 +559,72 @@ impl RenderObjectInterface for ViewportObject {
         bc.max()
     }
 
-    fn paint(
+    fn layout_box(
         &mut self,
-        _ctx: &mut crate::context::PaintCtx,
-        _children: &mut crate::tree::Children,
-    ) {
-        todo!()
+        ctx: &mut crate::context::LayoutCtx,
+        bc: &crate::constraints::BoxConstraints,
+        children: &mut crate::tree::Children,
+    ) -> Size {
+        tracing::debug!("layout_box, offset: {:?}", self.offset.pixels());
+        let self_size = bc.max();
+
+        match self.axis() {
+            Axis::Horizontal => self.offset.apply_viewport_dimension(self_size.height),
+            Axis::Vertical => self.offset.apply_viewport_dimension(self_size.width),
+        };
+
+        if self.center.is_none() {
+            self.min_scroll_extent = 0.0;
+            self.max_scroll_extent = 0.0;
+            self.has_visual_overflow = false;
+            self.offset
+                .apply_content_dimensions(self_size.width, self_size.height);
+            return self_size;
+        }
+
+        let (main_axis_extent, cross_axis_extent) = match self.axis() {
+            Axis::Horizontal => (self_size.height, self_size.width),
+            Axis::Vertical => (self_size.width, self_size.height),
+        };
+        // todo:
+        // let center_offset_adjustment = center_child.center_offset_adjustment;
+        let center_offset_adjustment = 0.;
+        let mut correction;
+        const MAX_LAYOUT_CYCLES: usize = 10;
+        for i in 0..MAX_LAYOUT_CYCLES {
+            correction = self.attempt_layout(
+                main_axis_extent,
+                cross_axis_extent,
+                self.offset.pixels() + center_offset_adjustment,
+                ctx,
+                children,
+            );
+            tracing::debug!("attempt_layout: {}, correction: {}", i, correction);
+
+            if correction != 0. {
+                self.offset.correct_by(correction);
+            } else {
+                if self.offset.apply_content_dimensions(
+                    (self.min_scroll_extent + main_axis_extent * self.anchor).min(0.),
+                    (self.max_scroll_extent - main_axis_extent * (1.0 - self.anchor)).max(0.),
+                ) {
+                    break;
+                }
+            }
+        }
+        self_size
+    }
+
+    fn paint(&mut self, ctx: &mut crate::context::PaintCtx, children: &mut crate::tree::Children) {
+        if children.is_empty() {
+            return;
+        }
+        let clip = ctx.child_state.size().to_rect();
+        ctx.clip(clip);
+        for child in children {
+            if child.state.visible {
+                child.paint(ctx);
+            }
+        }
     }
 }

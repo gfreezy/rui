@@ -4,8 +4,9 @@ use std::panic::Location;
 
 use crate::context::{ContextState, UpdateCtx};
 use crate::ext_event::ExtEventSink;
-use crate::key::Key;
+use crate::key::{Key, LocalKey};
 use crate::object::{AnyParentData, AnyRenderObject, Properties, RenderObject};
+use crate::perf::measure_time;
 use crate::tree::{Children, Element, State, StateNode};
 
 pub struct Ui<'a> {
@@ -22,6 +23,20 @@ impl<'a> Ui<'a> {
             tree,
             context_state,
             state_index: 0,
+            render_index: 0,
+            parent_data: None,
+        }
+    }
+
+    pub(crate) fn new_in_the_middle(
+        tree: &'a mut Children,
+        context_state: &'a ContextState,
+        state_index: usize,
+    ) -> Self {
+        Ui {
+            tree,
+            context_state,
+            state_index,
             render_index: 0,
             parent_data: None,
         }
@@ -53,13 +68,19 @@ impl<'a> Ui<'a> {
         State::new(raw_box)
     }
 
-    pub fn render_object<Props, R, N>(&mut self, key: Key, props: Props, content: N) -> R::Action
+    pub fn render_object<Props, R, N>(
+        &mut self,
+        key: impl Into<(Key, LocalKey)>,
+        props: Props,
+        content: N,
+    ) -> R::Action
     where
         Props: Properties<Object = R>,
         R: RenderObject<Props> + Any,
         N: FnOnce(&mut Ui),
     {
         let mut action = R::Action::default();
+        let (key, custom_key) = key.into();
         let index = if let Some(index) = self.find_render_object(key) {
             let node = &mut self.tree.renders[index];
             if let Some(object) = node.object.as_any().downcast_mut::<R>() {
@@ -86,6 +107,7 @@ impl<'a> Ui<'a> {
         self.render_index = index + 1;
 
         let node = &mut self.tree.renders[index];
+        node.custom_key = custom_key;
 
         let changed = node.set_parent_data(self.parent_data.take());
         if changed {

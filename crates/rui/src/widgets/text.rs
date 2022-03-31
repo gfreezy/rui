@@ -53,7 +53,7 @@ impl Text {
 
     #[track_caller]
     pub fn build(self, ui: &mut Ui) {
-        let caller = Location::caller().into();
+        let caller = crate::key::Key::current();
         ui.render_object(caller, self, |_| {});
     }
 }
@@ -196,14 +196,12 @@ impl RenderObjectInterface for TextObject {
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, _children: &mut Children) {
-        // tracing::debug!("paint for text {:?}", self.layout.text());
-
         let origin = Point::new(LABEL_X_PADDING, 0.0);
         let label_size = ctx.size();
 
         if self.style.line_breaking == LineBreaking::Clip {
             ctx.clip(label_size.to_rect());
         }
-        self.draw_at(ctx, origin)
+        self.draw_at(ctx, origin);
     }
 }

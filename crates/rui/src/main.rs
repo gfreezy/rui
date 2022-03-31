@@ -16,6 +16,7 @@ mod live_style;
 pub mod menu;
 pub mod object;
 pub mod perf;
+mod physics;
 pub mod sliver_constraints;
 mod style;
 pub mod text;
@@ -24,16 +25,23 @@ pub mod ui;
 pub mod widgets;
 pub mod window;
 
+use std::any::Any;
+use std::panic::Location;
+
 use app::WindowDesc;
 use druid_shell::kurbo::{Point, Size};
 
+use key::{Key, LocalKey};
 use menu::mac::menu_bar;
 
 use live_style::live_style;
+use object::{Properties, RenderObject};
+use sliver_constraints::{AxisDirection, CacheExtent};
 use style::Style;
 
 use style::alignment::Alignment;
-
+use widgets::sliver_list::SliverChildDelegate;
+use widgets::viewport::ViewportOffset;
 
 use crate::app::AppLauncher;
 use crate::ui::Ui;
@@ -44,53 +52,80 @@ use crate::widgets::text::Text;
 
 fn win(ui: &mut Ui) {
     // scroll_view(ui, |ui| {
+    //     column(ui, |ui| {
+    //         for i in 0..40 {
+    //             let style = live_style(ui, ".text");
+    //             text(ui, &format!("haha {i}"), style);
+    //         }
+    //     });
+    // });
+    // flex(ui, ".flex", |ui| {
+    //     let count = ui.state_node(|| 0isize);
 
+    //     flexible(ui, ".flexible1", |ui| {
+    //         flex(ui, ".inner-flex", |ui| {
+    //             let style = live_style(ui, ".text");
+    //             let _i = 1;
+    //             for i in 0..(*count as usize) {
+    //                 let count2 = ui.state_node(|| 0isize);
+
+    //                 text(
+    //                     ui,
+    //                     &format!("label {}, count: {}", i, *count2),
+    //                     style.clone(),
+    //                 );
+
+    //                 button(ui, &format!("button{i}, click to incr你好"), move || {
+    //                     println!("click to incr");
+    //                     count2.update(|c| *c += 1);
+    //                 });
+    //             }
+    //         });
+    //     });
+
+    //     flexible(ui, ".flexible2", |ui| {
+    //         // align(ui, |ui| {
+    //         //     Text::new("hello").build(ui);
+    //         // });
+
+    //         button(ui, "incr buttons", move || {
+    //             count.update(|c| *c += 1);
+    //             println!("incr buttons");
+    //         });
+    //     });
+    //     flexible(ui, ".flexible3", |ui| {
+    //         button(ui, "decr buttons", move || {
+    //             count.update(|c| {
+    //                 if *c > 0 {
+    //                     *c -= 1
+    //                 }
+    //             });
+    //             println!("decr buttons");
+    //         });
+    //     });
+    // });
+    // });
     flex(ui, ".flex", |ui| {
-        let count = ui.state_node(|| 0isize);
-
-        flexible(ui, ".flexible1", |ui| {
-            flex(ui, ".inner-flex", |ui| {
-                let style = live_style(ui, ".text");
-                let _i = 1;
-                for i in 0..(*count as usize) {
-                    let count2 = ui.state_node(|| 0isize);
-
-                    text(
-                        ui,
-                        &format!("label {}, count: {}", i, *count2),
-                        style.clone(),
-                    );
-
-                    button(ui, &format!("button{i}, click to incr你好"), move || {
-                        println!("click to incr");
-                        count2.update(|c| *c += 1);
-                    });
-                }
-            });
-        });
-
-        flexible(ui, ".flexible2", |ui| {
-            // align(ui, |ui| {
-            //     Text::new("hello").build(ui);
-            // });
-
-            button(ui, "incr buttons", move || {
-                count.update(|c| *c += 1);
-                println!("incr buttons");
-            });
-        });
-        flexible(ui, ".flexible3", |ui| {
-            button(ui, "decr buttons", move || {
-                count.update(|c| {
-                    if *c > 0 {
-                        *c -= 1
+        let style = live_style(ui, ".text");
+        text(ui, "haha", style);
+        expand(ui, |ui| {
+            viewport(
+                ui,
+                AxisDirection::Down,
+                AxisDirection::Right,
+                "center".to_string(),
+                |ui| {
+                    widgets::sliver_to_box::SliverToBox.build(ui, "center".to_string(), |_| {});
+                    for i in 0..30 {
+                        widgets::sliver_to_box::SliverToBox.build(ui, i.to_string(), |ui| {
+                            let style = live_style(ui, ".text");
+                            text(ui, &format!("hello{}", i), style);
+                        });
                     }
-                });
-                println!("decr buttons");
-            });
+                },
+            )
         });
     });
-    // });
 }
 
 fn scroll_view(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
@@ -161,6 +196,67 @@ fn text(ui: &mut Ui, text: &str, style: Style) {
 
 fn button<'a>(ui: &'a mut Ui<'_>, text: &str, click: impl FnMut() + 'static) {
     Button::new().labeled(ui, text, click);
+}
+
+fn viewport(
+    ui: &mut Ui,
+    axis_direction: AxisDirection,
+    cross_axis_direction: AxisDirection,
+    center: LocalKey,
+    content: impl FnMut(&mut Ui),
+) {
+    widgets::viewport::Viewport::new(
+        axis_direction,
+        cross_axis_direction,
+        0.0,
+        Some(center),
+        CacheExtent::Viewport(1.),
+    )
+    .build(ui, content)
+}
+
+struct Delegate {
+    center: Key,
+}
+
+impl SliverChildDelegate for Delegate {
+    fn key(&self, index: usize) -> Key {
+        if index == 0 {
+            self.center.clone()
+        } else {
+            Location::caller().into()
+        }
+    }
+
+    fn build(&self, ui: &mut Ui, index: usize) {
+        // tracing::debug!("build in delegate");
+        let style = live_style(ui, ".text");
+        text(ui, &format!("number {index}"), style);
+    }
+
+    fn estimated_count(&self) -> Option<usize> {
+        // tracing::debug!("estimated count");
+        Some(100)
+    }
+
+    fn estimate_max_scroll_offset(
+        &self,
+        sc: &constraints::SliverConstraints,
+        first_index: usize,
+        last_index: usize,
+        leading_scroll_offset: f64,
+        trailing_scroll_offset: f64,
+    ) -> Option<f64> {
+        None
+    }
+
+    fn should_rebuild(&self, old_delegate: &dyn SliverChildDelegate) -> bool {
+        false
+    }
+}
+
+fn sliver_list(ui: &mut Ui, center: Key) {
+    widgets::sliver_list::SliverList::new(Box::new(Delegate { center })).build(ui)
 }
 
 fn main() {

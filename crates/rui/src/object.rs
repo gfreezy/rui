@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::fmt::Debug;
 
 use druid_shell::kurbo::Size;
 
@@ -24,26 +25,32 @@ pub trait RenderObject<Props>: RenderObjectInterface {
 
 pub trait RenderObjectInterface {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children);
-    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children);
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children) {
+        for child in children {
+            child.lifecycle(ctx, event);
+        }
+    }
     fn dry_layout_box(
         &mut self,
         ctx: &mut LayoutCtx,
-        c: &BoxConstraints,
+        bc: &BoxConstraints,
         children: &mut Children,
-    ) -> Size;
+    ) -> Size {
+        unreachable!()
+    }
     fn layout_box(
         &mut self,
-        _ctx: &mut LayoutCtx,
-        _c: &BoxConstraints,
-        _children: &mut Children,
+        ctx: &mut LayoutCtx,
+        bc: &BoxConstraints,
+        children: &mut Children,
     ) -> Size {
         unimplemented!()
     }
     fn layout_sliver(
         &mut self,
-        _ctx: &mut LayoutCtx,
-        _sc: &SliverConstraints,
-        _children: &mut Children,
+        ctx: &mut LayoutCtx,
+        sc: &SliverConstraints,
+        children: &mut Children,
     ) -> SliverGeometry {
         unimplemented!()
     }
@@ -74,27 +81,6 @@ pub trait AnyRenderObject: Any {
         sc: &SliverConstraints,
         children: &mut Children,
     ) -> SliverGeometry;
-    fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children);
-}
-
-pub trait AnyRenderSliver: Any {
-    fn as_any(&mut self) -> &mut dyn Any;
-    fn name(&self) -> &'static str;
-
-    fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children);
-    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children);
-    fn dry_layout(
-        &mut self,
-        ctx: &mut LayoutCtx,
-        c: &SliverConstraints,
-        children: &mut Children,
-    ) -> Size;
-    fn layout_box(
-        &mut self,
-        ctx: &mut LayoutCtx,
-        bc: &SliverConstraints,
-        children: &mut Children,
-    ) -> Size;
     fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children);
 }
 
@@ -150,17 +136,22 @@ where
     }
 }
 
-pub trait AnyParentData {
+pub trait AnyParentData: Debug {
     fn as_any(&self) -> &dyn Any;
+    fn to_any_box(self: Box<Self>) -> Box<dyn Any>;
     fn as_any_mut(&mut self) -> &mut dyn Any;
 
     fn eql(&self, other: &dyn AnyParentData) -> bool;
 }
 
-impl<T: PartialEq + 'static> AnyParentData for T {
+impl<T: PartialEq + Debug + 'static> AnyParentData for T {
     fn as_any(&self) -> &dyn Any {
         self
     }
+    fn to_any_box(self: Box<Self>) -> Box<dyn Any> {
+        Box::new(self)
+    }
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }

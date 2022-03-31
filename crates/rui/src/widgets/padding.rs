@@ -68,8 +68,7 @@ impl Padding {
 
     #[track_caller]
     pub fn build(self, ui: &mut Ui, content: impl FnOnce(&mut Ui)) {
-        let caller = Location::caller().into();
-        ui.render_object(caller, self, content);
+        ui.render_object(crate::key::Key::current(), self, content);
     }
 }
 

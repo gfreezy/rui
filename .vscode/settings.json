@@ -1,5 +1,4 @@
 {
-    "explorer.sortOrder": "mixed",
     "explorer.openEditors.visible": 0,
     "search.exclude": {
         "**/Cargo.lock": true,
@@ -19,5 +18,6 @@
     "outline.showOperators": false,
     "outline.showObjects": false,
     "outline.showNamespaces": false,
-    "outline.showKeys": false
+    "outline.showKeys": false,
+    "explorer.sortOrder": "mixed"
 }

@@ -3,8 +3,8 @@ use std::{
     time::Duration,
 };
 
+use crate::tree::ElementState;
 use crate::{ext_event::ExtEventSink, id::ChildId};
-use crate::{tree::ElementState};
 use druid_shell::kurbo::{Insets, Rect, Size};
 use druid_shell::piet::{Piet, PietText, RenderContext};
 use druid_shell::{Region, TimerToken, WindowHandle};

@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 
 use std::rc::Rc;
+use std::time::Instant;
 
 use druid_shell::kurbo::Size;
 use druid_shell::piet::Piet;
@@ -20,6 +21,7 @@ use crate::ext_event::{ExtEventHost, ExtEventSink};
 use crate::id::WindowId;
 
 use crate::menu::{MenuItemId, MenuManager};
+use crate::perf::measure_time;
 use crate::window::Window;
 
 pub(crate) const RUN_COMMANDS_TOKEN: IdleToken = IdleToken::new(1);
@@ -334,10 +336,21 @@ impl AppState {
     /// This is principally because in certain cases (such as keydown on Windows)
     /// the OS needs to know if an event was handled.
     fn do_window_event(&mut self, event: Event, window_id: WindowId) -> Handled {
-        let result = self.inner.borrow_mut().do_window_event(window_id, event);
-        self.process_commands();
-        self.inner.borrow_mut().do_update();
-        result
+        measure_time("app_state::do_window_event", || {
+            let result = measure_time("app_state::inner::do_window_event", || {
+                self.inner.borrow_mut().do_window_event(window_id, event)
+            });
+            measure_time(
+                "app_state::inner::do_window_event::process_commands",
+                || {
+                    self.process_commands();
+                },
+            );
+            measure_time("app_state::inner::do_window_event::do_update", || {
+                self.inner.borrow_mut().do_update();
+            });
+            result
+        })
     }
 
     fn prepare_paint_window(&mut self, window_id: WindowId) {
@@ -345,11 +358,13 @@ impl AppState {
     }
 
     fn paint_window(&mut self, window_id: WindowId, piet: &mut Piet, invalid: &Region) {
-        self.inner.borrow_mut().paint(window_id, piet, invalid);
+        measure_time("app_state::paint_window", || {
+            self.inner.borrow_mut().paint(window_id, piet, invalid);
+        })
     }
 
     fn idle(&mut self, token: IdleToken) {
-        match token {
+        measure_time("app_state::idle", || match token {
             RUN_COMMANDS_TOKEN => {
                 self.process_commands();
                 self.inner.borrow_mut().do_update();
@@ -360,33 +375,37 @@ impl AppState {
                 self.inner.borrow_mut().do_update();
             }
             other => tracing::warn!("unexpected idle token {:?}", other),
-        }
+        })
     }
 
     pub(crate) fn handle_idle_callback(&mut self, cb: impl FnOnce()) {
-        let mut inner = self.inner.borrow_mut();
-        cb();
-        inner.do_update();
+        measure_time("app_state::handle_idle_callback", || {
+            let mut inner = self.inner.borrow_mut();
+            cb();
+            inner.do_update();
+        })
     }
 
     fn process_commands(&mut self) {
-        loop {
+        measure_time("app_state::process_commands", || loop {
             let next_cmd = self.inner.borrow_mut().command_queue.pop_front();
             match next_cmd {
                 Some(cmd) => self.handle_cmd(cmd),
                 None => break,
             }
-        }
+        })
     }
 
     fn process_ext_events(&mut self) {
-        loop {
-            let ext_cmd = self.inner.borrow_mut().ext_event_host.recv();
-            match ext_cmd {
-                Some(cmd) => self.handle_cmd(cmd),
-                None => break,
+        measure_time("app_state::process_ext_events", || loop {
+            loop {
+                let ext_cmd = self.inner.borrow_mut().ext_event_host.recv();
+                match ext_cmd {
+                    Some(cmd) => self.handle_cmd(cmd),
+                    None => break,
+                }
             }
-        }
+        })
     }
 
     /// Handle a 'command' message from druid-shell. These map to  an item

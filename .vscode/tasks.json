@@ -14,7 +14,12 @@
 			"label": "rust: cargo run",
 			"presentation": {
 				"focus": true,
-				"clear": true,
+				"clear": true
+			},
+			"options": {
+				"env": {
+					"RUST_BACKTRACE": "1"
+				}
 			}
 		},
 		{

@@ -1,5 +1,7 @@
 use crate::box_constraints::BoxConstraints;
 
+use crate::object::AnyParentData;
+use crate::physics::tolerance::{near_equal, Tolerance};
 use crate::style::axis::Axis;
 use crate::style::layout::{
     CrossAxisAlignment, FlexFit, MainAxisAlignment, MainAxisSize, TextDirection, VerticalDirection,
@@ -59,7 +61,7 @@ impl Flex {
 
     #[track_caller]
     pub fn build(self, ui: &mut Ui, content: impl FnOnce(&mut Ui)) {
-        ui.render_object(Location::caller().into(), self, content);
+        ui.render_object(crate::key::Key::current(), self, content);
     }
 }
 
@@ -84,10 +86,16 @@ impl Flexible {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 struct FlexParentData {
     flex: f64,
     fit: FlexFit,
+}
+
+impl PartialEq for FlexParentData {
+    fn eq(&self, other: &Self) -> bool {
+        near_equal(self.flex, other.flex, Tolerance::DEFAULT.distance) && self.fit == other.fit
+    }
 }
 
 impl Default for FlexParentData {
@@ -312,9 +320,6 @@ impl RenderObjectInterface for RenderFlex {
         for child in children {
             child.event(ctx, event)
         }
-    }
-
-    fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _children: &mut Children) {
     }
 
     fn dry_layout_box(

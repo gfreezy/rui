@@ -1,4 +1,4 @@
-use std::panic::Location;
+use std::{panic::Location, time::Instant};
 
 use druid_shell::{
     kurbo::{Point, Rect, Size, Vec2},
@@ -14,9 +14,9 @@ use crate::{
     event::Event,
     ext_event::ExtEventSink,
     id::{ChildId, WindowId},
-    lifecycle::LifeCycle,
+    lifecycle::{InternalLifeCycle, LifeCycle},
     menu::{MenuItemId, MenuManager},
-    perf::FPSCounter,
+    perf::{measure_time, FPSCounter},
     text::layout::TextLayout,
     tree::{Element, ElementState},
     ui::Ui,
@@ -73,7 +73,6 @@ impl Window {
     // #[instrument(skip(self, piet))]
     pub(crate) fn paint(&mut self, piet: &mut Piet, invalid: &Region, queue: &mut CommandQueue) {
         if self.root.needs_layout() {
-            // debug!("layout");
             self.layout(queue);
         }
 
@@ -101,7 +100,8 @@ impl Window {
             render_ctx: piet,
         };
         root.paint(&mut paint_ctx);
-        draw_fps(self.fps_counter.tick(), handle.get_size(), &mut paint_ctx);
+        let fps = self.fps_counter.tick();
+        draw_fps(fps, handle.get_size(), &mut paint_ctx);
     }
 
     // #[instrument(skip(self))]
@@ -132,12 +132,19 @@ impl Window {
             &mut layout_ctx,
             &(BoxConstraints::new(Size::ZERO, self.size).into()),
         );
+        let mut ctx = LifeCycleCtx {
+            context_state: &mut context_state,
+            child_state: &mut root_state,
+        };
+        root.lifecycle(
+            &mut ctx,
+            &LifeCycle::Internal(InternalLifeCycle::ParentWindowOrigin),
+        );
         invalid.union_with(&root_state.invalid);
     }
 
     // #[instrument(skip(self))]
     pub(crate) fn event(&mut self, queue: &mut CommandQueue, event: Event) -> Handled {
-        // debug!("event");
         match &event {
             Event::WindowSize(size) => self.size = *size,
             _ => (),
@@ -214,7 +221,6 @@ impl Window {
     }
 
     pub(crate) fn update(&mut self, _queue: &mut CommandQueue) {
-        // debug!("update");
         let Self {
             handle,
             ext_handle,
@@ -229,7 +235,9 @@ impl Window {
             text: handle.text(),
         };
         let mut cx = Ui::new(&mut root.children, &mut context_state);
-        app(&mut cx);
+        measure_time("app::update", || {
+            app(&mut cx);
+        });
         cx.cleanup_tree();
         root.merge_child_states_up();
     }
@@ -243,13 +251,11 @@ impl Window {
         } = self;
 
         if root.needs_layout() {
-            tracing::debug!("needs layout");
             handle.invalidate();
         } else {
             let invalid_rect = invalid.bounding_box();
-            handle.invalidate_rect(invalid_rect);
             if !invalid_rect.is_empty() {
-                tracing::debug!("invalidate rect: {invalid_rect}");
+                handle.invalidate_rect(invalid_rect);
             }
         }
         invalid.clear();

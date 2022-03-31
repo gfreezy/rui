@@ -54,4 +54,18 @@ pub enum LifeCycle {
     /// [`EventCtx::is_focused`]: struct.EventCtx.html#method.is_focused
     FocusChanged(bool),
     Other,
+    Internal(InternalLifeCycle),
+}
+
+/// Internal lifecycle events used by druid inside [`WidgetPod`].
+///
+/// These events are translated into regular [`LifeCycle`] events
+/// and should not be used directly.
+///
+/// [`WidgetPod`]: struct.WidgetPod.html
+/// [`LifeCycle`]: enum.LifeCycle.html
+#[derive(Debug, Clone)]
+pub enum InternalLifeCycle {
+    /// The parents widget origin in window coordinate space has changed.
+    ParentWindowOrigin,
 }
