@@ -81,7 +81,11 @@ impl RenderObjectInterface for SliverToBoxObject {
             max_paint_extent: child_extent,
             hit_test_extent: painted_child_size,
             has_visual_overflow: child_extent > sc.remaining_paint_extent || sc.scroll_offset > 0.0,
-            ..Default::default()
+            layout_extent: painted_child_size,
+            visible: painted_child_size > 0.0,
+            paint_origin: 0.0,
+            max_scroll_obstruction_extent: 0.0,
+            scroll_offset_correction: 0.0,
         }
     }
 

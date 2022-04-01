@@ -255,6 +255,12 @@ impl Element {
             format!("{:?}", self.state.window_origin()),
         );
         map.insert("size".to_string(), format!("{:?}", self.state.size));
+        if !self.custom_key.is_empty() {
+            map.insert("key".to_string(), self.custom_key.clone());
+        }
+        let custom_map = self.object.debug_state();
+        map.extend(custom_map.into_iter());
+
         DebugState {
             display_name: self.name().to_string(),
             children,
@@ -289,9 +295,14 @@ impl Element {
         self.state.origin = origin;
     }
 
+    pub fn set_viewport_offset(&mut self, offset: Vec2) {
+        self.state.set_viewport_offset(offset);
+    }
+
     pub fn origin(&self) -> Point {
         self.state.origin
     }
+
     pub fn set_paint_insets(&mut self, insets: Insets) {
         self.state.paint_insets = insets;
     }
@@ -774,11 +785,6 @@ impl Element {
         };
         self.state.geometry = geometry.clone();
 
-        // tracing::debug!(
-        //     "{} layout_sliver took {}",
-        //     object_name,
-        //     instant.elapsed().as_millis()
-        // );
         geometry
     }
 

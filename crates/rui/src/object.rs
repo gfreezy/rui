@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::collections::HashMap;
 use std::fmt::Debug;
 
 use druid_shell::kurbo::Size;
@@ -55,6 +56,9 @@ pub trait RenderObjectInterface {
         unimplemented!()
     }
     fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children);
+    fn debug_state(&self) -> HashMap<String, String> {
+        HashMap::new()
+    }
 }
 
 pub trait AnyRenderObject: Any {
@@ -82,6 +86,7 @@ pub trait AnyRenderObject: Any {
         children: &mut Children,
     ) -> SliverGeometry;
     fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children);
+    fn debug_state(&self) -> HashMap<String, String>;
 }
 
 impl<R> AnyRenderObject for R
@@ -133,6 +138,10 @@ where
 
     fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children) {
         R::paint(self, ctx, children)
+    }
+
+    fn debug_state(&self) -> HashMap<String, String> {
+        R::debug_state(self)
     }
 }
 

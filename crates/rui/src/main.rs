@@ -109,21 +109,22 @@ fn win(ui: &mut Ui) {
         let style = live_style(ui, ".text");
         text(ui, "haha", style);
         expand(ui, |ui| {
-            viewport(
-                ui,
-                AxisDirection::Down,
-                AxisDirection::Right,
-                "center".to_string(),
-                |ui| {
-                    widgets::sliver_to_box::SliverToBox.build(ui, "center".to_string(), |_| {});
-                    for i in 0..30 {
-                        widgets::sliver_to_box::SliverToBox.build(ui, i.to_string(), |ui| {
-                            let style = live_style(ui, ".text");
-                            text(ui, &format!("hello{}", i), style);
-                        });
-                    }
-                },
-            )
+            debug(ui, |ui| {
+                viewport(
+                    ui,
+                    AxisDirection::Down,
+                    AxisDirection::Right,
+                    "0".to_string(),
+                    |ui| {
+                        for i in 0..10 {
+                            widgets::sliver_to_box::SliverToBox.build(ui, i.to_string(), |ui| {
+                                let style = live_style(ui, ".text");
+                                text(ui, &format!("hello{}", i), style);
+                            });
+                        }
+                    },
+                )
+            });
         });
     });
 }
@@ -167,6 +168,10 @@ fn row(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
         style::layout::VerticalDirection::Down,
     )
     .build(ui, content);
+}
+
+fn debug(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
+    widgets::debug::Debug.build(ui, content);
 }
 
 fn flexible(ui: &mut Ui, style_name: &str, content: impl FnMut(&mut Ui)) {

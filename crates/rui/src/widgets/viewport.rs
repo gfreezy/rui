@@ -2,7 +2,7 @@ mod scroll_metrics;
 
 use std::panic::Location;
 
-use druid_shell::kurbo::{Insets, Point, Size, Vec2};
+use druid_shell::kurbo::{Affine, Insets, Point, Size, Vec2};
 use druid_shell::piet::RenderContext;
 use druid_shell::MouseEvent;
 
@@ -348,6 +348,7 @@ impl ViewportObject {
                     Insets::new(0.0, paint_extent, 0.0, 0.0),
                 ),
             };
+        child.set_viewport_offset(self.offset.scroll_offset());
         child.set_origin(ctx, origin);
         child.set_paint_insets(insets);
     }
@@ -569,22 +570,21 @@ impl RenderObjectInterface for ViewportObject {
         let self_size = bc.max();
 
         match self.axis() {
-            Axis::Horizontal => self.offset.apply_viewport_dimension(self_size.height),
-            Axis::Vertical => self.offset.apply_viewport_dimension(self_size.width),
+            Axis::Horizontal => self.offset.apply_viewport_dimension(self_size.width),
+            Axis::Vertical => self.offset.apply_viewport_dimension(self_size.height),
         };
 
         if self.center.is_none() {
             self.min_scroll_extent = 0.0;
             self.max_scroll_extent = 0.0;
             self.has_visual_overflow = false;
-            self.offset
-                .apply_content_dimensions(self_size.width, self_size.height);
+            self.offset.apply_content_dimensions(0.0, 0.0);
             return self_size;
         }
 
         let (main_axis_extent, cross_axis_extent) = match self.axis() {
-            Axis::Horizontal => (self_size.height, self_size.width),
-            Axis::Vertical => (self_size.width, self_size.height),
+            Axis::Horizontal => (self_size.width, self_size.height),
+            Axis::Vertical => (self_size.height, self_size.width),
         };
         // todo:
         // let center_offset_adjustment = center_child.center_offset_adjustment;
@@ -619,12 +619,13 @@ impl RenderObjectInterface for ViewportObject {
         if children.is_empty() {
             return;
         }
-        let clip = ctx.child_state.size().to_rect();
+
+        let clip = ctx.size().to_rect();
         ctx.clip(clip);
+        let offset = self.offset.scroll_offset();
+        ctx.transform(Affine::translate(-offset));
         for child in children {
-            if child.state.visible {
-                child.paint(ctx);
-            }
+            child.paint(ctx);
         }
     }
 }

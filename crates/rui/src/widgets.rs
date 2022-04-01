@@ -1,6 +1,7 @@
 pub mod align;
 pub mod background;
 pub mod button;
+pub mod debug;
 pub mod flex;
 pub mod padding;
 pub mod scroll_view;
