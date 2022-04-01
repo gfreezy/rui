@@ -247,25 +247,30 @@ impl ViewportObject {
             assert!(sliver_scroll_offset >= 0.0);
             assert!(cache_extent_correction <= 0.0);
 
-            let child_layout_geometry = child.layout_sliver(
-                ctx,
-                &SliverConstraints {
-                    axis_direction: self.axis_direction,
-                    growth_direction,
-                    user_scroll_direction: adjusted_user_scroll_direction,
-                    scroll_offset: sliver_scroll_offset,
-                    preceding_scroll_extent,
-                    overlap: max_paint_offset - layout_offset,
-                    remaining_paint_extent: (remaining_paint_extent - layout_offset
-                        + initial_layout_offset)
-                        .max(0.),
-                    cross_axis_extent,
-                    cross_axis_direction: self.cross_axis_direction,
-                    viewport_main_axis_extent: main_axis_extent,
-                    remaining_cache_extent: (remainting_cache_extent + cache_extent_correction)
-                        .max(0.0),
-                    cache_origin: corrected_cache_origin,
-                },
+            let sc = SliverConstraints {
+                axis_direction: self.axis_direction,
+                growth_direction,
+                user_scroll_direction: adjusted_user_scroll_direction,
+                scroll_offset: sliver_scroll_offset,
+                preceding_scroll_extent,
+                overlap: max_paint_offset - layout_offset,
+                remaining_paint_extent: (remaining_paint_extent - layout_offset
+                    + initial_layout_offset)
+                    .max(0.),
+                cross_axis_extent,
+                cross_axis_direction: self.cross_axis_direction,
+                viewport_main_axis_extent: main_axis_extent,
+                remaining_cache_extent: (remainting_cache_extent + cache_extent_correction)
+                    .max(0.0),
+                cache_origin: corrected_cache_origin,
+            };
+            let child_layout_geometry = child.layout_sliver(ctx, &sc);
+
+            tracing::debug!(
+                "{}: {:#?} \n {:#?}",
+                &child.custom_key,
+                sc,
+                child_layout_geometry
             );
             if child_layout_geometry.scroll_offset_correction != 0. {
                 return child_layout_geometry.scroll_offset_correction;
@@ -441,22 +446,25 @@ impl ViewportObject {
             .take_while(|c| Some(&c.custom_key) != self.center.as_ref())
             .collect();
         leading_negative_children.reverse();
+        let leading_negative_count = leading_negative_children.len();
 
-        let result = self.layout_child_sequence(
-            ctx,
-            leading_negative_children.into_iter(),
-            main_axis_extent.max(center_offset) - main_axis_extent,
-            0.0,
-            forward_direction_remaining_paint_extent,
-            reverse_direction_remaining_paint_extent,
-            main_axis_extent,
-            cross_axis_extent,
-            GrowthDirection::Reverse,
-            reverse_direction_remaining_cache_extent,
-            (main_axis_extent - center_offset).clamp(-self.calculated_cache_extent, 0.0),
-        );
-        if result != 0.0 {
-            return -result;
+        if leading_negative_count != 0 {
+            let result = self.layout_child_sequence(
+                ctx,
+                leading_negative_children.into_iter(),
+                main_axis_extent.max(center_offset) - main_axis_extent,
+                0.0,
+                forward_direction_remaining_paint_extent,
+                reverse_direction_remaining_paint_extent,
+                main_axis_extent,
+                cross_axis_extent,
+                GrowthDirection::Reverse,
+                reverse_direction_remaining_cache_extent,
+                (main_axis_extent - center_offset).clamp(-self.calculated_cache_extent, 0.0),
+            );
+            if result != 0.0 {
+                return -result;
+            }
         }
         let following_children: Vec<_> = children
             .iter()
@@ -466,7 +474,11 @@ impl ViewportObject {
             ctx,
             following_children.into_iter(),
             (-center_offset).max(0.0),
-            (-center_offset).min(0.0),
+            if leading_negative_count == 0 {
+                (-center_offset).min(0.0)
+            } else {
+                0.0
+            },
             if center_offset >= main_axis_extent {
                 center_offset
             } else {
@@ -622,10 +634,11 @@ impl RenderObjectInterface for ViewportObject {
 
         let clip = ctx.size().to_rect();
         ctx.clip(clip);
-        let offset = self.offset.scroll_offset();
-        ctx.transform(Affine::translate(-offset));
+
         for child in children {
-            child.paint(ctx);
+            if child.state.geometry.visible {
+                child.paint(ctx);
+            }
         }
     }
 }

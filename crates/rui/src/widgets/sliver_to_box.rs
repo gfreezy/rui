@@ -1,7 +1,12 @@
+use druid_shell::{
+    kurbo::{Affine, Vec2},
+    piet::RenderContext,
+};
+
 use crate::{
     key::{Key, LocalKey},
     object::{Properties, RenderObject, RenderObjectInterface},
-    sliver_constraints::SliverGeometry,
+    sliver_constraints::{apply_growth_direction_to_axis_direction, AxisDirection, SliverGeometry},
     ui::Ui,
 };
 
@@ -24,13 +29,17 @@ impl RenderObject<SliverToBox> for SliverToBoxObject {
     type Action = ();
 
     fn create(props: SliverToBox) -> Self {
-        SliverToBoxObject
+        SliverToBoxObject {
+            paint_offset: Vec2::ZERO,
+        }
     }
 
     fn update(&mut self, ctx: &mut crate::context::UpdateCtx, props: SliverToBox) -> Self::Action {}
 }
 
-pub struct SliverToBoxObject;
+pub struct SliverToBoxObject {
+    paint_offset: Vec2,
+}
 
 impl RenderObjectInterface for SliverToBoxObject {
     fn event(
@@ -70,11 +79,12 @@ impl RenderObjectInterface for SliverToBoxObject {
             crate::style::axis::Axis::Horizontal => child_size.width,
             crate::style::axis::Axis::Vertical => child_size.height,
         };
+
         let painted_child_size = calculate_paint_offset(sc, 0.0, child_extent);
         let cache_extent = calculate_cache_offset(sc, 0.0, child_extent);
         assert!(painted_child_size.is_finite());
         assert!(painted_child_size >= 0.0);
-        SliverGeometry {
+        let geometry = SliverGeometry {
             scroll_extent: child_extent,
             paint_extent: painted_child_size,
             cache_extent,
@@ -86,10 +96,30 @@ impl RenderObjectInterface for SliverToBoxObject {
             paint_origin: 0.0,
             max_scroll_obstruction_extent: 0.0,
             scroll_offset_correction: 0.0,
-        }
+        };
+
+        self.paint_offset = match apply_growth_direction_to_axis_direction(
+            sc.axis_direction,
+            sc.growth_direction,
+        ) {
+            AxisDirection::Down => Vec2::new(0.0, -sc.scroll_offset),
+            AxisDirection::Left => Vec2::new(
+                -(geometry.scroll_extent - (geometry.paint_extent + sc.scroll_offset)),
+                0.0,
+            ),
+            AxisDirection::Right => Vec2::new(-sc.scroll_offset, 0.0),
+            AxisDirection::Up => Vec2::new(
+                0.0,
+                -(geometry.scroll_extent - (geometry.paint_extent + sc.scroll_offset)),
+            ),
+        };
+
+        geometry
     }
 
     fn paint(&mut self, ctx: &mut crate::context::PaintCtx, children: &mut crate::tree::Children) {
+        ctx.transform(Affine::translate(self.paint_offset));
+
         for child in children {
             child.paint(ctx);
         }

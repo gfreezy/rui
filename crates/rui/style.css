@@ -19,17 +19,14 @@
 
 .flexible1 {
     flex: 1;
-    flex-fit: tight;
 }
 
 .flexible2 {
-    flex: 2;
-    flex-fit: tight;
+    flex: 1;
 }
 
 .flexible3 {
     flex: 1;
-    flex-fit: tight;
 }
 
 .box {

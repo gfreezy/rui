@@ -40,6 +40,7 @@ use sliver_constraints::{AxisDirection, CacheExtent};
 use style::Style;
 
 use style::alignment::Alignment;
+use widgets::sized_box::SizedBox;
 use widgets::sliver_list::SliverChildDelegate;
 use widgets::viewport::ViewportOffset;
 
@@ -106,25 +107,28 @@ fn win(ui: &mut Ui) {
     // });
     // });
     flex(ui, ".flex", |ui| {
-        let style = live_style(ui, ".text");
-        text(ui, "haha", style);
         expand(ui, |ui| {
-            debug(ui, |ui| {
-                viewport(
-                    ui,
-                    AxisDirection::Down,
-                    AxisDirection::Right,
-                    "0".to_string(),
-                    |ui| {
-                        for i in 0..10 {
-                            widgets::sliver_to_box::SliverToBox.build(ui, i.to_string(), |ui| {
-                                let style = live_style(ui, ".text");
-                                text(ui, &format!("hello{}", i), style);
-                            });
-                        }
-                    },
-                )
-            });
+            let style = live_style(ui, ".text");
+            text(ui, "haha", style);
+        });
+
+        expand(ui, |ui| {
+            // debug(ui, |ui| {
+            viewport(
+                ui,
+                AxisDirection::Down,
+                AxisDirection::Right,
+                "0".to_string(),
+                |ui| {
+                    for i in 0..10 {
+                        widgets::sliver_to_box::SliverToBox.build(ui, i.to_string(), |ui| {
+                            let style = live_style(ui, ".text");
+                            text(ui, &format!("hello{}", i), style);
+                        });
+                    }
+                },
+            )
+            // });
         });
     });
 }

@@ -760,9 +760,9 @@ impl Element {
         // let span = tracing::span!(tracing::Level::DEBUG, "layout_sliver", ?c, object_name);
         // let _h = span.enter();
 
-        if !self.state.needs_layout {
-            return self.state.geometry.clone();
-        }
+        // if !self.state.needs_layout {
+        //     return self.state.geometry.clone();
+        // }
 
         self.state.needs_layout = false;
 
