@@ -13,7 +13,7 @@ use druid_shell::{
 };
 use tracing::debug;
 
-use crate::app::{PendingWindow, WindowConfig};
+use crate::app::{PendingWindow, WindowConfig, WindowDesc};
 use crate::command::{sys as sys_cmd, Command, Target};
 
 use crate::event::Event;
@@ -433,6 +433,11 @@ impl AppState {
             _ if cmd.is(sys_cmd::HIDE_APPLICATION) => self.hide_app(),
             #[cfg(target_os = "macos")]
             _ if cmd.is(sys_cmd::HIDE_OTHERS) => self.hide_others(),
+            _ if cmd.is(sys_cmd::NEW_WINDOW) => {
+                if let Err(e) = self.new_window(cmd) {
+                    tracing::error!("failed to create window: '{}'", e);
+                }
+            }
             _ if cmd.is(sys_cmd::CLOSE_ALL_WINDOWS) => self.request_close_all_windows(),
             T::Window(id) if cmd.is(sys_cmd::INVALIDATE_IME) => self.invalidate_ime(cmd, id),
             // these should come from a window
@@ -457,6 +462,16 @@ impl AppState {
                 self.inner.borrow_mut().dispatch_cmd(cmd);
             }
         }
+    }
+
+    fn new_window(&mut self, cmd: Command) -> Result<(), Box<dyn std::error::Error>> {
+        let desc = cmd.get_unchecked(sys_cmd::NEW_WINDOW);
+        // The NEW_WINDOW command is private and only druid can receive it by normal means,
+        // thus unwrapping can be considered safe and deserves a panic.
+        let desc = desc.take().unwrap().downcast::<WindowDesc>().unwrap();
+        let window = desc.build_native(self)?;
+        window.show();
+        Ok(())
     }
 
     fn request_close_window(&mut self, id: WindowId) {

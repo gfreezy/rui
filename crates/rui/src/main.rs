@@ -1,3 +1,4 @@
+#![allow(unused)]
 #[macro_use]
 mod macros;
 pub mod app;
@@ -27,12 +28,17 @@ pub mod window;
 
 use std::any::Any;
 use std::panic::Location;
+use std::sync::mpsc::{channel, Receiver, Sender};
 
 use app::WindowDesc;
+use command::{sys, SingleUse, Target};
+use debug_state::DebugState;
 use druid_shell::kurbo::{Point, Size};
 
+use id::ChildId;
 use key::{Key, LocalKey};
 use menu::mac::menu_bar;
+use menu::{Menu, MenuItem};
 
 use live_style::live_style;
 use object::{Properties, RenderObject};
@@ -42,70 +48,54 @@ use style::Style;
 use style::alignment::Alignment;
 use widgets::sized_box::SizedBox;
 use widgets::sliver_list::SliverChildDelegate;
+use widgets::sliver_to_box;
 use widgets::viewport::ViewportOffset;
 
 use crate::app::AppLauncher;
 use crate::ui::Ui;
 use crate::widgets::button::Button;
 
-use crate::widgets::scroll_view::ScrollView;
 use crate::widgets::text::Text;
 
-fn win(ui: &mut Ui) {
-    // scroll_view(ui, |ui| {
-    //     column(ui, |ui| {
-    //         for i in 0..40 {
-    //             let style = live_style(ui, ".text");
-    //             text(ui, &format!("haha {i}"), style);
-    //         }
-    //     });
-    // });
-    // flex(ui, ".flex", |ui| {
-    //     let count = ui.state_node(|| 0isize);
+fn inspect(ui: &mut Ui, receiver: &Receiver<Snapshot>) {
+    let snapshot = ui.state_node(|| Snapshot {
+        debug_state: DebugState::default(),
+    });
+    if let Ok(v) = receiver.try_recv() {
+        snapshot.set(v);
+    }
+    let selected = ui.state_node(|| ChildId::ZERO);
 
-    //     flexible(ui, ".flexible1", |ui| {
-    //         flex(ui, ".inner-flex", |ui| {
-    //             let style = live_style(ui, ".text");
-    //             let _i = 1;
-    //             for i in 0..(*count as usize) {
-    //                 let count2 = ui.state_node(|| 0isize);
+    flex(ui, ".panel", |ui| {
+        viewport(ui, AxisDirection::Down, AxisDirection::Right, |ui| {
+            snapshot.debug_state.visit(
+                &mut |debug_state, level| {
+                    sliver_to_box(ui, "center".to_string(), |ui| {
+                        let ident = level * 4;
+                        let current_id = debug_state.id;
+                        button(
+                            ui,
+                            &format!("{:ident$}{}", "", debug_state.display_name),
+                            move || {
+                                selected.set(current_id);
+                            },
+                        );
+                    });
+                },
+                0,
+            );
+        });
+        viewport(ui, AxisDirection::Down, AxisDirection::Right, |ui| {
+            if let Some(debug_state) = snapshot.debug_state.debug_state_for_id(*selected) {
+                sliver_to_box(ui, "center".to_string(), |ui| {
+                    text(ui, &debug_state.to_string(), Default::default());
+                });
+            }
+        });
+    });
+}
 
-    //                 text(
-    //                     ui,
-    //                     &format!("label {}, count: {}", i, *count2),
-    //                     style.clone(),
-    //                 );
-
-    //                 button(ui, &format!("button{i}, click to incr你好"), move || {
-    //                     println!("click to incr");
-    //                     count2.update(|c| *c += 1);
-    //                 });
-    //             }
-    //         });
-    //     });
-
-    //     flexible(ui, ".flexible2", |ui| {
-    //         // align(ui, |ui| {
-    //         //     Text::new("hello").build(ui);
-    //         // });
-
-    //         button(ui, "incr buttons", move || {
-    //             count.update(|c| *c += 1);
-    //             println!("incr buttons");
-    //         });
-    //     });
-    //     flexible(ui, ".flexible3", |ui| {
-    //         button(ui, "decr buttons", move || {
-    //             count.update(|c| {
-    //                 if *c > 0 {
-    //                     *c -= 1
-    //                 }
-    //             });
-    //             println!("decr buttons");
-    //         });
-    //     });
-    // });
-    // });
+fn win(ui: &mut Ui, sender: &Sender<Snapshot>) {
     flex(ui, ".flex", |ui| {
         expand(ui, |ui| {
             let style = live_style(ui, ".text");
@@ -114,27 +104,22 @@ fn win(ui: &mut Ui) {
 
         expand(ui, |ui| {
             // debug(ui, |ui| {
-            viewport(
-                ui,
-                AxisDirection::Down,
-                AxisDirection::Right,
-                "0".to_string(),
-                |ui| {
-                    for i in 0..10 {
-                        widgets::sliver_to_box::SliverToBox.build(ui, i.to_string(), |ui| {
-                            let style = live_style(ui, ".text");
-                            text(ui, &format!("hello{}", i), style);
-                        });
-                    }
-                },
-            )
+            viewport(ui, AxisDirection::Down, AxisDirection::Right, |ui| {
+                for i in 0..10 {
+                    sliver_to_box(ui, i.to_string(), |ui| {
+                        let style = live_style(ui, ".text");
+                        text(ui, &format!("hello{}", i), style);
+                    });
+                }
+            })
             // });
         });
     });
-}
-
-fn scroll_view(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
-    ScrollView::new(Point::ZERO, Size::new(600., 400.)).build(ui, content);
+    sender
+        .send(Snapshot {
+            debug_state: ui.tree[0].debug_state(),
+        })
+        .unwrap();
 }
 
 fn flex(ui: &mut Ui, style_name: &str, content: impl FnMut(&mut Ui)) {
@@ -211,17 +196,20 @@ fn viewport(
     ui: &mut Ui,
     axis_direction: AxisDirection,
     cross_axis_direction: AxisDirection,
-    center: LocalKey,
     content: impl FnMut(&mut Ui),
 ) {
     widgets::viewport::Viewport::new(
         axis_direction,
         cross_axis_direction,
         0.0,
-        Some(center),
+        None,
         CacheExtent::Viewport(1.),
     )
     .build(ui, content)
+}
+
+fn sliver_to_box(ui: &mut Ui, local_key: String, content: impl FnMut(&mut Ui)) {
+    widgets::sliver_to_box::SliverToBox.build(ui, local_key, content);
 }
 
 struct Delegate {
@@ -268,8 +256,16 @@ fn sliver_list(ui: &mut Ui, center: Key) {
     widgets::sliver_list::SliverList::new(Box::new(Delegate { center })).build(ui)
 }
 
+struct Snapshot {
+    debug_state: DebugState,
+}
+
 fn main() {
-    let desc = WindowDesc::new("app".to_string(), win).menu(|_| menu_bar());
-    let app = AppLauncher::with_window(desc).log_to_console();
+    let (sender, receiver) = channel::<Snapshot>();
+
+    let desc = WindowDesc::new("app".to_string(), move |ui| win(ui, &sender)).menu(|_| menu_bar());
+    let inspector_desc =
+        WindowDesc::new("app".to_string(), move |ui| inspect(ui, &receiver)).menu(|_| menu_bar());
+    let app = AppLauncher::with_windows(vec![desc, inspector_desc]).log_to_console();
     app.launch().unwrap();
 }

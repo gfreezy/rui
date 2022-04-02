@@ -88,7 +88,7 @@ impl RenderObject<Button> for ButtonObject {
             props,
             label_size: Size::ZERO,
             border_color: Color::BLACK,
-            background_color: Color::GREEN,
+            background_color: Color::WHITE,
         }
     }
 
@@ -131,11 +131,7 @@ impl RenderObjectInterface for ButtonObject {
         match event {
             LifeCycle::HotChanged(hot) => {
                 if *hot {
-                    self.background_color = Color::RED;
-                    debug!("on hover");
                 } else {
-                    self.background_color = Color::WHITE;
-                    debug!("off hover");
                 }
                 ctx.request_paint();
             }
@@ -176,11 +172,6 @@ impl RenderObjectInterface for ButtonObject {
         ctx.stroke(rect, &border_color, stroke_width);
 
         ctx.fill(rect, &PaintBrush::Color(self.background_color.clone()));
-        debug!(
-            "fill {:?}, layout rect: {:?}",
-            rect,
-            ctx.child_state.layout_rect()
-        );
         children[0].paint(ctx);
     }
 

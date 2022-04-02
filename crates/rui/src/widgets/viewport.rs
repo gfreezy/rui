@@ -266,12 +266,12 @@ impl ViewportObject {
             };
             let child_layout_geometry = child.layout_sliver(ctx, &sc);
 
-            tracing::debug!(
-                "{}: {:#?} \n {:#?}",
-                &child.custom_key,
-                sc,
-                child_layout_geometry
-            );
+            // tracing::debug!(
+            //     "{}: {:#?} \n {:#?}",
+            //     &child.custom_key,
+            //     sc,
+            //     child_layout_geometry
+            // );
             if child_layout_geometry.scroll_offset_correction != 0. {
                 return child_layout_geometry.scroll_offset_correction;
             }
@@ -519,9 +519,20 @@ impl RenderObject<Viewport> for ViewportObject {
             axis_direction,
             cross_axis_direction,
             anchor,
-            center,
             cache_extent
         ) {
+            ctx.request_layout();
+        }
+
+        let should_assign = match (&self.center, &props.center) {
+            (None, None) => false,
+            (None, Some(_)) => true,
+            // No center is provided, we used the first child.
+            (Some(_), None) => false,
+            (Some(_), Some(_)) => true,
+        };
+        if should_assign && self.center != props.center {
+            self.center = props.center;
             ctx.request_layout();
         }
     }
@@ -578,13 +589,17 @@ impl RenderObjectInterface for ViewportObject {
         bc: &crate::constraints::BoxConstraints,
         children: &mut crate::tree::Children,
     ) -> Size {
-        tracing::debug!("layout_box, offset: {:?}", self.offset.pixels());
+        // tracing::debug!("layout_box, offset: {:?}", self.offset.pixels());
         let self_size = bc.max();
 
         match self.axis() {
             Axis::Horizontal => self.offset.apply_viewport_dimension(self_size.width),
             Axis::Vertical => self.offset.apply_viewport_dimension(self_size.height),
         };
+
+        if self.center.is_none() {
+            self.center = children.first().map(|c| c.custom_key.clone());
+        }
 
         if self.center.is_none() {
             self.min_scroll_extent = 0.0;
@@ -611,7 +626,7 @@ impl RenderObjectInterface for ViewportObject {
                 ctx,
                 children,
             );
-            tracing::debug!("attempt_layout: {}, correction: {}", i, correction);
+            // tracing::debug!("attempt_layout: {}, correction: {}", i, correction);
 
             if correction != 0. {
                 self.offset.correct_by(correction);

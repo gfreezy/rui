@@ -7,6 +7,12 @@
     text-alignment: center;
 }
 
+.panel {
+    spacing: 10;
+    background: #aaa;
+    insets: 10;
+}
+
 .flex {
     axis: vertical;
     spacing: 10;

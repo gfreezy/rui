@@ -99,12 +99,12 @@ pub fn apply_growth_direction_to_scroll_direction(
     }
 }
 pub fn apply_growth_direction_to_axis_direction(
-    axisDirection: AxisDirection,
-    growthDirection: GrowthDirection,
+    axis_direction: AxisDirection,
+    growth_direction: GrowthDirection,
 ) -> AxisDirection {
-    match growthDirection {
-        GrowthDirection::Forward => axisDirection,
-        GrowthDirection::Reverse => axisDirection.flip(),
+    match growth_direction {
+        GrowthDirection::Forward => axis_direction,
+        GrowthDirection::Reverse => axis_direction.flip(),
     }
 }
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]

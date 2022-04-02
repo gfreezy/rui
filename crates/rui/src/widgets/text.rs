@@ -1,5 +1,6 @@
 //! A label widget.
 
+use std::collections::HashMap;
 use std::panic::Location;
 
 use druid_shell::kurbo::{Point, Size};
@@ -203,5 +204,11 @@ impl RenderObjectInterface for TextObject {
             ctx.clip(label_size.to_rect());
         }
         self.draw_at(ctx, origin);
+    }
+
+    fn debug_state(&self) -> HashMap<String, String> {
+        let mut map = HashMap::new();
+        map.insert("text".to_string(), self.layout.text().unwrap().to_string());
+        map
     }
 }

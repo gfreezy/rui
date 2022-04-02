@@ -90,6 +90,7 @@ impl Window {
             ext_handle: ext_handle.clone(),
 
             text: handle.text(),
+            command_queue: queue,
         };
 
         let mut root_state = ElementState::new(*phatom_root_id, Some(size.clone()));
@@ -105,7 +106,7 @@ impl Window {
     }
 
     // #[instrument(skip(self))]
-    pub(crate) fn layout(&mut self, _command_queue: &mut CommandQueue) {
+    pub(crate) fn layout(&mut self, command_queue: &mut CommandQueue) {
         let Self {
             handle,
             ext_handle,
@@ -120,6 +121,7 @@ impl Window {
             window: handle.clone(),
             ext_handle: ext_handle.clone(),
             text: handle.text(),
+            command_queue,
         };
         let mut root_state = ElementState::new(*phatom_root_id, Some(size.clone()));
 
@@ -167,6 +169,7 @@ impl Window {
             window: handle.clone(),
             ext_handle: ext_handle.clone(),
             text: handle.text(),
+            command_queue: queue,
         };
         let mut root_state = ElementState::new(*phatom_root_id, Some(size.clone()));
 
@@ -193,7 +196,7 @@ impl Window {
         is_handled.into()
     }
 
-    pub(crate) fn lifecycle(&mut self, _queue: &mut CommandQueue, event: &LifeCycle) {
+    pub(crate) fn lifecycle(&mut self, command_queue: &mut CommandQueue, event: &LifeCycle) {
         let Self {
             handle,
             ext_handle,
@@ -208,6 +211,7 @@ impl Window {
             window: handle.clone(),
             ext_handle: ext_handle.clone(),
             text: handle.text(),
+            command_queue,
         };
         let mut root_state = ElementState::new(*phatom_root_id, Some(size.clone()));
 
@@ -220,7 +224,7 @@ impl Window {
         invalid.union_with(&root_state.invalid);
     }
 
-    pub(crate) fn update(&mut self, _queue: &mut CommandQueue) {
+    pub(crate) fn update(&mut self, command_queue: &mut CommandQueue) {
         let Self {
             handle,
             ext_handle,
@@ -233,6 +237,7 @@ impl Window {
             window: handle.clone(),
             ext_handle: ext_handle.clone(),
             text: handle.text(),
+            command_queue,
         };
         let mut cx = Ui::new(&mut root.children, &mut context_state);
         measure_time("app::update", || {

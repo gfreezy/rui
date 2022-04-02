@@ -244,7 +244,6 @@ impl Element {
     pub(crate) fn debug_state(&mut self) -> DebugState {
         let children = self.children.iter().map(|c| c.debug_state()).collect();
         let mut map = HashMap::new();
-        map.insert("id".to_string(), format!("{:?}", self.state.id));
         map.insert("origin".to_string(), format!("{:?}", self.state.origin));
         map.insert(
             "paint_rect".to_string(),
@@ -258,10 +257,11 @@ impl Element {
         if !self.custom_key.is_empty() {
             map.insert("key".to_string(), self.custom_key.clone());
         }
-        let custom_map = self.object.debug_state();
-        map.extend(custom_map.into_iter());
+        let custom_debug_state = self.object.debug_state();
+        map.extend(custom_debug_state.into_iter());
 
         DebugState {
+            id: self.id(),
             display_name: self.name().to_string(),
             children,
             other_values: map,
@@ -760,9 +760,9 @@ impl Element {
         // let span = tracing::span!(tracing::Level::DEBUG, "layout_sliver", ?c, object_name);
         // let _h = span.enter();
 
-        // if !self.state.needs_layout {
-        //     return self.state.geometry.clone();
-        // }
+        if !self.state.needs_layout {
+            return self.state.geometry.clone();
+        }
 
         self.state.needs_layout = false;
 
@@ -874,19 +874,19 @@ impl Element {
         };
         self.object.paint(&mut inner_ctx, &mut self.children);
 
-        // debug!("layout rect: {:?}", self.layout_rect());
-        let rect = inner_ctx.size().to_rect();
+        // // debug!("layout rect: {:?}", self.layout_rect());
+        // let rect = inner_ctx.size().to_rect();
 
-        const STYLE: StrokeStyle = StrokeStyle::new()
-            .dash_pattern(&[4.0, 2.0])
-            .dash_offset(8.0)
-            .line_join(LineJoin::Round);
-        inner_ctx.render_ctx.stroke_styled(
-            rect,
-            &PaintBrush::Color(Color::rgb8(0, 0, 0)),
-            1.,
-            &STYLE,
-        );
+        // const STYLE: StrokeStyle = StrokeStyle::new()
+        //     .dash_pattern(&[4.0, 2.0])
+        //     .dash_offset(8.0)
+        //     .line_join(LineJoin::Round);
+        // inner_ctx.render_ctx.stroke_styled(
+        //     rect,
+        //     &PaintBrush::Color(Color::rgb8(0, 0, 0)),
+        //     1.,
+        //     &STYLE,
+        // );
     }
 
     pub(crate) fn needs_update(&self) -> bool {

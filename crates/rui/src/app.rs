@@ -442,6 +442,12 @@ impl AppLauncher {
             ext_event_host: ExtEventHost::new(),
         }
     }
+    pub fn with_windows(windows: Vec<WindowDesc>) -> Self {
+        AppLauncher {
+            windows,
+            ext_event_host: ExtEventHost::new(),
+        }
+    }
 
     /// Returns an [`ExtEventSink`] that can be moved between threads,
     /// and can be used to submit commands back to the application.

@@ -1,11 +1,15 @@
 //! A data structure for representing widget trees.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
+
+use crate::id::ChildId;
 
 /// A description widget and its children, clonable and comparable, meant
 /// for testing and debugging. This is extremely not optimized.
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct DebugState {
+    /// The widget's unique id.
+    pub id: ChildId,
     /// The widget's type as a human-readable string.
     pub display_name: String,
     /// If a widget has a "central" value (for instance, a textbox's contents),
@@ -46,5 +50,41 @@ impl std::fmt::Debug for DebugState {
             }
             f_struct.finish()
         }
+    }
+}
+
+impl DebugState {
+    pub fn visit<T: FnMut(&DebugState, usize)>(&self, visitor: &mut T, level: usize) {
+        visitor(self, level);
+        for child in &self.children {
+            child.visit(visitor, level + 1);
+        }
+    }
+
+    pub fn debug_state_for_id(&self, id: ChildId) -> Option<&DebugState> {
+        if self.id == id {
+            Some(self)
+        } else {
+            for child in &self.children {
+                if let Some(child) = child.debug_state_for_id(id) {
+                    return Some(child);
+                }
+            }
+            None
+        }
+    }
+}
+
+impl ToString for DebugState {
+    fn to_string(&self) -> String {
+        let mut map: BTreeMap<_, _> = self
+            .other_values
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        map.insert("display_name".to_string(), self.display_name.clone());
+        map.insert("main_value".to_string(), self.main_value.clone());
+        map.insert("id".to_string(), self.id.to_string());
+        format!("{:#?}", map)
     }
 }

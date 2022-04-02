@@ -3,7 +3,12 @@ use std::{
     time::Duration,
 };
 
-use crate::tree::ElementState;
+use crate::{
+    app::WindowDesc,
+    app_state::CommandQueue,
+    command::{sys, Command, SingleUse, Target},
+    tree::ElementState,
+};
 use crate::{ext_event::ExtEventSink, id::ChildId};
 use druid_shell::kurbo::{Insets, Rect, Size};
 use druid_shell::piet::{Piet, PietText, RenderContext};
@@ -24,36 +29,37 @@ macro_rules! impl_context_method {
 }
 
 /// Static state that is shared between most contexts.
-pub(crate) struct ContextState {
+pub(crate) struct ContextState<'a> {
     pub(crate) window: WindowHandle,
     pub(crate) ext_handle: ExtEventSink,
     pub(crate) text: PietText,
+    pub(crate) command_queue: &'a mut CommandQueue,
 }
 
 pub struct UpdateCtx<'a> {
-    pub(crate) context_state: &'a ContextState,
+    pub(crate) context_state: &'a ContextState<'a>,
     pub(crate) child_state: &'a mut ElementState,
 }
 
 pub struct EventCtx<'a> {
-    pub(crate) context_state: &'a ContextState,
+    pub(crate) context_state: &'a ContextState<'a>,
     pub(crate) child_state: &'a mut ElementState,
     pub(crate) is_active: bool,
     pub(crate) is_handled: bool,
 }
 
 pub struct LifeCycleCtx<'a> {
-    pub(crate) context_state: &'a ContextState,
+    pub(crate) context_state: &'a ContextState<'a>,
     pub(crate) child_state: &'a mut ElementState,
 }
 
 pub struct LayoutCtx<'a> {
-    pub(crate) context_state: &'a ContextState,
+    pub(crate) context_state: &'a ContextState<'a>,
     pub(crate) child_state: &'a mut ElementState,
 }
 
 pub struct PaintCtx<'a, 'c> {
-    pub(crate) context_state: &'a ContextState,
+    pub(crate) context_state: &'a ContextState<'a>,
     pub(crate) child_state: &'a mut ElementState,
     /// The render context for actually painting.
     pub render_ctx: &'a mut Piet<'c>,
@@ -156,7 +162,7 @@ impl_context_method!(EventCtx<'_>, UpdateCtx<'_>, LifeCycleCtx<'_>, {
         self.child_state.invalid.set_rect(
             self.child_state.paint_rect() - self.child_state.layout_rect().origin().to_vec2(),
         );
-        tracing::debug!("request paint: {:?}", self.child_state.paint_rect());
+        // tracing::debug!("request paint: {:?}", self.child_state.paint_rect());
     }
 
     /// Request a [`paint`] pass for redrawing a rectangle, which is given
@@ -177,7 +183,9 @@ impl_context_method!(EventCtx<'_>, UpdateCtx<'_>, LifeCycleCtx<'_>, {
     /// response to some event) it must call this method.
     ///
     /// [`layout`]: trait.Widget.html#tymethod.layout
+    #[track_caller]
     pub fn request_layout(&mut self) {
+        tracing::debug!("request layout: {:?}", std::panic::Location::caller());
         self.child_state.needs_layout = true;
     }
 });
@@ -200,11 +208,35 @@ impl_context_method!(
     }
 );
 
-impl ContextState {
+impl<'a> ContextState<'a> {
     fn request_timer(&self, child_state: &mut ElementState, deadline: Duration) -> TimerToken {
         let timer_token = self.window.request_timer(deadline);
         child_state.add_timer(timer_token);
         timer_token
+    }
+
+    /// Submit a [`Command`] to be run after this event is handled.
+    ///
+    /// Commands are run in the order they are submitted; all commands
+    /// submitted during the handling of an event are executed before
+    /// the [`update()`] method is called.
+    ///
+    /// [`Target::Auto`] commands will be sent to every window (`Target::Global`).
+    ///
+    /// [`Command`]: struct.Command.html
+    /// [`update()`]: trait.Widget.html#tymethod.update
+    pub fn submit_command(&mut self, command: impl Into<Command>) {
+        self.command_queue
+            .push_back(command.into().default_to(Target::Global))
+    }
+
+    /// Create a new window.
+    pub fn new_window(&mut self, desc: WindowDesc) {
+        self.submit_command(
+            sys::NEW_WINDOW
+                .with(SingleUse::new(Box::new(desc)))
+                .to(Target::Global),
+        );
     }
 }
 
