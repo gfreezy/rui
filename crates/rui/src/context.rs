@@ -186,7 +186,7 @@ impl_context_method!(EventCtx<'_>, UpdateCtx<'_>, LifeCycleCtx<'_>, {
     #[track_caller]
     pub fn request_layout(&mut self) {
         tracing::debug!("request layout: {:?}", std::panic::Location::caller());
-        self.child_state.needs_layout = true;
+        self.child_state.mark_needs_layout();
     }
 });
 

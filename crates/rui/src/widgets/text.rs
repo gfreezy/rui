@@ -186,6 +186,7 @@ impl RenderObjectInterface for TextObject {
         };
 
         self.layout.set_wrap_width(width);
+        self.layout.set_text_alignment(self.style.text_alignment);
         self.layout.rebuild_if_needed(&mut ctx.text());
 
         let text_metrics = self.layout.layout_metrics();

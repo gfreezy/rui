@@ -5,6 +5,8 @@ use std::panic::Location;
 
 pub type LocalKey = String;
 
+pub const EMPTY_LOCAL_KEY: &str = "";
+
 /// A unique call location.
 ///
 /// These come from `#[track_caller]` annotations. It is a newtype

@@ -442,8 +442,8 @@ impl ViewportObject {
             (full_cache_extent - center_cache_offset).clamp(0.0, full_cache_extent);
 
         let mut leading_negative_children: Vec<_> = children
-            .iter()
-            .take_while(|c| Some(&c.custom_key) != self.center.as_ref())
+            .iter_mut()
+            .take_while(|c| Some(&c.local_key) != self.center.as_ref())
             .collect();
         leading_negative_children.reverse();
         let leading_negative_count = leading_negative_children.len();
@@ -467,8 +467,8 @@ impl ViewportObject {
             }
         }
         let following_children: Vec<_> = children
-            .iter()
-            .skip_while(|c| Some(&c.custom_key) != self.center.as_ref())
+            .iter_mut()
+            .skip_while(|c| Some(&c.local_key) != self.center.as_ref())
             .collect();
         return self.layout_child_sequence(
             ctx,
@@ -598,7 +598,7 @@ impl RenderObjectInterface for ViewportObject {
         };
 
         if self.center.is_none() {
-            self.center = children.first().map(|c| c.custom_key.clone());
+            self.center = children.first().map(|c| c.local_key.clone());
         }
 
         if self.center.is_none() {

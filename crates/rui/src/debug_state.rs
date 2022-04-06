@@ -40,6 +40,7 @@ impl std::fmt::Debug for DebugState {
             if !self.main_value.is_empty() {
                 f_struct.field("_main_value_", &self.main_value);
             }
+            f_struct.field("child_len", &self.children.len());
             let mut other_values: Vec<_> = self.other_values.iter().collect();
             other_values.sort();
             for (key, value) in other_values {

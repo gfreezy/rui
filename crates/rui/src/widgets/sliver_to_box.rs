@@ -84,19 +84,19 @@ impl RenderObjectInterface for SliverToBoxObject {
         let cache_extent = calculate_cache_offset(sc, 0.0, child_extent);
         assert!(painted_child_size.is_finite());
         assert!(painted_child_size >= 0.0);
-        let geometry = SliverGeometry {
-            scroll_extent: child_extent,
-            paint_extent: painted_child_size,
+        let geometry = SliverGeometry::new(
+            child_extent,
+            None,
+            painted_child_size,
+            None,
+            child_extent,
+            None,
+            None,
+            None,
+            child_extent > sc.remaining_paint_extent || sc.scroll_offset > 0.0,
+            None,
             cache_extent,
-            max_paint_extent: child_extent,
-            hit_test_extent: painted_child_size,
-            has_visual_overflow: child_extent > sc.remaining_paint_extent || sc.scroll_offset > 0.0,
-            layout_extent: painted_child_size,
-            visible: painted_child_size > 0.0,
-            paint_origin: 0.0,
-            max_scroll_obstruction_extent: 0.0,
-            scroll_offset_correction: 0.0,
-        };
+        );
 
         self.paint_offset = match apply_growth_direction_to_axis_direction(
             sc.axis_direction,

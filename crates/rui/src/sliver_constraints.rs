@@ -509,7 +509,47 @@ impl SliverGeometry {
         cache_extent: 0.0,
     };
 
-    pub fn new() -> Self {
-        Default::default()
+    pub fn new(
+        scroll_extent: impl Into<Option<f64>>,
+        paint_origin: impl Into<Option<f64>>,
+        paint_extent: impl Into<Option<f64>>,
+        layout_extent: impl Into<Option<f64>>,
+        max_paint_extent: impl Into<Option<f64>>,
+        max_scroll_obstruction_extent: impl Into<Option<f64>>,
+        hit_test_extent: impl Into<Option<f64>>,
+        visible: impl Into<Option<bool>>,
+        has_visual_overflow: impl Into<Option<bool>>,
+        scroll_offset_correction: impl Into<Option<f64>>,
+        cache_extent: impl Into<Option<f64>>,
+    ) -> Self {
+        let scroll_extent = scroll_extent.into().unwrap_or(0.);
+        let paint_origin = paint_origin.into().unwrap_or(0.);
+        let paint_extent = paint_extent.into().unwrap_or(0.);
+        let layout_extent_option = layout_extent.into();
+        let cache_extent = cache_extent
+            .into()
+            .or_else(|| layout_extent_option)
+            .unwrap_or(paint_extent);
+        let layout_extent = layout_extent_option.unwrap_or(paint_extent);
+        let max_paint_extent = max_paint_extent.into().unwrap_or(0.);
+        let max_scroll_obstruction_extent = max_scroll_obstruction_extent.into().unwrap_or(0.);
+        let hit_test_extent = hit_test_extent.into().unwrap_or(paint_extent);
+        let visible = visible.into().unwrap_or(paint_extent > 0.);
+        let has_visual_overflow = has_visual_overflow.into().unwrap_or(false);
+        let scroll_offset_correction = scroll_offset_correction.into().unwrap_or(0.);
+
+        SliverGeometry {
+            scroll_extent,
+            paint_origin,
+            paint_extent,
+            layout_extent,
+            max_paint_extent,
+            max_scroll_obstruction_extent,
+            hit_test_extent,
+            visible,
+            has_visual_overflow,
+            scroll_offset_correction,
+            cache_extent,
+        }
     }
 }

@@ -10,7 +10,10 @@
             "name": "Launch",
             "program": "${workspaceFolder}/target/debug/rui",
             "args": [],
-            "cwd": "${workspaceFolder}"
+            "cwd": "${workspaceFolder}",
+            "sourceLanguages": [
+                "rust"
+            ],
         }
     ]
 }

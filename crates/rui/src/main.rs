@@ -66,7 +66,7 @@ fn inspect(ui: &mut Ui, receiver: &Receiver<Snapshot>) {
     }
     let selected = ui.state_node(|| ChildId::ZERO);
 
-    flex(ui, ".panel", |ui| {
+    row(ui, |ui| {
         viewport(ui, AxisDirection::Down, AxisDirection::Right, |ui| {
             snapshot.debug_state.visit(
                 &mut |debug_state, level| {
@@ -96,7 +96,7 @@ fn inspect(ui: &mut Ui, receiver: &Receiver<Snapshot>) {
 }
 
 fn win(ui: &mut Ui, sender: &Sender<Snapshot>) {
-    flex(ui, ".flex", |ui| {
+    column(ui, |ui| {
         expand(ui, |ui| {
             let style = live_style(ui, ".text");
             text(ui, "haha", style);
@@ -105,12 +105,13 @@ fn win(ui: &mut Ui, sender: &Sender<Snapshot>) {
         expand(ui, |ui| {
             // debug(ui, |ui| {
             viewport(ui, AxisDirection::Down, AxisDirection::Right, |ui| {
-                for i in 0..10 {
-                    sliver_to_box(ui, i.to_string(), |ui| {
-                        let style = live_style(ui, ".text");
-                        text(ui, &format!("hello{}", i), style);
-                    });
-                }
+                // for i in 0..10 {
+                //     sliver_to_box(ui, i.to_string(), |ui| {
+                //         let style = live_style(ui, ".text");
+                //         text(ui, &format!("hello{}", i), style);
+                //     });
+                // }
+                sliver_list(ui, "0".to_string())
             })
             // });
         });
@@ -213,27 +214,23 @@ fn sliver_to_box(ui: &mut Ui, local_key: String, content: impl FnMut(&mut Ui)) {
 }
 
 struct Delegate {
-    center: Key,
+    center: String,
 }
 
 impl SliverChildDelegate for Delegate {
-    fn key(&self, index: usize) -> Key {
-        if index == 0 {
-            self.center.clone()
-        } else {
-            Location::caller().into()
-        }
+    fn key(&self, index: usize) -> String {
+        index.to_string()
     }
 
     fn build(&self, ui: &mut Ui, index: usize) {
-        // tracing::debug!("build in delegate");
-        let style = live_style(ui, ".text");
+        tracing::debug!("build in delegate: {index}");
+        let style = live_style(ui, ".inspect-text");
         text(ui, &format!("number {index}"), style);
     }
 
     fn estimated_count(&self) -> Option<usize> {
         // tracing::debug!("estimated count");
-        Some(100)
+        Some(10)
     }
 
     fn estimate_max_scroll_offset(
@@ -252,7 +249,7 @@ impl SliverChildDelegate for Delegate {
     }
 }
 
-fn sliver_list(ui: &mut Ui, center: Key) {
+fn sliver_list(ui: &mut Ui, center: String) {
     widgets::sliver_list::SliverList::new(Box::new(Delegate { center })).build(ui)
 }
 

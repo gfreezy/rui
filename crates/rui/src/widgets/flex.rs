@@ -163,7 +163,7 @@ impl RenderFlex {
         let mut cross_size: f64 = 0.0;
         let mut allocated_size: f64 = 0.0;
         let total_child = children.len();
-        for child in children.iter() {
+        for child in children.iter_mut() {
             let flex = self.get_flex(child);
             if flex > 0.0 {
                 total_flex += flex;
@@ -202,7 +202,7 @@ impl RenderFlex {
             } else {
                 f64::NAN
             };
-            for (i, child) in children.iter().enumerate() {
+            for (i, child) in children.iter_mut().enumerate() {
                 let flex = self.get_flex(child);
                 if flex > 0.0 {
                     let max_child_extent = if can_flex {

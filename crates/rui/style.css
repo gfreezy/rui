@@ -4,23 +4,18 @@
     font-weight: bold;
     color: rgb(238, 193, 95);
     line-breaking: clip;
-    text-alignment: center;
 }
 
-.panel {
-    spacing: 10;
-    background: #aaa;
-    insets: 10;
+.inspect-text {
+    text-align: start;
 }
 
 .flex {
     axis: vertical;
-    spacing: 10;
     background: #aaa;
-    insets: 10;
     main-axis-size: max;
-    cross-axis-alignment: start;
     vertical-direction: down;
+    cross-axis-alignment: start;
 }
 
 .flexible1 {

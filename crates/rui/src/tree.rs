@@ -32,6 +32,14 @@ pub struct Children {
     pub(crate) bump: Bump,
 }
 
+impl std::fmt::Debug for Children {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Children")
+            .field("renders", &self.renders)
+            .finish()
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct State<T: 'static> {
     pub(crate) ptr: *mut dyn Any,
@@ -84,11 +92,18 @@ impl Drop for StateNode {
 pub struct Element {
     pub(crate) name: &'static str,
     pub(crate) key: Key,
-    pub(crate) custom_key: LocalKey,
+    pub(crate) local_key: LocalKey,
     pub(crate) object: Box<dyn AnyRenderObject>,
     pub(crate) children: Children,
     pub(crate) state: ElementState,
     pub(crate) dead: bool,
+}
+
+impl std::fmt::Debug for Element {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let debug_state = self.debug_state();
+        write!(f, "{:#?}", &debug_state)
+    }
 }
 
 pub struct ElementState {
@@ -146,6 +161,10 @@ pub struct ElementState {
 
     pub(crate) needs_layout: bool,
 
+    /// Whether [invokeLayoutCallback] for this render object is currently running.
+    ///
+    pub(crate) doing_this_layout_with_callback: bool,
+
     /// Any descendant has requested update.
     pub(crate) request_update: bool,
 }
@@ -186,8 +205,18 @@ impl Children {
         self.renders.last()
     }
 
-    pub fn iter(&mut self) -> ChildIter {
-        self.into_iter()
+    pub fn iter_mut(&mut self) -> ChildIterMut {
+        ChildIterMut {
+            children: self,
+            index: 0,
+        }
+    }
+
+    pub fn iter(&self) -> ChildIter {
+        ChildIter {
+            children: self,
+            index: 0,
+        }
     }
 
     /// Should only be used when `Element` need to change their child lists.
@@ -221,16 +250,25 @@ impl IndexMut<usize> for Children {
     }
 }
 
+impl<'a> IntoIterator for &'a mut Children {
+    type Item = &'a mut Element;
+    type IntoIter = ChildIterMut<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
+
 /// [`RenderObject`] API for `Child` nodes.
 impl Element {
-    pub(crate) fn new<T>(key: Key, object: T) -> Self
+    pub(crate) fn new<T>(key: Key, local_key: LocalKey, object: T) -> Self
     where
         T: AnyRenderObject,
     {
         Element {
             name: type_name::<T>(),
             key,
-            custom_key: "".to_string(),
+            local_key,
             object: Box::new(object),
             children: Children::new(),
             state: ElementState::new(ChildId::next(), None),
@@ -241,9 +279,10 @@ impl Element {
     #[doc(hidden)]
     /// From the current data, get a best-effort description of the state of
     /// this widget and its children for debugging purposes.
-    pub(crate) fn debug_state(&mut self) -> DebugState {
+    pub(crate) fn debug_state(&self) -> DebugState {
         let children = self.children.iter().map(|c| c.debug_state()).collect();
         let mut map = HashMap::new();
+        map.insert("children_len".to_string(), self.children.len().to_string());
         map.insert("origin".to_string(), format!("{:?}", self.state.origin));
         map.insert(
             "paint_rect".to_string(),
@@ -254,8 +293,8 @@ impl Element {
             format!("{:?}", self.state.window_origin()),
         );
         map.insert("size".to_string(), format!("{:?}", self.state.size));
-        if !self.custom_key.is_empty() {
-            map.insert("key".to_string(), self.custom_key.clone());
+        if !self.local_key.is_empty() {
+            map.insert("key".to_string(), self.local_key.clone());
         }
         let custom_debug_state = self.object.debug_state();
         map.extend(custom_debug_state.into_iter());
@@ -335,11 +374,7 @@ impl Element {
 
     #[track_caller]
     pub fn request_layout(&mut self) {
-        tracing::debug!(
-            "request_layout, caller: {:?}",
-            std::panic::Location::caller()
-        );
-        self.state.needs_layout = true;
+        self.state.mark_needs_layout();
     }
 
     /// Returns `true` if any descendant is active.
@@ -363,11 +398,30 @@ impl Element {
 
 /// Allows iterating over a set of [`Children`].
 pub struct ChildIter<'a> {
-    children: &'a mut Children,
+    children: &'a Children,
     index: usize,
 }
 
 impl<'a> Iterator for ChildIter<'a> {
+    type Item = &'a Element;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.index += 1;
+        self.children.renders.get(self.index - 1)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.children.len(), Some(self.children.len()))
+    }
+}
+
+/// Allows iterating over a set of [`Children`].
+pub struct ChildIterMut<'a> {
+    children: &'a mut Children,
+    index: usize,
+}
+
+impl<'a> Iterator for ChildIterMut<'a> {
     type Item = &'a mut Element;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -384,7 +438,7 @@ impl<'a> Iterator for ChildIter<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for ChildIter<'a> {
+impl<'a> DoubleEndedIterator for ChildIterMut<'a> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.index -= 1;
         self.children.renders.get(self.index - 1).map(|node| {
@@ -392,18 +446,6 @@ impl<'a> DoubleEndedIterator for ChildIter<'a> {
             // This is save because each child can only be accessed once.
             unsafe { &mut *node_p }
         })
-    }
-}
-
-impl<'a> IntoIterator for &'a mut Children {
-    type Item = &'a mut Element;
-    type IntoIter = ChildIter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        ChildIter {
-            children: self,
-            index: 0,
-        }
     }
 }
 
@@ -426,6 +468,18 @@ impl ElementState {
             parent_window_origin: Point::ORIGIN,
             visible: true,
             request_update: false,
+            doing_this_layout_with_callback: false,
+        }
+    }
+
+    #[track_caller]
+    pub(crate) fn mark_needs_layout(&mut self) {
+        if !self.doing_this_layout_with_callback {
+            tracing::debug!(
+                "mark_needs_layout, caller: {:?}",
+                std::panic::Location::caller()
+            );
+            self.needs_layout = true;
         }
     }
 
@@ -481,7 +535,9 @@ impl ElementState {
         // invalid rects.
         child_state.invalid.clear();
 
-        self.needs_layout |= child_state.needs_layout;
+        if !self.doing_this_layout_with_callback {
+            self.needs_layout |= child_state.needs_layout;
+        }
         self.has_active |= child_state.has_active;
         self.request_update |= child_state.request_update;
     }
