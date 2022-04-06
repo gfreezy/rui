@@ -223,7 +223,7 @@ impl SliverChildDelegate for Delegate {
     }
 
     fn build(&self, ui: &mut Ui, index: usize) {
-        tracing::debug!("build in delegate: {index}");
+        // tracing::debug!("build in delegate: {index}");
         let style = live_style(ui, ".inspect-text");
         text(ui, &format!("number {index}"), style);
     }
@@ -247,6 +247,12 @@ impl SliverChildDelegate for Delegate {
     fn should_rebuild(&self, old_delegate: &dyn SliverChildDelegate) -> bool {
         false
     }
+
+    fn find_index_by_key(&self, key: &LocalKey) -> Option<usize> {
+        key.parse().ok()
+    }
+
+    fn did_finish_layout(&self, first_index: usize, last_index: usize) {}
 }
 
 fn sliver_list(ui: &mut Ui, center: String) {

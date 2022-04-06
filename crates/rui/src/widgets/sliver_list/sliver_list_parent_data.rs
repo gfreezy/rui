@@ -3,7 +3,7 @@ use crate::{
     physics::tolerance::{near_equal, Tolerance},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Default, Clone)]
 pub struct SliverListParentData {
     pub(crate) keep_alive: bool,
     pub(crate) kept_alive: bool,

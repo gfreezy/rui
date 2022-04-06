@@ -16,10 +16,14 @@ use crate::style::size::{Height, MaxHeight, MaxWidth, MinHeight, MinWidth, Width
 use crate::tree::Children;
 use crate::ui::Ui;
 
-#[derive(Debug, Default, PartialEq, Clone)]
+use super::sliver_list_parent_data::SliverListParentData;
+
+#[derive(Debug, Clone)]
 pub struct SliverListItem {
     pub(crate) local_key: LocalKey,
     pub(crate) index: usize,
+    pub(crate) child_index: usize,
+    pub(crate) parent_data: SliverListParentData,
 }
 
 impl Properties for SliverListItem {
@@ -36,7 +40,7 @@ impl RenderObject<SliverListItem> for SliverListItemObject {
         SliverListItemObject
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, props: SliverListItem) {}
+    fn update(&mut self, ctx: &mut UpdateCtx, props: SliverListItem, children: &mut Children) {}
 }
 
 impl RenderObjectInterface for SliverListItemObject {

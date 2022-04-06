@@ -122,7 +122,7 @@ impl RenderObject<Text> for TextObject {
         TextObject::new(props)
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, props: Text) {
+    fn update(&mut self, ctx: &mut UpdateCtx, props: Text, children: &mut Children) {
         if self.layout.text() != Some(&props.text) {
             self.layout.set_text(props.text);
             ctx.request_layout();

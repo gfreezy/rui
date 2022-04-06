@@ -88,7 +88,7 @@ impl<'a> Ui<'a> {
                     context_state: self.context_state,
                     child_state: &mut node.state,
                 };
-                action = object.update(&mut ctx, props);
+                action = object.update(&mut ctx, props, &mut node.children);
             } else {
                 // TODO: Think of something smart
                 panic!("Wrong node type. Expected {}", std::any::type_name::<R>())
@@ -114,6 +114,7 @@ impl<'a> Ui<'a> {
             node.request_layout();
         }
 
+        // todo: sliver list dynamic children need special handling
         let mut child_ui = Ui::new(&mut node.children, self.context_state);
         content(&mut child_ui);
 

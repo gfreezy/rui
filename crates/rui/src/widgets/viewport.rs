@@ -512,7 +512,12 @@ impl RenderObject<Viewport> for ViewportObject {
         }
     }
 
-    fn update(&mut self, ctx: &mut crate::context::UpdateCtx, props: Viewport) -> Self::Action {
+    fn update(
+        &mut self,
+        ctx: &mut crate::context::UpdateCtx,
+        props: Viewport,
+        children: &mut Children,
+    ) -> Self::Action {
         if assign_if_not_eq!(
             self,
             props,

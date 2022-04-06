@@ -7,6 +7,7 @@ use crate::{
     key::{Key, LocalKey},
     object::{Properties, RenderObject, RenderObjectInterface},
     sliver_constraints::{apply_growth_direction_to_axis_direction, AxisDirection, SliverGeometry},
+    tree::Children,
     ui::Ui,
 };
 
@@ -34,7 +35,13 @@ impl RenderObject<SliverToBox> for SliverToBoxObject {
         }
     }
 
-    fn update(&mut self, ctx: &mut crate::context::UpdateCtx, props: SliverToBox) -> Self::Action {}
+    fn update(
+        &mut self,
+        ctx: &mut crate::context::UpdateCtx,
+        props: SliverToBox,
+        children: &mut Children,
+    ) -> Self::Action {
+    }
 }
 
 pub struct SliverToBoxObject {

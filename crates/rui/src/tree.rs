@@ -475,10 +475,10 @@ impl ElementState {
     #[track_caller]
     pub(crate) fn mark_needs_layout(&mut self) {
         if !self.doing_this_layout_with_callback {
-            tracing::debug!(
-                "mark_needs_layout, caller: {:?}",
-                std::panic::Location::caller()
-            );
+            // tracing::debug!(
+            //     "mark_needs_layout, caller: {:?}",
+            //     std::panic::Location::caller()
+            // );
             self.needs_layout = true;
         }
     }

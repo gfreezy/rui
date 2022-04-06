@@ -6,6 +6,7 @@ use crate::{
     key::Key,
     object::{Properties, RenderObject, RenderObjectInterface},
     style::{alignment::Alignment, layout::TextDirection},
+    tree::Children,
     ui::Ui,
 };
 
@@ -64,7 +65,12 @@ impl RenderObject<Align> for RenderAlign {
         }
     }
 
-    fn update(&mut self, ctx: &mut crate::context::UpdateCtx, props: Align) -> Self::Action {
+    fn update(
+        &mut self,
+        ctx: &mut crate::context::UpdateCtx,
+        props: Align,
+        children: &mut Children,
+    ) -> Self::Action {
         let new = Self::create(props);
         if self != &new {
             *self = new;

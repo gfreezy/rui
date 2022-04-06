@@ -85,7 +85,12 @@ impl RenderObject<ScrollView> for ScrollViewObject {
         }
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, props: ScrollView) -> Self::Action {
+    fn update(
+        &mut self,
+        ctx: &mut UpdateCtx,
+        props: ScrollView,
+        children: &mut Children,
+    ) -> Self::Action {
         if self.viewport != props.viewport {
             self.viewport = props.viewport;
             ctx.request_layout();

@@ -306,7 +306,7 @@ impl RenderObject<Flex> for RenderFlex {
         }
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, props: Flex) {
+    fn update(&mut self, ctx: &mut UpdateCtx, props: Flex, children: &mut Children) {
         let render_flex = Self::create(props);
         if self != &render_flex {
             *self = render_flex;
