@@ -190,7 +190,9 @@ fn text(ui: &mut Ui, text: &str, style: Style) {
 }
 
 fn button<'a>(ui: &'a mut Ui<'_>, text: &str, click: impl FnMut() + 'static) {
-    Button::new().labeled(ui, text, click);
+    Button::new()
+        .text_align(druid_shell::piet::TextAlignment::Start)
+        .labeled(ui, text, click);
 }
 
 fn viewport(
@@ -225,7 +227,7 @@ impl SliverChildDelegate for Delegate {
     fn build(&self, ui: &mut Ui, index: usize) {
         // tracing::debug!("build in delegate: {index}");
         let style = live_style(ui, ".inspect-text");
-        text(ui, &format!("number {index}"), style);
+        button(ui, &format!("number {index}"), || {});
     }
 
     fn estimated_count(&self) -> Option<usize> {

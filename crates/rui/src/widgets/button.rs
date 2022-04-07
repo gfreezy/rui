@@ -1,7 +1,7 @@
 use std::panic::Location;
 
 use druid_shell::kurbo::{Point, Size};
-use druid_shell::piet::{Color, PaintBrush, RenderContext};
+use druid_shell::piet::{Color, PaintBrush, RenderContext, TextAlignment};
 use druid_shell::MouseButton;
 use tracing::debug;
 
@@ -20,6 +20,7 @@ use crate::{
 
 pub struct Button {
     disabled: bool,
+    text_align: TextAlignment,
     handler: Box<dyn FnMut() + 'static>,
 }
 
@@ -37,6 +38,7 @@ impl Button {
     pub fn new() -> Self {
         Button {
             disabled: false,
+            text_align: TextAlignment::Center,
             handler: Box::new(|| {}),
         }
     }
@@ -46,6 +48,10 @@ impl Button {
         self
     }
 
+    pub fn text_align(mut self, text_align: TextAlignment) -> Self {
+        self.text_align = text_align;
+        self
+    }
     pub fn handler(mut self, h: impl FnMut() + 'static) -> Self {
         self.handler = Box::new(h);
         self
@@ -159,7 +165,12 @@ impl RenderObjectInterface for ButtonObject {
         let required_size = self.label_size + padding;
         let size = bc.constrain(required_size);
 
-        let h_offset = (size.width - self.label_size.width) / 2.0;
+        let h_offset = match self.props.text_align {
+            TextAlignment::Start => padding.width / 2.0,
+            TextAlignment::End => (size.width - required_size.width),
+            TextAlignment::Center => (size.width - self.label_size.width) / 2.0,
+            TextAlignment::Justified => (size.width - self.label_size.width) / 2.0,
+        };
         let v_offset = (size.height - self.label_size.height) / 2.0;
         children[0].set_origin(ctx, Point::new(h_offset, v_offset));
 

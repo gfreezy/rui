@@ -49,7 +49,7 @@ impl SliverList {
 
     #[track_caller]
     pub fn build(self, ui: &mut Ui) {
-        ui.render_object(crate::key::Key::current(), self, |_| {})
+        ui.render_object_dynamicly(crate::key::Key::current(), self);
     }
 }
 

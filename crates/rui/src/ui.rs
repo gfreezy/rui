@@ -68,16 +68,15 @@ impl<'a> Ui<'a> {
         State::new(raw_box)
     }
 
-    pub fn render_object<Props, R, N>(
+    /// Children is managed by parent node on fly.
+    pub fn render_object_dynamicly<Props, R>(
         &mut self,
         key: impl Into<(Key, LocalKey)>,
         props: Props,
-        content: N,
     ) -> R::Action
     where
         Props: Properties<Object = R>,
         R: RenderObject<Props> + Any,
-        N: FnOnce(&mut Ui),
     {
         let mut action = R::Action::default();
         let (key, local_key) = key.into();
@@ -114,7 +113,23 @@ impl<'a> Ui<'a> {
             node.request_layout();
         }
 
-        // todo: sliver list dynamic children need special handling
+        action
+    }
+
+    pub fn render_object<Props, R, N>(
+        &mut self,
+        key: impl Into<(Key, LocalKey)>,
+        props: Props,
+        content: N,
+    ) -> R::Action
+    where
+        Props: Properties<Object = R>,
+        R: RenderObject<Props> + Any,
+        N: FnOnce(&mut Ui),
+    {
+        let action = self.render_object_dynamicly(key, props);
+        let node = &mut self.tree.renders[self.render_index - 1];
+
         let mut child_ui = Ui::new(&mut node.children, self.context_state);
         content(&mut child_ui);
 
