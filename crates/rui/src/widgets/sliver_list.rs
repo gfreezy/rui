@@ -5,7 +5,7 @@ use self::sliver_list_item::SliverListItem;
 use self::sliver_list_parent_data::SliverListParentData;
 use crate::{
     box_constraints::BoxConstraints,
-    context::{LayoutCtx, UpdateCtx},
+    context::{LayoutCtx, PaintCtx, UpdateCtx},
     key::{Key, LocalKey},
     object::{AnyParentData, Properties, RenderObject, RenderObjectInterface},
     physics::tolerance::{near_equal, Tolerance},
@@ -427,43 +427,6 @@ impl RenderSliverList {
 }
 
 impl RenderObjectInterface for RenderSliverList {
-    fn event(
-        &mut self,
-        ctx: &mut crate::context::EventCtx,
-        event: &crate::event::Event,
-        children: &mut crate::tree::Children,
-    ) {
-        for child in children {
-            child.event(ctx, event);
-        }
-    }
-
-    fn lifecycle(
-        &mut self,
-        ctx: &mut crate::context::LifeCycleCtx,
-        event: &crate::lifecycle::LifeCycle,
-        children: &mut crate::tree::Children,
-    ) {
-        for child in children {
-            child.lifecycle(ctx, event);
-        }
-    }
-
-    fn dry_layout_box(
-        &mut self,
-        ctx: &mut crate::context::LayoutCtx,
-        bc: &crate::box_constraints::BoxConstraints,
-        children: &mut crate::tree::Children,
-    ) -> druid_shell::kurbo::Size {
-        todo!()
-    }
-
-    fn paint(&mut self, ctx: &mut crate::context::PaintCtx, children: &mut crate::tree::Children) {
-        for child in children {
-            child.paint(ctx);
-        }
-    }
-
     fn layout_sliver(
         &mut self,
         ctx: &mut crate::context::LayoutCtx,
@@ -812,10 +775,6 @@ impl RenderObjectInterface for RenderSliverList {
                 child.set_visible(true);
             } else {
                 child.set_visible(false);
-            }
-
-            if child.needs_layout() {
-                panic!("needs layout");
             }
         }
 

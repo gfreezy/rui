@@ -30,12 +30,18 @@ pub trait RenderObject<Props>: RenderObjectInterface {
 }
 
 pub trait RenderObjectInterface {
-    fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children);
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children) {
+        for child in children {
+            child.event(ctx, event);
+        }
+    }
+
     fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children) {
         for child in children {
             child.lifecycle(ctx, event);
         }
     }
+
     fn dry_layout_box(
         &mut self,
         ctx: &mut LayoutCtx,
@@ -44,6 +50,7 @@ pub trait RenderObjectInterface {
     ) -> Size {
         unreachable!()
     }
+
     fn layout_box(
         &mut self,
         ctx: &mut LayoutCtx,
@@ -52,6 +59,7 @@ pub trait RenderObjectInterface {
     ) -> Size {
         unimplemented!()
     }
+
     fn layout_sliver(
         &mut self,
         ctx: &mut LayoutCtx,
@@ -60,7 +68,12 @@ pub trait RenderObjectInterface {
     ) -> SliverGeometry {
         unimplemented!()
     }
-    fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children);
+    fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children) {
+        for child in children {
+            child.paint(ctx);
+        }
+    }
+
     fn debug_state(&self) -> HashMap<String, String> {
         HashMap::new()
     }

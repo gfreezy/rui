@@ -321,93 +321,6 @@ impl Element {
     }
 }
 
-/// Public API for child nodes.
-impl Element {
-    pub fn as_any(&mut self) -> &mut dyn Any {
-        self.object.as_any()
-    }
-
-    pub fn id(&self) -> ChildId {
-        self.state.id
-    }
-    /// Set the origin of this widget, in the parent's coordinate space.
-    ///
-    /// A container widget should call the [`Widget::layout`] method on its children in
-    /// its own [`Widget::layout`] implementation, and then call `set_origin` to
-    /// position those children.
-    ///
-    /// The child will receive the [`LifeCycle::Size`] event informing them of the final [`Size`].
-    ///
-    /// [`Widget::layout`]: trait.Widget.html#tymethod.layout
-    /// [`Rect`]: struct.Rect.html
-    /// [`Size`]: struct.Size.html
-    /// [`LifeCycle::Size`]: enum.LifeCycle.html#variant.Size
-    pub fn set_origin(&mut self, ctx: &mut LayoutCtx, origin: Point) {
-        self.state.origin = origin;
-    }
-
-    pub fn set_viewport_offset(&mut self, offset: Vec2) {
-        self.state.set_viewport_offset(offset);
-    }
-
-    pub fn origin(&self) -> Point {
-        self.state.origin
-    }
-
-    pub fn set_paint_insets(&mut self, insets: Insets) {
-        self.state.paint_insets = insets;
-    }
-
-    /// Returns the layout [`Rect`].
-    ///
-    /// This will be a [`Rect`] with a [`Size`] determined by the child's [`layout`]
-    /// method, and the origin that was set by [`set_origin`].
-    ///
-    /// [`Rect`]: struct.Rect.html
-    /// [`Size`]: struct.Size.html
-    /// [`layout`]: trait.Widget.html#tymethod.layout
-    /// [`set_origin`]: WidgetPod::set_origin
-    pub fn layout_rect(&self) -> Rect {
-        self.state.layout_rect()
-    }
-
-    /// The paint region for this widget.
-    ///
-    /// For more information, see [`WidgetPod::paint_rect`].
-    ///
-    /// [`WidgetPod::paint_rect`]: struct.WidgetPod.html#method.paint_rect
-    pub fn paint_rect(&self) -> Rect {
-        self.state.paint_rect()
-    }
-
-    pub fn request_update(&mut self) {
-        self.state.request_update = true;
-    }
-
-    #[track_caller]
-    pub fn request_layout(&mut self) {
-        self.state.mark_needs_layout();
-    }
-
-    /// Returns `true` if any descendant is active.
-    pub fn has_active(&self) -> bool {
-        self.state.has_active
-    }
-
-    /// Query the "active" state of the widget.
-    pub fn is_active(&self) -> bool {
-        self.state.is_active
-    }
-
-    /// Query the "hot" state of the widget.
-    ///
-    /// See [`EventCtx::is_hot`](struct.EventCtx.html#method.is_hot) for
-    /// additional information.
-    pub fn is_hot(&self) -> bool {
-        self.state.is_hot
-    }
-}
-
 /// Allows iterating over a set of [`Children`].
 pub struct ChildIter<'a> {
     children: &'a Children,
@@ -889,6 +802,94 @@ impl Element {
 
 /// Public API for child nodes.
 impl Element {
+    pub fn as_any(&mut self) -> &mut dyn Any {
+        self.object.as_any()
+    }
+
+    pub fn id(&self) -> ChildId {
+        self.state.id
+    }
+    /// Set the origin of this widget, in the parent's coordinate space.
+    ///
+    /// A container widget should call the [`Widget::layout`] method on its children in
+    /// its own [`Widget::layout`] implementation, and then call `set_origin` to
+    /// position those children.
+    ///
+    /// The child will receive the [`LifeCycle::Size`] event informing them of the final [`Size`].
+    ///
+    /// [`Widget::layout`]: trait.Widget.html#tymethod.layout
+    /// [`Rect`]: struct.Rect.html
+    /// [`Size`]: struct.Size.html
+    /// [`LifeCycle::Size`]: enum.LifeCycle.html#variant.Size
+    pub fn set_origin(&mut self, ctx: &mut LayoutCtx, origin: Point) {
+        self.state.origin = origin;
+    }
+
+    pub fn set_viewport_offset(&mut self, offset: Vec2) {
+        self.state.set_viewport_offset(offset);
+    }
+
+    pub fn origin(&self) -> Point {
+        self.state.origin
+    }
+
+    pub fn geometry(&self) -> &SliverGeometry {
+        &self.state.geometry
+    }
+
+    pub fn set_paint_insets(&mut self, insets: Insets) {
+        self.state.paint_insets = insets;
+    }
+
+    /// Returns the layout [`Rect`].
+    ///
+    /// This will be a [`Rect`] with a [`Size`] determined by the child's [`layout`]
+    /// method, and the origin that was set by [`set_origin`].
+    ///
+    /// [`Rect`]: struct.Rect.html
+    /// [`Size`]: struct.Size.html
+    /// [`layout`]: trait.Widget.html#tymethod.layout
+    /// [`set_origin`]: WidgetPod::set_origin
+    pub fn layout_rect(&self) -> Rect {
+        self.state.layout_rect()
+    }
+
+    /// The paint region for this widget.
+    ///
+    /// For more information, see [`WidgetPod::paint_rect`].
+    ///
+    /// [`WidgetPod::paint_rect`]: struct.WidgetPod.html#method.paint_rect
+    pub fn paint_rect(&self) -> Rect {
+        self.state.paint_rect()
+    }
+
+    pub fn request_update(&mut self) {
+        self.state.request_update = true;
+    }
+
+    #[track_caller]
+    pub fn request_layout(&mut self) {
+        self.state.mark_needs_layout();
+    }
+
+    /// Returns `true` if any descendant is active.
+    pub fn has_active(&self) -> bool {
+        self.state.has_active
+    }
+
+    /// Query the "active" state of the widget.
+    pub fn is_active(&self) -> bool {
+        self.state.is_active
+    }
+
+    /// Query the "hot" state of the widget.
+    ///
+    /// See [`EventCtx::is_hot`](struct.EventCtx.html#method.is_hot) for
+    /// additional information.
+    pub fn is_hot(&self) -> bool {
+        self.state.is_hot
+    }
+
     pub fn size(&self) -> Size {
         self.state.size()
     }

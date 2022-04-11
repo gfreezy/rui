@@ -652,7 +652,7 @@ impl RenderObjectInterface for ViewportObject {
         ctx.clip(clip);
 
         for child in children {
-            if child.state.geometry.visible {
+            if child.geometry().visible {
                 child.paint(ctx);
             }
         }
