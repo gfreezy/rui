@@ -285,6 +285,10 @@ impl Element {
         map.insert("children_len".to_string(), self.children.len().to_string());
         map.insert("origin".to_string(), format!("{:?}", self.state.origin));
         map.insert(
+            "needs_layout".to_string(),
+            format!("{:?}", self.state.needs_layout),
+        );
+        map.insert(
             "paint_rect".to_string(),
             format!("{:?}", self.state.paint_rect()),
         );
@@ -306,6 +310,14 @@ impl Element {
             other_values: map,
             ..Default::default()
         }
+    }
+
+    pub(crate) fn set_visible(&mut self, visible: bool) {
+        self.state.visible = visible;
+    }
+
+    pub(crate) fn visible(&self) -> bool {
+        self.state.visible
     }
 }
 
@@ -475,10 +487,13 @@ impl ElementState {
     #[track_caller]
     pub(crate) fn mark_needs_layout(&mut self) {
         if !self.doing_this_layout_with_callback {
-            // tracing::debug!(
-            //     "mark_needs_layout, caller: {:?}",
-            //     std::panic::Location::caller()
-            // );
+            tracing::debug!(
+                "mark_needs_layout, caller: {:?}",
+                std::panic::Location::caller()
+            );
+            // let bt = backtrace::Backtrace::new();
+            // tracing::debug!("request layout: {:?}", bt);
+
             self.needs_layout = true;
         }
     }
@@ -786,6 +801,7 @@ impl Element {
         // let _h = span.enter();
 
         // if !self.state.needs_layout {
+        //     tracing::debug!("skip layout_box: {}", object_name);
         //     return self.state.size;
         // }
 
@@ -813,12 +829,13 @@ impl Element {
     pub fn layout_sliver(&mut self, ctx: &mut LayoutCtx, sc: &SliverConstraints) -> SliverGeometry {
         let object_name = self.object.name();
         let instant = Instant::now();
-        // let span = tracing::span!(tracing::Level::DEBUG, "layout_sliver", ?c, object_name);
+        // let span = tracing::span!(tracing::Level::DEBUG, "layout_sliver", object_name);
         // let _h = span.enter();
 
-        if !self.state.needs_layout {
-            return self.state.geometry.clone();
-        }
+        // if !self.state.needs_layout {
+        //     tracing::debug!("skip layout_sliver: {}", object_name);
+        //     return self.state.geometry.clone();
+        // }
 
         self.state.needs_layout = false;
 
@@ -849,6 +866,10 @@ impl Element {
         let instant = Instant::now();
         // let span = tracing::span!(tracing::Level::DEBUG, "paint", object_name);
         // let _h = span.enter();
+
+        if !self.visible() {
+            return;
+        }
 
         ctx.with_save(|ctx| {
             let origin = self.paint_rect().origin().to_vec2();

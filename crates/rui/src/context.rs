@@ -185,7 +185,6 @@ impl_context_method!(EventCtx<'_>, UpdateCtx<'_>, LifeCycleCtx<'_>, {
     /// [`layout`]: trait.Widget.html#tymethod.layout
     #[track_caller]
     pub fn request_layout(&mut self) {
-        tracing::debug!("request layout: {:?}", std::panic::Location::caller());
         self.child_state.mark_needs_layout();
     }
 });

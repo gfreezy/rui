@@ -7,7 +7,7 @@ use crate::{
 pub struct SliverListParentData {
     pub(crate) keep_alive: bool,
     pub(crate) kept_alive: bool,
-    pub(crate) layout_offset: f64,
+    pub(crate) layout_offset: Option<f64>,
     pub(crate) index: usize,
 }
 
@@ -29,13 +29,15 @@ impl AnyParentData for SliverListParentData {
             .as_any()
             .downcast_ref::<SliverListParentData>()
             .unwrap();
+        let layout_offset_equal = match (self.layout_offset, other.layout_offset) {
+            (None, None) => true,
+            (None, Some(_)) => false,
+            (Some(_), None) => false,
+            (Some(l), Some(r)) => near_equal(l, r, Tolerance::DEFAULT.distance),
+        };
         self.keep_alive == other.keep_alive
             && self.kept_alive == other.kept_alive
             && self.index == other.index
-            && near_equal(
-                self.layout_offset,
-                other.layout_offset,
-                Tolerance::DEFAULT.distance,
-            )
+            && layout_offset_equal
     }
 }

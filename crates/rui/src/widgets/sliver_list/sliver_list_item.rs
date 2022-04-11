@@ -23,7 +23,6 @@ pub struct SliverListItem {
     pub(crate) local_key: LocalKey,
     pub(crate) index: usize,
     pub(crate) child_index: usize,
-    pub(crate) parent_data: SliverListParentData,
 }
 
 impl Properties for SliverListItem {

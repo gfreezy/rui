@@ -553,10 +553,6 @@ impl RenderObjectInterface for ViewportObject {
         match event {
             Event::Wheel(mouse_event) => {
                 self.handle_pointer_scroll(mouse_event);
-                // for child in children {
-                //     child.state.set_viewport_offset(self.offset.scroll_offset());
-                // }
-                // tracing::debug!("scroll offset: {}, children len: {}", self.offset.pixels(), children.len());
                 ctx.request_layout();
                 ctx.set_handled();
                 return;

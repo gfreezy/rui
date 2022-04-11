@@ -13,7 +13,7 @@ use crate::{
 
 pub(crate) struct WindowContainer;
 
-const DEBUG: bool = true;
+const DEBUG: bool = false;
 
 impl RenderObjectInterface for WindowContainer {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children) {

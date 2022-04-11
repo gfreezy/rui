@@ -36,7 +36,7 @@ use debug_state::DebugState;
 use druid_shell::kurbo::{Point, Size};
 
 use id::ChildId;
-use key::{Key, LocalKey};
+use key::{Key, LocalKey, EMPTY_LOCAL_KEY};
 use menu::mac::menu_bar;
 use menu::{Menu, MenuItem};
 
@@ -75,7 +75,7 @@ fn inspect(ui: &mut Ui, receiver: &Receiver<Snapshot>) {
                         let current_id = debug_state.id;
                         button(
                             ui,
-                            &format!("{:ident$}{}", "", debug_state.display_name),
+                            &format!("{:ident$}{}({})", "", debug_state.display_name, debug_state.children.len()),
                             move || {
                                 selected.set(current_id);
                             },
@@ -87,7 +87,7 @@ fn inspect(ui: &mut Ui, receiver: &Receiver<Snapshot>) {
         });
         viewport(ui, AxisDirection::Down, AxisDirection::Right, |ui| {
             if let Some(debug_state) = snapshot.debug_state.debug_state_for_id(*selected) {
-                sliver_to_box(ui, "center".to_string(), |ui| {
+                sliver_to_box(ui, "center13".to_string(), |ui| {
                     text(ui, &debug_state.to_string(), Default::default());
                 });
             }
@@ -105,13 +105,19 @@ fn win(ui: &mut Ui, sender: &Sender<Snapshot>) {
         expand(ui, |ui| {
             // debug(ui, |ui| {
             viewport(ui, AxisDirection::Down, AxisDirection::Right, |ui| {
-                // for i in 0..10 {
-                //     sliver_to_box(ui, i.to_string(), |ui| {
-                //         let style = live_style(ui, ".text");
-                //         text(ui, &format!("hello{}", i), style);
-                //     });
-                // }
-                sliver_list(ui, "0".to_string())
+                for i in 0..10 {
+                    sliver_to_box(ui, i.to_string(), |ui| {
+                        let style = live_style(ui, ".text");
+                        text(ui, &format!("hello{}", i), style);
+                    });
+                }
+                sliver_list(
+                    ui,
+                    "0".to_string(),
+                    Box::new(Delegate {
+                        center: EMPTY_LOCAL_KEY.to_string(),
+                    }),
+                )
             })
             // });
         });
@@ -232,7 +238,7 @@ impl SliverChildDelegate for Delegate {
 
     fn estimated_count(&self) -> Option<usize> {
         // tracing::debug!("estimated count");
-        Some(10)
+        Some(100)
     }
 
     fn estimate_max_scroll_offset(
@@ -257,8 +263,8 @@ impl SliverChildDelegate for Delegate {
     fn did_finish_layout(&self, first_index: usize, last_index: usize) {}
 }
 
-fn sliver_list(ui: &mut Ui, center: String) {
-    widgets::sliver_list::SliverList::new(Box::new(Delegate { center })).build(ui)
+fn sliver_list(ui: &mut Ui, center: String, delegate: Box<dyn SliverChildDelegate>) {
+    widgets::sliver_list::SliverList::new(delegate).build(ui)
 }
 
 struct Snapshot {
