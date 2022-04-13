@@ -68,6 +68,7 @@ pub trait RenderObjectInterface {
     ) -> SliverGeometry {
         unimplemented!()
     }
+
     fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children) {
         for child in children {
             child.paint(ctx);

@@ -2,14 +2,14 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use crate::id::ChildId;
+use crate::id::ElementId;
 
 /// A description widget and its children, clonable and comparable, meant
 /// for testing and debugging. This is extremely not optimized.
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct DebugState {
     /// The widget's unique id.
-    pub id: ChildId,
+    pub id: ElementId,
     /// The widget's type as a human-readable string.
     pub display_name: String,
     /// If a widget has a "central" value (for instance, a textbox's contents),
@@ -62,7 +62,7 @@ impl DebugState {
         }
     }
 
-    pub fn debug_state_for_id(&self, id: ChildId) -> Option<&DebugState> {
+    pub fn debug_state_for_id(&self, id: ElementId) -> Option<&DebugState> {
         if self.id == id {
             Some(self)
         } else {

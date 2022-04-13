@@ -23,3 +23,7 @@ pub fn near_equal(a: f64, b: f64, epsilon: f64) -> bool {
     assert!(epsilon >= 0.0);
     (a > (b - epsilon)) && (a < (b + epsilon)) || a == b
 }
+
+pub fn default_near_equal(a: f64, b: f64) -> bool {
+    near_equal(a, b, EPSILON_DEFAULT)
+}

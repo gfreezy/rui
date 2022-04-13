@@ -20,7 +20,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::id::{ChildId as WidgetId, WindowId};
+use crate::id::{ElementId as WidgetId, WindowId};
 
 /// The identity of a [`Selector`].
 ///

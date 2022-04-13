@@ -1,6 +1,6 @@
 pub use crate::{box_constraints::BoxConstraints, sliver_constraints::SliverConstraints};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Constraints {
     BoxConstraints(BoxConstraints),
     SliverConstraints(SliverConstraints),
@@ -10,8 +10,16 @@ impl Constraints {
     pub fn to_box(&self) -> BoxConstraints {
         self.into()
     }
+
     pub fn to_sliver(&self) -> SliverConstraints {
         self.into()
+    }
+
+    pub(crate) fn is_tight(&self) -> bool {
+        match self {
+            Constraints::BoxConstraints(bc) => bc.is_tight(),
+            Constraints::SliverConstraints(sc) => sc.is_tight(),
+        }
     }
 }
 

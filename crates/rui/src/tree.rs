@@ -16,10 +16,11 @@ use druid_shell::{Region, TimerToken};
 
 use crate::box_constraints::BoxConstraints;
 
+use crate::constraints::Constraints;
 use crate::context::{ContextState, EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx};
 use crate::debug_state::DebugState;
 use crate::event::Event;
-use crate::id::ChildId;
+use crate::id::ElementId;
 use crate::key::{Key, LocalKey};
 use crate::lifecycle::{InternalLifeCycle, LifeCycle};
 use crate::object::{AnyParentData, AnyRenderObject};
@@ -107,7 +108,7 @@ impl std::fmt::Debug for Element {
 }
 
 pub struct ElementState {
-    pub(crate) id: ChildId,
+    pub(crate) id: ElementId,
 
     /// The size of the box child; this is the value returned by the child's `layout_box`
     /// method.
@@ -120,6 +121,9 @@ pub struct ElementState {
     /// The origin of the child in the parent's coordinate space; together with
     /// `size` these constitute the child's layout rect.
     pub(crate) origin: Point,
+
+    /// Constraints for the child's layout.
+    pub(crate) constraints: Constraints,
 
     /// The origin of the parent in the window coordinate space;
     pub(crate) parent_window_origin: Point,
@@ -148,6 +152,8 @@ pub struct ElementState {
     pub(crate) invalid: Region,
 
     pub(crate) visible: bool,
+
+    pub(crate) relayout_boundary: Option<ElementId>,
 
     // TODO: consider using bitflags for the booleans.
     // hover state
@@ -259,19 +265,20 @@ impl<'a> IntoIterator for &'a mut Children {
     }
 }
 
-/// [`RenderObject`] API for `Child` nodes.
+/// [`RenderObject`] API for `Element` nodes.
 impl Element {
     pub(crate) fn new<T>(key: Key, local_key: LocalKey, object: T) -> Self
     where
         T: AnyRenderObject,
     {
+        let id = ElementId::next();
         Element {
             name: type_name::<T>(),
             key,
             local_key,
             object: Box::new(object),
             children: Children::new(),
-            state: ElementState::new(ChildId::next(), None),
+            state: ElementState::new(id, None),
             dead: false,
         }
     }
@@ -318,6 +325,37 @@ impl Element {
 
     pub(crate) fn visible(&self) -> bool {
         self.state.visible
+    }
+
+    /// Whether the constraints are the only input to the sizing algorithm (in
+    /// particular, child nodes have no impact).
+    ///
+    /// Returning false is always correct, but returning true can be more
+    /// efficient when computing the size of this render object because we don't
+    /// need to recompute the size if the constraints don't change.
+    ///
+    /// Typically, subclasses will always return the same value. If the value can
+    /// change, then, when it does change, the subclass should make sure to call
+    /// [markNeedsLayoutForSizedByParentChange].
+    ///
+    /// Subclasses that return true must not change the dimensions of this render
+    /// object in [performLayout]. Instead, that work should be done by
+    /// [performResize] or - for subclasses of [RenderBox] - in
+    /// [RenderBox.computeDryLayout].
+    pub(crate) fn sized_by_parent(&self) -> bool {
+        false
+    }
+
+    fn constraints(&self) -> &Constraints {
+        &self.state.constraints
+    }
+
+    fn set_constraints(&mut self, c: Constraints) {
+        self.state.constraints = c;
+    }
+
+    fn set_relayout_boundary(&mut self, relayout_boundary: Option<ElementId>) {
+        self.state.relayout_boundary = relayout_boundary;
     }
 }
 
@@ -375,17 +413,19 @@ impl<'a> DoubleEndedIterator for ChildIterMut<'a> {
 }
 
 impl ElementState {
-    pub(crate) fn new(id: ChildId, size: Option<Size>) -> Self {
+    pub(crate) fn new(id: ElementId, size: Option<Size>) -> Self {
         ElementState {
             id,
             origin: Point::ORIGIN,
             viewport_offset: Vec2::ZERO,
             size: size.unwrap_or_default(),
             geometry: SliverGeometry::ZERO,
+            constraints: Constraints::BoxConstraints(BoxConstraints::UNBOUNDED),
             baseline_offset: 0.,
             invalid: Region::EMPTY,
             parent_data: None,
             is_hot: false,
+            relayout_boundary: None,
             is_active: false,
             has_active: false,
             needs_layout: true,
@@ -707,16 +747,52 @@ impl Element {
             .dry_layout(&mut child_ctx, c, &mut self.children)
     }
 
-    pub fn layout_box(&mut self, ctx: &mut LayoutCtx, c: &BoxConstraints) -> Size {
+    fn should_do_layout(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        c: &Constraints,
+        parent_use_size: bool,
+    ) -> bool {
+        let relayout_boundary = if !parent_use_size || self.sized_by_parent() || c.is_tight() {
+            Some(self.id())
+        } else {
+            // ctx is parent's state. So it is parent's id.
+            ctx.relayout_boundary()
+        };
+        if !self.needs_layout()
+            && c == self.constraints()
+            && relayout_boundary == self.relayout_boundary()
+        {
+            return false;
+        }
+
+        self.set_constraints(c.clone());
+        if relayout_boundary.is_some() && relayout_boundary != self.relayout_boundary() {
+            for child in self.children.iter_mut() {
+                child.clean_relayout_boundary();
+            }
+        }
+
+        self.set_relayout_boundary(relayout_boundary);
+
+        if self.sized_by_parent() {
+            // performResize()
+        }
+
+        true
+    }
+
+    pub fn layout_box(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints) -> Size {
+        if self.should_do_layout(ctx, &bc.into(), true) {
+            self._layout_box(ctx, bc)
+        } else {
+            self.state.size
+        }
+    }
+
+    fn _layout_box(&mut self, ctx: &mut LayoutCtx, c: &BoxConstraints) -> Size {
         let object_name = self.object.name();
         let instant = Instant::now();
-        // let span = tracing::span!(tracing::Level::DEBUG, "layout_box", ?c, object_name);
-        // let _h = span.enter();
-
-        // if !self.state.needs_layout {
-        //     tracing::debug!("skip layout_box: {}", object_name);
-        //     return self.state.size;
-        // }
 
         self.state.needs_layout = false;
 
@@ -729,26 +805,26 @@ impl Element {
             .object
             .layout_box(&mut child_ctx, c, &mut self.children);
 
-        // tracing::debug!(
-        //     "{} layout_box took {}",
-        //     object_name,
-        //     instant.elapsed().as_millis()
-        // );
         self.state.size = new_size;
 
         new_size
     }
 
     pub fn layout_sliver(&mut self, ctx: &mut LayoutCtx, sc: &SliverConstraints) -> SliverGeometry {
+        if self.should_do_layout(ctx, &sc.into(), true) {
+            self._layout_sliver(ctx, sc)
+        } else {
+            self.state.geometry.clone()
+        }
+    }
+
+    pub fn _layout_sliver(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        sc: &SliverConstraints,
+    ) -> SliverGeometry {
         let object_name = self.object.name();
         let instant = Instant::now();
-        // let span = tracing::span!(tracing::Level::DEBUG, "layout_sliver", object_name);
-        // let _h = span.enter();
-
-        // if !self.state.needs_layout {
-        //     tracing::debug!("skip layout_sliver: {}", object_name);
-        //     return self.state.geometry.clone();
-        // }
 
         self.state.needs_layout = false;
 
@@ -806,7 +882,7 @@ impl Element {
         self.object.as_any()
     }
 
-    pub fn id(&self) -> ChildId {
+    pub fn id(&self) -> ElementId {
         self.state.id
     }
     /// Set the origin of this widget, in the parent's coordinate space.
@@ -892,6 +968,20 @@ impl Element {
 
     pub fn size(&self) -> Size {
         self.state.size()
+    }
+
+    pub fn relayout_boundary(&self) -> Option<ElementId> {
+        self.state.relayout_boundary
+    }
+
+    pub fn clean_relayout_boundary(&mut self) {
+        if self.relayout_boundary() != Some(self.id()) {
+            self.state.relayout_boundary = None;
+            self.request_layout();
+            for child in self.children.iter_mut() {
+                child.clean_relayout_boundary();
+            }
+        }
     }
 
     pub fn name(&self) -> &'static str {

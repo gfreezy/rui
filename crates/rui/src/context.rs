@@ -9,7 +9,7 @@ use crate::{
     command::{sys, Command, SingleUse, Target},
     tree::ElementState,
 };
-use crate::{ext_event::ExtEventSink, id::ChildId};
+use crate::{ext_event::ExtEventSink, id::ElementId};
 use druid_shell::kurbo::{Insets, Rect, Size};
 use druid_shell::piet::{Piet, PietText, RenderContext};
 use druid_shell::{Region, TimerToken, WindowHandle};
@@ -76,7 +76,7 @@ impl_context_method!(
     PaintCtx<'_, '_>,
     {
         /// get the `ChildId` of the current widget.
-        pub fn child_id(&self) -> ChildId {
+        pub fn child_id(&self) -> ElementId {
             self.child_state.id
         }
 
@@ -124,6 +124,10 @@ impl_context_method!(
 
         pub fn parent_data<T: 'static>(&self) -> Option<&T> {
             self.child_state.parent_data()
+        }
+
+        pub fn relayout_boundary(&self) -> Option<ElementId> {
+            self.child_state.relayout_boundary
         }
     }
 );

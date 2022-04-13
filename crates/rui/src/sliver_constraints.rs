@@ -1,6 +1,8 @@
 use druid_shell::kurbo::Size;
 
-use crate::{box_constraints::BoxConstraints, style::axis::Axis};
+use crate::{
+    box_constraints::BoxConstraints, physics::tolerance::default_near_equal, style::axis::Axis,
+};
 
 /// The direction in which a sliver's contents are ordered, relative to the
 /// scroll offset axis.
@@ -295,6 +297,24 @@ pub struct SliverConstraints {
     pub remaining_cache_extent: f64,
 }
 
+impl PartialEq for SliverConstraints {
+    fn eq(&self, other: &Self) -> bool {
+        self.axis_direction == other.axis_direction
+            && self.growth_direction == other.growth_direction
+            && default_near_equal(self.scroll_offset, other.scroll_offset)
+            && default_near_equal(self.overlap, other.overlap)
+            && default_near_equal(self.remaining_paint_extent, other.remaining_paint_extent)
+            && default_near_equal(self.cross_axis_extent, other.cross_axis_extent)
+            && self.cross_axis_direction == other.cross_axis_direction
+            && default_near_equal(
+                self.viewport_main_axis_extent,
+                other.viewport_main_axis_extent,
+            )
+            && default_near_equal(self.cache_origin, other.cache_origin)
+            && default_near_equal(self.remaining_cache_extent, other.remaining_cache_extent)
+    }
+}
+
 pub fn axis_direction_to_axis(axis_direction: AxisDirection) -> Axis {
     match axis_direction {
         AxisDirection::Up | AxisDirection::Down => Axis::Vertical,
@@ -343,6 +363,10 @@ impl SliverConstraints {
                 Size::new(cross_axis_extent, max_extent),
             ),
         }
+    }
+
+    pub(crate) fn is_tight(&self) -> bool {
+        false
     }
 }
 

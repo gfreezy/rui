@@ -14,9 +14,9 @@
 
 //! The fundamental druid types.
 
-
-
 use druid_shell::kurbo::Size;
+
+use crate::physics::tolerance::default_near_equal;
 
 /// Constraints for layout.
 ///
@@ -40,6 +40,15 @@ use druid_shell::kurbo::Size;
 pub struct BoxConstraints {
     min: Size,
     max: Size,
+}
+
+impl PartialEq for BoxConstraints {
+    fn eq(&self, other: &Self) -> bool {
+        default_near_equal(self.min.width, other.min.width)
+            && default_near_equal(self.min.height, other.min.height)
+            && default_near_equal(self.max.width, other.max.width)
+            && default_near_equal(self.max.height, other.max.height)
+    }
 }
 
 impl BoxConstraints {
@@ -80,6 +89,19 @@ impl BoxConstraints {
             min: size,
             max: size,
         }
+    }
+
+    pub fn has_tight_width(&self) -> bool {
+        self.min_width() >= self.max_width()
+    }
+
+    pub fn has_tight_height(&self) -> bool {
+        self.min_height() >= self.max_height()
+    }
+
+    /// Whether there is exactly one size that satisfies the constraints.
+    pub fn is_tight(&self) -> bool {
+        self.has_tight_width() && self.has_tight_height()
     }
 
     /// Create a "tight" box constraints object for one or more dimensions.

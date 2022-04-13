@@ -3,18 +3,18 @@
 use druid_shell::Counter;
 
 #[derive(Clone, Copy, Debug, PartialOrd, PartialEq, Ord, Eq, Hash, Default)]
-pub struct ChildId(u64);
+pub struct ElementId(u64);
 
-impl ChildId {
-    pub const ZERO: ChildId = ChildId(0);
+impl ElementId {
+    pub const ZERO: ElementId = ElementId(0);
     /// Allocate a new, unique window id.
-    pub fn next() -> ChildId {
+    pub fn next() -> ElementId {
         static CHILD_COUNTER: Counter = Counter::new();
-        ChildId(CHILD_COUNTER.next())
+        ElementId(CHILD_COUNTER.next())
     }
 }
 
-impl ToString for ChildId {
+impl ToString for ElementId {
     fn to_string(&self) -> String {
         self.0.to_string()
     }

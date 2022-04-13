@@ -35,7 +35,7 @@ use command::{sys, SingleUse, Target};
 use debug_state::DebugState;
 use druid_shell::kurbo::{Point, Size};
 
-use id::ChildId;
+use id::ElementId;
 use key::{Key, LocalKey, EMPTY_LOCAL_KEY};
 use menu::mac::menu_bar;
 use menu::{Menu, MenuItem};
@@ -64,7 +64,7 @@ fn inspect(ui: &mut Ui, receiver: &Receiver<Snapshot>) {
     if let Ok(v) = receiver.try_recv() {
         snapshot.set(v);
     }
-    let selected = ui.state_node(|| ChildId::ZERO);
+    let selected = ui.state_node(|| ElementId::ZERO);
 
     row(ui, |ui| {
         viewport(ui, AxisDirection::Down, AxisDirection::Right, |ui| {
@@ -75,7 +75,12 @@ fn inspect(ui: &mut Ui, receiver: &Receiver<Snapshot>) {
                         let current_id = debug_state.id;
                         button(
                             ui,
-                            &format!("{:ident$}{}({})", "", debug_state.display_name, debug_state.children.len()),
+                            &format!(
+                                "{:ident$}{}({})",
+                                "",
+                                debug_state.display_name,
+                                debug_state.children.len()
+                            ),
                             move || {
                                 selected.set(current_id);
                             },
