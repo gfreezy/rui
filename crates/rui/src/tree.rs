@@ -292,6 +292,10 @@ impl Element {
         map.insert("children_len".to_string(), self.children.len().to_string());
         map.insert("origin".to_string(), format!("{:?}", self.state.origin));
         map.insert(
+            "relayout_boundary".to_string(),
+            format!("{:?}", self.state.relayout_boundary),
+        );
+        map.insert(
             "needs_layout".to_string(),
             format!("{:?}", self.state.needs_layout),
         );
@@ -343,7 +347,7 @@ impl Element {
     /// [performResize] or - for subclasses of [RenderBox] - in
     /// [RenderBox.computeDryLayout].
     pub(crate) fn sized_by_parent(&self) -> bool {
-        false
+        self.object.sized_by_parent()
     }
 
     fn constraints(&self) -> &Constraints {
@@ -444,8 +448,6 @@ impl ElementState {
                 "mark_needs_layout, caller: {:?}",
                 std::panic::Location::caller()
             );
-            // let bt = backtrace::Backtrace::new();
-            // tracing::debug!("request layout: {:?}", bt);
 
             self.needs_layout = true;
         }
@@ -554,6 +556,7 @@ impl ElementState {
             .flatten()
     }
 
+    #[track_caller]
     pub(crate) fn set_parent_data(&mut self, parent_data: Option<Box<dyn AnyParentData>>) -> bool {
         let changed = match (&self.parent_data, &parent_data) {
             (None, None) => false,
@@ -562,11 +565,12 @@ impl ElementState {
             (Some(l), Some(r)) => !l.eql(r.deref()),
         };
         if changed {
-            tracing::debug!(
-                "set parent data, old: {:?}, new: {:?}",
-                self.parent_data,
-                parent_data
-            );
+            // tracing::debug!(
+            //     "set parent data, old: {:?}, new: {:?}, {:?}",
+            //     self.parent_data,
+            //     parent_data,
+            //     std::panic::Location::caller()
+            // );
         }
         self.parent_data = parent_data;
         changed
@@ -782,8 +786,13 @@ impl Element {
         true
     }
 
-    pub fn layout_box(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints) -> Size {
-        if self.should_do_layout(ctx, &bc.into(), true) {
+    pub fn layout_box(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        bc: &BoxConstraints,
+        parent_use_size: bool,
+    ) -> Size {
+        if self.should_do_layout(ctx, &bc.into(), parent_use_size) {
             self._layout_box(ctx, bc)
         } else {
             self.state.size
@@ -810,8 +819,13 @@ impl Element {
         new_size
     }
 
-    pub fn layout_sliver(&mut self, ctx: &mut LayoutCtx, sc: &SliverConstraints) -> SliverGeometry {
-        if self.should_do_layout(ctx, &sc.into(), true) {
+    pub fn layout_sliver(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        sc: &SliverConstraints,
+        parent_use_size: bool,
+    ) -> SliverGeometry {
+        if self.should_do_layout(ctx, &sc.into(), parent_use_size) {
             self._layout_sliver(ctx, sc)
         } else {
             self.state.geometry.clone()
@@ -1078,6 +1092,7 @@ impl Element {
     }
 
     /// return whether parent is changed
+    #[track_caller]
     pub(crate) fn set_parent_data(&mut self, parent_data: Option<Box<dyn AnyParentData>>) -> bool {
         self.state.set_parent_data(parent_data)
     }

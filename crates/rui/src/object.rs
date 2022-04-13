@@ -30,6 +30,10 @@ pub trait RenderObject<Props>: RenderObjectInterface {
 }
 
 pub trait RenderObjectInterface {
+    fn sized_by_parent(&self) -> bool {
+        false
+    }
+
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children) {
         for child in children {
             child.event(ctx, event);
@@ -83,6 +87,7 @@ pub trait RenderObjectInterface {
 pub trait AnyRenderObject: Any {
     fn as_any(&mut self) -> &mut dyn Any;
     fn name(&self) -> &'static str;
+    fn sized_by_parent(&self) -> bool;
 
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children);
     fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children);
@@ -118,6 +123,10 @@ where
 
     fn name(&self) -> &'static str {
         std::any::type_name::<Self>()
+    }
+
+    fn sized_by_parent(&self) -> bool {
+        R::sized_by_parent(self)
     }
 
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children) {

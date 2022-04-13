@@ -225,6 +225,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossbeam-channel"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5aaa7bd5fb665c6864b5f963dd9097905c54125909c7aa94c9e18507cdbe6c53"
+dependencies = [
+ "cfg-if 1.0.0",
+ "crossbeam-utils",
+]
+
+[[package]]
+name = "crossbeam-utils"
+version = "0.8.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0bf124c720b7686e3c2663cf54062ab0f68a88af2fb6a030e87e30bf721fcb38"
+dependencies = [
+ "cfg-if 1.0.0",
+ "lazy_static",
+]
+
+[[package]]
 name = "druid-shell"
 version = "0.7.0"
 source = "git+https://github.com/linebender/druid?rev=0079ae3#0079ae31127b3a309c9b0fc8806d52ff68822dd5"
@@ -295,26 +315,6 @@ dependencies = [
  "libc",
  "redox_syscall",
  "winapi 0.3.9",
-]
-
-[[package]]
-name = "float_eq"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1d53499e94f9a7828e63c574adf62bcade7f358c3738f9ea70d7c2edb61023d"
-dependencies = [
- "float_eq_derive",
-]
-
-[[package]]
-name = "float_eq_derive"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b7612111f1dc51b9beca69821205273a0d1bfed57cd650827b418fac56ac4b6"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -1171,8 +1171,8 @@ dependencies = [
  "anymap2",
  "bumpalo",
  "convert_case",
+ "crossbeam-channel",
  "druid-shell",
- "float_eq",
  "fxhash",
  "generational-indextree",
  "illicit",

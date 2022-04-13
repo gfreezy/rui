@@ -349,7 +349,7 @@ impl RenderObjectInterface for RenderFlex {
             main_size: mut actual_size,
             mut cross_size,
         } = self.compute_sizes(ctx, &bc, children, |ctx, child, bc| {
-            child.layout_box(ctx, &bc)
+            child.layout_box(ctx, &bc, true)
         });
 
         if self.cross_axis_alignment == CrossAxisAlignment::Baseline {

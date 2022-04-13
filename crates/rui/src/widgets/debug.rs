@@ -74,7 +74,7 @@ impl RenderObjectInterface for DebugObject {
         bc.debug_check("SizedBox");
 
         let size = if !children.is_empty() {
-            children[0].layout_box(ctx, bc)
+            children[0].layout_box(ctx, bc, true)
         } else {
             Size::ZERO
         };

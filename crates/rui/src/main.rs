@@ -4,7 +4,7 @@ mod macros;
 pub mod app;
 pub mod app_state;
 pub mod box_constraints;
-pub mod command;
+pub mod commands;
 pub mod constraints;
 pub mod context;
 mod debug_state;
@@ -28,15 +28,17 @@ pub mod window;
 
 use std::any::Any;
 use std::panic::Location;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::{Arc, Mutex};
 
 use app::WindowDesc;
-use command::{sys, SingleUse, Target};
+use commands::{sys, SingleUse, Target};
+use crossbeam_channel::{Receiver, Sender};
 use debug_state::DebugState;
 use druid_shell::kurbo::{Point, Size};
 
 use id::ElementId;
 use key::{Key, LocalKey, EMPTY_LOCAL_KEY};
+use menu::mac::application::quit;
 use menu::mac::menu_bar;
 use menu::{Menu, MenuItem};
 
@@ -57,41 +59,72 @@ use crate::widgets::button::Button;
 
 use crate::widgets::text::Text;
 
-fn inspect(ui: &mut Ui, receiver: &Receiver<Snapshot>) {
-    let snapshot = ui.state_node(|| Snapshot {
-        debug_state: DebugState::default(),
-    });
-    if let Ok(v) = receiver.try_recv() {
-        snapshot.set(v);
-    }
+fn inspect(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
     let selected = ui.state_node(|| ElementId::ZERO);
 
     row(ui, |ui| {
         viewport(ui, AxisDirection::Down, AxisDirection::Right, |ui| {
-            snapshot.debug_state.visit(
+            let mut data = vec![];
+            snapshot.lock().unwrap().debug_state.visit(
                 &mut |debug_state, level| {
-                    sliver_to_box(ui, "center".to_string(), |ui| {
-                        let ident = level * 4;
-                        let current_id = debug_state.id;
-                        button(
-                            ui,
-                            &format!(
-                                "{:ident$}{}({})",
-                                "",
-                                debug_state.display_name,
-                                debug_state.children.len()
-                            ),
-                            move || {
-                                selected.set(current_id);
-                            },
-                        );
-                    });
+                    data.push((level, debug_state.clone()));
                 },
                 0,
             );
+
+            let delegate = VecSliverListDelegate {
+                data,
+                key_fn: |(level, s)| s.id.to_string(),
+                content: move |ui, (level, debug_state)| {
+                    let ident = level * 4;
+                    let current_id = debug_state.id;
+                    button(
+                        ui,
+                        &format!(
+                            "{:ident$}{}(id: {}, len: {})",
+                            "",
+                            debug_state.display_name,
+                            debug_state.id,
+                            debug_state.children.len()
+                        ),
+                        move || {
+                            selected.set(current_id);
+                        },
+                    );
+                },
+            };
+
+            sliver_list(ui, delegate);
+            // snapshot.debug_state.visit(
+            //     &mut |debug_state, level| {
+            //         sliver_to_box(ui, "center".to_string(), |ui| {
+            //             let ident = level * 4;
+            //             let current_id = debug_state.id;
+            //             button(
+            //                 ui,
+            //                 &format!(
+            //                     "{:ident$}{}(id: {}, len: {})",
+            //                     "",
+            //                     debug_state.display_name,
+            //                     debug_state.id,
+            //                     debug_state.children.len()
+            //                 ),
+            //                 move || {
+            //                     selected.set(current_id);
+            //                 },
+            //             );
+            //         });
+            //     },
+            //     0,
+            // );
         });
         viewport(ui, AxisDirection::Down, AxisDirection::Right, |ui| {
-            if let Some(debug_state) = snapshot.debug_state.debug_state_for_id(*selected) {
+            if let Some(debug_state) = snapshot
+                .lock()
+                .unwrap()
+                .debug_state
+                .debug_state_for_id(*selected)
+            {
                 sliver_to_box(ui, "center13".to_string(), |ui| {
                     text(ui, &debug_state.to_string(), Default::default());
                 });
@@ -100,7 +133,7 @@ fn inspect(ui: &mut Ui, receiver: &Receiver<Snapshot>) {
     });
 }
 
-fn win(ui: &mut Ui, sender: &Sender<Snapshot>) {
+fn win(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
     column(ui, |ui| {
         expand(ui, |ui| {
             let style = live_style(ui, ".text");
@@ -118,20 +151,16 @@ fn win(ui: &mut Ui, sender: &Sender<Snapshot>) {
                 }
                 sliver_list(
                     ui,
-                    "0".to_string(),
-                    Box::new(Delegate {
+                    Delegate {
                         center: EMPTY_LOCAL_KEY.to_string(),
-                    }),
+                    },
                 )
             })
             // });
         });
     });
-    sender
-        .send(Snapshot {
-            debug_state: ui.tree[0].debug_state(),
-        })
-        .unwrap();
+
+    snapshot.lock().unwrap().debug_state = ui.tree[0].debug_state();
 }
 
 fn flex(ui: &mut Ui, style_name: &str, content: impl FnMut(&mut Ui)) {
@@ -226,16 +255,68 @@ fn sliver_to_box(ui: &mut Ui, local_key: String, content: impl FnMut(&mut Ui)) {
     widgets::sliver_to_box::SliverToBox.build(ui, local_key, content);
 }
 
+struct VecSliverListDelegate<T, C: FnMut(&mut Ui, &T) + 'static> {
+    data: Vec<T>,
+    key_fn: fn(&T) -> String,
+    content: C,
+}
+
+impl<T: PartialEq + 'static, C: FnMut(&mut Ui, &T) + 'static> SliverChildDelegate
+    for VecSliverListDelegate<T, C>
+{
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn key(&self, index: usize) -> LocalKey {
+        (self.key_fn)(&self.data[index])
+    }
+
+    fn build(&mut self, ui: &mut Ui, index: usize) {
+        (self.content)(ui, &self.data[index])
+    }
+
+    fn estimated_count(&self) -> Option<usize> {
+        Some(self.data.len())
+    }
+
+    fn estimate_max_scroll_offset(
+        &self,
+        sc: &constraints::SliverConstraints,
+        first_index: usize,
+        last_index: usize,
+        leading_scroll_offset: f64,
+        trailing_scroll_offset: f64,
+    ) -> Option<f64> {
+        None
+    }
+
+    fn should_rebuild(&self, old_delegate: &dyn SliverChildDelegate) -> bool {
+        let old = old_delegate.as_any().downcast_ref::<Self>().unwrap();
+        &old.data != &self.data
+    }
+
+    fn find_index_by_key(&self, key: &LocalKey) -> Option<usize> {
+        self.data
+            .iter()
+            .position(|item| &(self.key_fn)(item) == key)
+    }
+}
+
 struct Delegate {
     center: String,
 }
 
 impl SliverChildDelegate for Delegate {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
     fn key(&self, index: usize) -> String {
         index.to_string()
     }
 
-    fn build(&self, ui: &mut Ui, index: usize) {
+    fn build(&mut self, ui: &mut Ui, index: usize) {
         // tracing::debug!("build in delegate: {index}");
         let style = live_style(ui, ".inspect-text");
         button(ui, &format!("number {index}"), || {});
@@ -268,20 +349,25 @@ impl SliverChildDelegate for Delegate {
     fn did_finish_layout(&self, first_index: usize, last_index: usize) {}
 }
 
-fn sliver_list(ui: &mut Ui, center: String, delegate: Box<dyn SliverChildDelegate>) {
-    widgets::sliver_list::SliverList::new(delegate).build(ui)
+fn sliver_list(ui: &mut Ui, delegate: impl SliverChildDelegate + 'static) {
+    widgets::sliver_list::SliverList::new(Box::new(delegate)).build(ui)
 }
 
+#[derive(Debug)]
 struct Snapshot {
     debug_state: DebugState,
 }
 
 fn main() {
-    let (sender, receiver) = channel::<Snapshot>();
-
-    let desc = WindowDesc::new("app".to_string(), move |ui| win(ui, &sender)).menu(|_| menu_bar());
+    let snapshot = Arc::new(Mutex::new(Snapshot {
+        debug_state: DebugState::default(),
+    }));
+    let snapshot1 = snapshot.clone();
+    let desc = WindowDesc::new("app".to_string(), move |ui| win(ui, snapshot1.clone()))
+        .menu(|_| menu_bar());
     let inspector_desc =
-        WindowDesc::new("app".to_string(), move |ui| inspect(ui, &receiver)).menu(|_| menu_bar());
+        WindowDesc::new("app".to_string(), move |ui| inspect(ui, snapshot.clone()))
+            .menu(|_| menu_bar());
     let app = AppLauncher::with_windows(vec![desc, inspector_desc]).log_to_console();
     app.launch().unwrap();
 }

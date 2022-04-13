@@ -4,7 +4,7 @@ use druid_shell::{Counter, HotKey, IntoKey, RawMods};
 
 use crate::{
     app_state::CommandQueue,
-    command::{Command, Target},
+    commands::{Command, Target},
     id::WindowId,
 };
 
@@ -422,14 +422,16 @@ pub mod mac {
 
     /// A basic macOS menu bar.
     pub fn menu_bar() -> Menu {
-        Menu::new(String::from("")).entry(application::default())
+        Menu::new(String::from(""))
+            .entry(application::default())
+            .entry(file::default())
     }
 
     /// The application menu
     pub mod application {
         use druid_shell::SysMods;
 
-        use crate::command;
+        use crate::commands;
 
         use super::*;
 
@@ -451,13 +453,13 @@ pub mod mac {
 
         /// The 'About App' menu item.
         pub fn about() -> MenuItem {
-            MenuItem::new(String::from("macos-menu-about-app")).command(command::sys::SHOW_ABOUT)
+            MenuItem::new(String::from("macos-menu-about-app")).command(commands::sys::SHOW_ABOUT)
         }
 
         /// The preferences menu item.
         pub fn preferences() -> MenuItem {
             MenuItem::new(String::from("macos-menu-preferences"))
-                .command(command::sys::SHOW_PREFERENCES)
+                .command(commands::sys::SHOW_PREFERENCES)
                 .hotkey(SysMods::Cmd, ",")
         }
 
@@ -469,7 +471,7 @@ pub mod mac {
         pub fn hide() -> MenuItem {
             #[allow(deprecated)]
             MenuItem::new(String::from("macos-menu-hide-app"))
-                .command(command::sys::HIDE_APPLICATION)
+                .command(commands::sys::HIDE_APPLICATION)
                 .hotkey(SysMods::Cmd, "h")
         }
 
@@ -481,21 +483,46 @@ pub mod mac {
         pub fn hide_others() -> MenuItem {
             #[allow(deprecated)]
             MenuItem::new(String::from("macos-menu-hide-others"))
-                .command(command::sys::HIDE_OTHERS)
+                .command(commands::sys::HIDE_OTHERS)
                 .hotkey(SysMods::AltCmd, "h")
         }
 
         /// The 'show all' builtin menu item
         //FIXME: this doesn't work
         pub fn show_all() -> MenuItem {
-            MenuItem::new(String::from("macos-menu-show-all")).command(command::sys::SHOW_ALL)
+            MenuItem::new(String::from("macos-menu-show-all")).command(commands::sys::SHOW_ALL)
         }
 
         /// The 'Quit' menu item.
         pub fn quit() -> MenuItem {
             MenuItem::new(String::from("macos-menu-quit-app"))
-                .command(command::sys::QUIT_APP)
+                .command(commands::sys::QUIT_APP)
                 .hotkey(SysMods::Cmd, "q")
+        }
+    }
+
+    /// The file menu.
+    pub mod file {
+        use druid_shell::SysMods;
+
+        use super::*;
+
+        use crate::commands;
+
+        /// A default file menu.
+        ///
+        /// This will not be suitable for many applications; you should
+        /// build the menu you need manually, using the items defined here
+        /// where appropriate.
+        pub fn default() -> Menu {
+            Menu::new(String::from("common-menu-file-menu")).entry(close())
+        }
+
+        /// The 'Close' menu item.
+        pub fn close() -> MenuItem {
+            MenuItem::new(String::from("common-menu-file-close"))
+                .command(commands::sys::CLOSE_WINDOW)
+                .hotkey(SysMods::Cmd, "w")
         }
     }
 }

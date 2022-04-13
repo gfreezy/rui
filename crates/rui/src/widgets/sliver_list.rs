@@ -17,13 +17,15 @@ use crate::{
 };
 use druid_shell::kurbo::{Point, Vec2};
 use std::{
+    any::Any,
     collections::{BTreeMap, HashMap},
     panic::Location,
 };
 
 pub trait SliverChildDelegate {
-    fn key(&self, index: usize) -> String;
-    fn build(&self, ui: &mut Ui, index: usize);
+    fn as_any(&self) -> &dyn Any;
+    fn key(&self, index: usize) -> LocalKey;
+    fn build(&mut self, ui: &mut Ui, index: usize);
     fn estimated_count(&self) -> Option<usize>;
     fn find_index_by_key(&self, key: &LocalKey) -> Option<usize> {
         None
@@ -146,7 +148,7 @@ impl RenderSliverList {
         // }
     }
 
-    fn build_item(&self, ui: &mut Ui, item: &SliverListItem) -> bool {
+    fn build_item(&mut self, ui: &mut Ui, item: &SliverListItem) -> bool {
         let caller = Key::current();
         if let Some(count) = self.delegate.estimated_count() {
             if item.index < count {
@@ -170,12 +172,10 @@ impl RenderSliverList {
         &mut self,
         children: &mut Children,
         child_index: usize,
-        parent_data: &SliverListParentData,
+        index: usize,
     ) -> Option<Element> {
-        if !parent_data.kept_alive {
-            return children.remove_element(child_index);
-        }
-        self.keep_alive_bucket.remove(&parent_data.index)
+        let _ = self.keep_alive_bucket.remove(&index);
+        children.remove_element(child_index)
     }
 
     fn add_initial_child(&mut self, ctx: &mut LayoutCtx, children: &mut Children) -> bool {
@@ -200,11 +200,6 @@ impl RenderSliverList {
     ) {
         invoke_layout_callback(ctx, |ctx| {
             if let Some(mut child) = self.keep_alive_bucket.remove(&index) {
-                let parent_data = child
-                    .parent_data_mut::<SliverListParentData>()
-                    .expect("no parent data found.");
-                assert!(parent_data.kept_alive);
-                parent_data.kept_alive = false;
                 self.insert(children, child, after);
             } else {
                 self.create_child(ctx, children, index, after);
@@ -217,14 +212,15 @@ impl RenderSliverList {
             .take_parent_data::<SliverListParentData>()
             .expect("no valid parent data");
         if parent_data.keep_alive {
-            assert!(!parent_data.kept_alive);
-            let mut el = self.remove(children, child_index, &parent_data).unwrap();
-            parent_data.kept_alive = true;
+            tracing::debug!("cache sliver list item, index: {}", child_index);
+            let mut el = self
+                .remove(children, child_index, parent_data.index)
+                .unwrap();
             let index = parent_data.index;
             el.set_parent_data(Some(parent_data));
             self.keep_alive_bucket.insert(index, el);
         } else {
-            self.remove(children, child_index, &parent_data);
+            self.remove(children, child_index, parent_data.index);
         }
     }
 
@@ -264,11 +260,14 @@ impl RenderSliverList {
         let mut ui = Ui::new_in_the_middle(children, ctx.context_state, render_index);
         let parent_data = SliverListParentData {
             keep_alive: true,
-            kept_alive: false,
             layout_offset: None,
             index,
         };
         ui.set_parent_data(Some(Box::new(parent_data.clone())));
+
+        if Some(index) >= self.delegate.estimated_count() {
+            return;
+        }
 
         let item = SliverListItem {
             child_index: render_index,
@@ -308,7 +307,7 @@ impl RenderSliverList {
         self.create_or_obtain_child(ctx, children, index, None);
         // insert successfully
         if child_index(&children[0]) == index {
-            let _ = children[0].layout_box(ctx, child_constraints);
+            let _ = children[0].layout_box(ctx, child_constraints, true);
             return true;
         }
         // no more leading children
@@ -338,7 +337,7 @@ impl RenderSliverList {
         self.create_or_obtain_child(ctx, children, index, Some(after));
         if let Some(child) = children.get_mut(after + 1) {
             if child_index(child) == index {
-                child.layout_box(ctx, child_constraints);
+                child.layout_box(ctx, child_constraints, true);
                 return true;
             }
         }
@@ -377,7 +376,7 @@ impl RenderSliverList {
                     return false;
                 }
             } else {
-                children[*child].layout_box(ctx, child_constraints);
+                children[*child].layout_box(ctx, child_constraints, true);
             }
             *trailing_child_with_layout = *child;
         }
@@ -508,7 +507,7 @@ impl RenderObjectInterface for RenderSliverList {
                     // insertAndLayoutLeadingChild only lays out the children before
                     // firstChild. In this case, nothing has been laid out. We have
                     // to lay out firstChild manually.
-                    let _ = children[0].layout_box(ctx, &child_constraints);
+                    let _ = children[0].layout_box(ctx, &child_constraints, true);
 
                     leading_child_index_with_layout = Some(index);
                     if trailing_child_index_with_layout.is_none() {
@@ -618,7 +617,7 @@ impl RenderObjectInterface for RenderSliverList {
         // scroll offset.
         assert!(child_scroll_offset(&children[0]) <= scroll_offset);
         if leading_child_index_with_layout.is_none() {
-            let size = children[0].layout_box(ctx, &child_constraints);
+            let size = children[0].layout_box(ctx, &child_constraints, true);
         }
         let mut trailing_child_with_layout =
             find_child_with_index(children, trailing_child_index_with_layout).unwrap_or(0);

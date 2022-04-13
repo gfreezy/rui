@@ -14,7 +14,7 @@ use druid_shell::{
 use tracing::debug;
 
 use crate::app::{PendingWindow, WindowConfig, WindowDesc};
-use crate::command::{sys as sys_cmd, Command, Target};
+use crate::commands::{sys as sys_cmd, Command, Target};
 
 use crate::event::Event;
 use crate::ext_event::{ExtEventHost, ExtEventSink};
@@ -70,6 +70,9 @@ pub struct InnerAppState {
     root_menu: Option<MenuManager>,
     ext_event_host: ExtEventHost,
     windows: Windows,
+    /// The id of the most-recently-focused window that has a menu. On macOS, this
+    /// is the window that's currently in charge of the app menu.
+    menu_window: Option<WindowId>,
 }
 
 #[derive(Default)]
@@ -119,6 +122,7 @@ impl AppState {
         let inner = Rc::new(RefCell::new(InnerAppState {
             app,
             root_menu: None,
+            menu_window: None,
             command_queue: VecDeque::new(),
             windows: Windows::default(),
             ext_event_host,
@@ -302,6 +306,7 @@ impl InnerAppState {
         for window in self.windows.iter_mut() {
             window.update(&mut self.command_queue);
         }
+
         self.invalidate_and_finalize();
     }
 
@@ -312,6 +317,17 @@ impl InnerAppState {
     fn invalidate_and_finalize(&mut self) {
         for win in self.windows.iter_mut() {
             win.invalidate_and_finalize();
+        }
+    }
+
+    fn window_got_focus(&mut self, window_id: WindowId) {
+        if let Some(win) = self.windows.get_mut(window_id) {
+            if win.menu.is_some() {
+                self.menu_window = Some(window_id);
+            }
+
+            #[cfg(target_os = "macos")]
+            win.macos_update_app_menu()
         }
     }
 }
@@ -327,6 +343,10 @@ impl AppState {
 
     fn remove_window(&mut self, window_id: WindowId) {
         self.inner.borrow_mut().remove_window(window_id)
+    }
+
+    fn window_got_focus(&mut self, window_id: WindowId) {
+        self.inner.borrow_mut().window_got_focus(window_id)
     }
 
     /// Send an event to the widget hierarchy.
@@ -425,7 +445,7 @@ impl AppState {
     /// Handle a command. Top level commands (e.g. for creating and destroying
     /// windows) have their logic here; other commands are passed to the window.
     fn handle_cmd(&mut self, cmd: Command) {
-        use crate::command::Target as T;
+        use crate::commands::Target as T;
         match cmd.target() {
             // these are handled the same no matter where they come from
             _ if cmd.is(sys_cmd::QUIT_APP) => self.quit(),
@@ -635,6 +655,10 @@ impl WinHandler for WindowHandler {
     fn zoom(&mut self, delta: f64) {
         let event = Event::Zoom(delta);
         self.app_state.do_window_event(event, self.window_id);
+    }
+
+    fn got_focus(&mut self) {
+        self.app_state.window_got_focus(self.window_id);
     }
 
     fn timer(&mut self, token: TimerToken) {

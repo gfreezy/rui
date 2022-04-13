@@ -139,39 +139,6 @@ impl RenderObjectInterface for SizedBoxObject {
     fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _children: &mut Children) {
     }
 
-    fn dry_layout_box(
-        &mut self,
-        ctx: &mut LayoutCtx,
-        bc: &BoxConstraints,
-        children: &mut Children,
-    ) -> Size {
-        bc.debug_check("SizedBox");
-        let props = &self.props;
-        let new_bc = child_constraints(
-            &bc,
-            props.width.into(),
-            props.height.into(),
-            props.min_width.into(),
-            props.min_height.into(),
-            props.max_width.into(),
-            props.max_height.into(),
-        );
-        let child_bc = new_bc.loosen();
-        let size = if !children.is_empty() {
-            children[0].dry_layout_box(ctx, &(child_bc.into()))
-        } else {
-            Size::ZERO
-        };
-        let mut new_size = new_bc.constrain(size);
-        if props.width.is_normal() {
-            new_size.width = props.width.value();
-        }
-        if props.height.is_normal() {
-            new_size.height = props.height.value();
-        }
-        new_size
-    }
-
     fn layout_box(
         &mut self,
         ctx: &mut LayoutCtx,
@@ -191,7 +158,7 @@ impl RenderObjectInterface for SizedBoxObject {
         );
         let child_bc = new_bc.loosen();
         let size = if !children.is_empty() {
-            children[0].layout_box(ctx, &(child_bc.into()))
+            children[0].layout_box(ctx, &(child_bc.into()), true)
         } else {
             Size::ZERO
         };

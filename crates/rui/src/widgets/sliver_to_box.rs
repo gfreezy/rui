@@ -81,7 +81,7 @@ impl RenderObjectInterface for SliverToBoxObject {
             return SliverGeometry::ZERO;
         }
         let child_size =
-            children[0].layout_box(ctx, &sc.as_box_constraints(0.0, f64::INFINITY, None));
+            children[0].layout_box(ctx, &sc.as_box_constraints(0.0, f64::INFINITY, None), true);
         let child_extent = match sc.axis() {
             crate::style::axis::Axis::Horizontal => child_size.width,
             crate::style::axis::Axis::Vertical => child_size.height,

@@ -64,7 +64,7 @@ impl RenderObjectInterface for SliverListItemObject {
         bc.debug_check("SliverListItemObject");
 
         let size = if !children.is_empty() {
-            children[0].layout_box(ctx, bc)
+            children[0].layout_box(ctx, bc, true)
         } else {
             Size::ZERO
         };

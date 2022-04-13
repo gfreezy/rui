@@ -6,7 +6,7 @@ use std::{
 use crate::{
     app::WindowDesc,
     app_state::CommandQueue,
-    command::{sys, Command, SingleUse, Target},
+    commands::{sys, Command, SingleUse, Target},
     tree::ElementState,
 };
 use crate::{ext_event::ExtEventSink, id::ElementId};

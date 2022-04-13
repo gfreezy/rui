@@ -1,5 +1,7 @@
 //! Unique identities.
 
+use std::fmt::Display;
+
 use druid_shell::Counter;
 
 #[derive(Clone, Copy, Debug, PartialOrd, PartialEq, Ord, Eq, Hash, Default)]
@@ -14,11 +16,12 @@ impl ElementId {
     }
 }
 
-impl ToString for ElementId {
-    fn to_string(&self) -> String {
-        self.0.to_string()
+impl Display for ElementId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.to_string())
     }
 }
+
 #[derive(Clone, Copy, Debug, PartialOrd, PartialEq, Ord, Eq, Hash)]
 pub struct WindowId(u64);
 

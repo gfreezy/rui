@@ -264,7 +264,7 @@ impl ViewportObject {
                     .max(0.0),
                 cache_origin: corrected_cache_origin,
             };
-            let child_layout_geometry = child.layout_sliver(ctx, &sc);
+            let child_layout_geometry = child.layout_sliver(ctx, &sc, true);
 
             // tracing::debug!(
             //     "{}: {:#?} \n {:#?}",
@@ -544,6 +544,10 @@ impl RenderObject<Viewport> for ViewportObject {
 }
 
 impl RenderObjectInterface for ViewportObject {
+    fn sized_by_parent(&self) -> bool {
+        true
+    }
+
     fn event(
         &mut self,
         ctx: &mut crate::context::EventCtx,
@@ -573,15 +577,6 @@ impl RenderObjectInterface for ViewportObject {
         for child in children {
             child.lifecycle(ctx, event);
         }
-    }
-
-    fn dry_layout_box(
-        &mut self,
-        _ctx: &mut crate::context::LayoutCtx,
-        bc: &crate::constraints::BoxConstraints,
-        _children: &mut crate::tree::Children,
-    ) -> Size {
-        bc.max()
     }
 
     fn layout_box(

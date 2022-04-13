@@ -1,7 +1,7 @@
 use druid_shell::kurbo::Size;
 use druid_shell::{Clipboard, KeyEvent, MouseEvent, TimerToken};
 
-use crate::command::{Command, Notification};
+use crate::commands::{Command, Notification};
 
 #[derive(Debug, Clone)]
 pub enum Event {

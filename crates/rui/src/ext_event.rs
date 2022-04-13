@@ -19,7 +19,7 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use crate::app_state::{WindowHandler, EXT_EVENT_IDLE_TOKEN};
-use crate::command::{Command, Selector, SelectorSymbol, Target};
+use crate::commands::{Command, Selector, SelectorSymbol, Target};
 use crate::id::WindowId;
 use druid_shell::IdleHandle;
 

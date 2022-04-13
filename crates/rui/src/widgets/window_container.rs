@@ -16,6 +16,10 @@ pub(crate) struct WindowContainer;
 const DEBUG: bool = false;
 
 impl RenderObjectInterface for WindowContainer {
+    fn sized_by_parent(&self) -> bool {
+        true
+    }
+
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, children: &mut Children) {
         let instant = Instant::now();
 
@@ -78,14 +82,9 @@ impl RenderObjectInterface for WindowContainer {
         children: &mut Children,
     ) -> Size {
         let instant = Instant::now();
-        let mut size = Size::ZERO;
         for child in children {
-            let child_size = child.layout_box(ctx, bc);
+            let child_size = child.layout_box(ctx, bc, false);
             child.set_origin(ctx, Point::ZERO);
-            size = Size::new(
-                child_size.width.max(size.width),
-                child_size.height.max(size.height),
-            );
         }
 
         if DEBUG {
@@ -94,7 +93,7 @@ impl RenderObjectInterface for WindowContainer {
                 instant.elapsed().as_micros()
             );
         }
-        size
+        bc.max()
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, children: &mut Children) {

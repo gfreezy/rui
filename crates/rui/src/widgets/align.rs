@@ -150,7 +150,7 @@ impl RenderObjectInterface for RenderAlign {
             ));
         }
 
-        let child_size = children[0].layout_box(ctx, &bc.loosen().into());
+        let child_size = children[0].layout_box(ctx, &bc.loosen().into(), true);
         let size = bc.constrain(Size::new(
             if shrink_wrap_width {
                 child_size.width * self.width_factor.unwrap_or(1.0)

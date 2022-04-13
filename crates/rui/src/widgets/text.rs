@@ -124,6 +124,11 @@ impl RenderObject<Text> for TextObject {
 
     fn update(&mut self, ctx: &mut UpdateCtx, props: Text, children: &mut Children) {
         if self.layout.text() != Some(&props.text) {
+            tracing::debug!(
+                "TextObject::update: {} {:?}",
+                &props.text,
+                self.layout.text()
+            );
             self.layout.set_text(props.text);
             ctx.request_layout();
         }
@@ -132,29 +137,17 @@ impl RenderObject<Text> for TextObject {
             self.style = props.style;
             self.update_style();
             ctx.request_layout();
+            tracing::debug!("TextObject::update: layout is None2");
         }
 
         if self.layout.layout().is_none() {
+            tracing::debug!("TextObject::update: layout is None3");
             ctx.request_layout();
         }
     }
 }
 
 impl RenderObjectInterface for TextObject {
-    fn event(&mut self, _ctx: &mut EventCtx, _event: &Event, _children: &mut Children) {}
-
-    fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _children: &mut Children) {
-    }
-
-    fn dry_layout_box(
-        &mut self,
-        ctx: &mut LayoutCtx,
-        bc: &BoxConstraints,
-        _children: &mut Children,
-    ) -> Size {
-        todo!()
-    }
-
     fn layout_box(
         &mut self,
         ctx: &mut LayoutCtx,

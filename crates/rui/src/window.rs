@@ -69,6 +69,15 @@ impl Window {
         // }
     }
 
+    /// On macos we need to update the global application menu to be the menu
+    /// for the current window.
+    #[cfg(target_os = "macos")]
+    pub(crate) fn macos_update_app_menu(&mut self) {
+        if let Some(menu) = self.menu.as_mut() {
+            self.handle.set_menu(menu.refresh());
+        }
+    }
+
     pub(crate) fn prepare_paint(&mut self) {}
 
     // #[instrument(skip(self, piet))]
@@ -133,7 +142,8 @@ impl Window {
 
         root_state.size = root.layout_box(
             &mut layout_ctx,
-            &(BoxConstraints::new(Size::ZERO, self.size).into()),
+            &BoxConstraints::new(self.size, self.size),
+            false,
         );
         let mut ctx = LifeCycleCtx {
             context_state: &mut context_state,

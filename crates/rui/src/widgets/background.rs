@@ -67,13 +67,4 @@ impl RenderObjectInterface for Background {
         }
         children[0].paint(ctx);
     }
-
-    fn dry_layout_box(
-        &mut self,
-        ctx: &mut LayoutCtx,
-        bc: &BoxConstraints,
-        children: &mut Children,
-    ) -> Size {
-        children[0].layout_box(ctx, bc)
-    }
 }

@@ -273,39 +273,6 @@ impl RenderObjectInterface for TextBoxObject {
     fn lifecycle(&mut self, _ctx: &mut LifeCycleCtx, _event: &LifeCycle, _children: &mut Children) {
     }
 
-    fn dry_layout_box(
-        &mut self,
-        ctx: &mut LayoutCtx,
-        bc: &BoxConstraints,
-        _children: &mut Children,
-    ) -> Size {
-        let width = self.width.unwrap_or(f64::INFINITY);
-
-        self.placeholder.rebuild_if_needed(&mut ctx.text());
-        if self.editor.multiline() {
-            self.editor.set_wrap_width(bc.max().width.min(width));
-        }
-        self.editor.rebuild_if_needed(&mut ctx.text());
-
-        let text_metrics = if self.text.is_empty() {
-            self.placeholder.layout_metrics()
-        } else {
-            self.editor.layout().layout_metrics()
-        };
-
-        let height = text_metrics.size.height;
-        let size = bc.constrain((width, height));
-        // if we have a non-left text-alignment, we need to manually adjust our position.
-        self.update_alignment_adjustment(size.width, &text_metrics);
-
-        let bottom_padding = (size.height - text_metrics.size.height) / 2.0;
-        let baseline_off =
-            bottom_padding + (text_metrics.size.height - text_metrics.first_baseline);
-        ctx.set_baseline_offset(baseline_off);
-
-        size
-    }
-
     fn layout_box(
         &mut self,
         ctx: &mut LayoutCtx,
