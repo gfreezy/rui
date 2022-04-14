@@ -28,7 +28,7 @@ impl<'a> Ui<'a> {
         }
     }
 
-    pub(crate) fn set_parent_data(&mut self, parent_data: Option<Box<dyn AnyParentData>>) {
+    pub fn set_parent_data(&mut self, parent_data: Option<Box<dyn AnyParentData>>) {
         self.parent_data = parent_data;
     }
 
@@ -60,6 +60,7 @@ impl<'a> Ui<'a> {
         props: Props,
         at: Option<usize>,
         insert: bool,
+        parent_data: Option<Box<dyn AnyParentData>>,
         content: Option<N>,
     ) -> R::Action
     where
@@ -70,6 +71,7 @@ impl<'a> Ui<'a> {
         if let Some(at) = at {
             self.render_index = at;
         }
+        self.set_parent_data(parent_data);
         let mut action = R::Action::default();
         let (key, local_key) = key.into();
         let index = match (insert, self.find_render_object(key, &local_key)) {
@@ -145,7 +147,8 @@ impl<'a> Ui<'a> {
         R: RenderObject<Props> + Any,
         N: FnOnce(&mut Ui),
     {
-        self.render_object_pro(key, props, None, false, Some(content))
+        let current_parent_data = self.parent_data.take();
+        self.render_object_pro(key, props, None, false, current_parent_data, Some(content))
     }
 }
 

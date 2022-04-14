@@ -60,6 +60,7 @@ impl SliverList {
             self,
             None,
             false,
+            None,
             None::<Box<dyn FnMut(&mut Ui)>>,
         );
     }
@@ -69,7 +70,6 @@ impl RenderObject<SliverList> for RenderSliverList {
     type Action = ();
 
     fn create(props: SliverList) -> Self {
-        tracing::debug!("create sliver list");
         RenderSliverList {
             delegate: props.delegate,
             keep_alive_bucket: HashMap::new(),
@@ -82,9 +82,8 @@ impl RenderObject<SliverList> for RenderSliverList {
         props: SliverList,
         children: &mut Children,
     ) -> Self::Action {
-        // tracing::debug!("update sliver list");
         if props.delegate.should_rebuild(&*self.delegate) {
-            tracing::debug!("rebuild sliver list");
+            tracing::trace!("rebuild sliver list");
             self.delegate = props.delegate;
             self.keep_alive_bucket.clear();
             ctx.request_layout();
@@ -150,6 +149,7 @@ impl RenderSliverList {
         for (new_child_index, old_child_index) in swap_mapping.iter().rev() {
             if new_child_index.is_none() {
                 children.remove_element(*old_child_index);
+                ctx.request_layout();
             }
         }
 
@@ -162,18 +162,31 @@ impl RenderSliverList {
 
         // Build existing children
         for (child_index, parent_data) in children_parent_data.into_iter().enumerate() {
-            let index = parent_data.as_ref().map(|v| v.index).unwrap();
+            assert!(parent_data.is_some());
+            let parent_data = parent_data.unwrap();
             let mut ui = Ui::new(children, &ctx.context_state);
-            ui.set_parent_data(parent_data.map(|v| v as Box<dyn AnyParentData>));
-            self.build_item(&mut ui, index, child_index, false);
+            self.build_item(
+                &mut ui,
+                parent_data.index,
+                child_index,
+                false,
+                Some(parent_data as Box<_>),
+            );
         }
     }
 
-    fn build_item(&mut self, ui: &mut Ui, index: usize, child_index: usize, insert: bool) {
+    fn build_item(
+        &mut self,
+        ui: &mut Ui,
+        index: usize,
+        child_index: usize,
+        insert: bool,
+        parent_data: Option<Box<dyn AnyParentData>>,
+    ) {
         let caller = Key::current();
         if let Some(count) = self.delegate.estimated_count() {
             if index < count {
-                tracing::debug!(
+                tracing::trace!(
                     "build sliver list item, index: {}, child_index: {}",
                     index,
                     child_index
@@ -188,6 +201,7 @@ impl RenderSliverList {
                     },
                     Some(child_index),
                     insert,
+                    parent_data,
                     Some(|ui: &mut Ui| {
                         self.delegate.build(ui, index);
                     }),
@@ -228,14 +242,14 @@ impl RenderSliverList {
     ) {
         invoke_layout_callback(ctx, |ctx| {
             if let Some(mut child) = self.keep_alive_bucket.remove(&index) {
-                tracing::debug!(
+                tracing::trace!(
                     "obtain sliver list child, index: {}, after: {:?}",
                     index,
                     after
                 );
                 self.insert(children, child, after);
             } else {
-                tracing::debug!(
+                tracing::trace!(
                     "create sliver list child, index: {}, after: {:?}",
                     index,
                     after
@@ -246,19 +260,16 @@ impl RenderSliverList {
     }
 
     fn destroy_or_cache_child(&mut self, children: &mut Children, child_index: usize) {
-        let mut parent_data = children[child_index]
-            .take_parent_data::<SliverListParentData>()
+        let parent_data = children[child_index]
+            .parent_data::<SliverListParentData>()
             .expect("no valid parent data");
+        let index = parent_data.index;
         if parent_data.keep_alive {
-            tracing::debug!("cache sliver list item, index: {}", child_index);
-            let mut el = self
-                .remove(children, child_index, parent_data.index)
-                .unwrap();
-            let index = parent_data.index;
-            el.set_parent_data(Some(parent_data));
+            tracing::trace!("cache sliver list item, index: {}", child_index);
+            let el = self.remove(children, child_index, index).unwrap();
             self.keep_alive_bucket.insert(index, el);
         } else {
-            self.remove(children, child_index, parent_data.index);
+            self.remove(children, child_index, index);
         }
     }
 
@@ -301,9 +312,14 @@ impl RenderSliverList {
             layout_offset: None,
             index,
         };
-        ui.set_parent_data(Some(Box::new(parent_data)));
 
-        self.build_item(&mut ui, index, render_index, true);
+        self.build_item(
+            &mut ui,
+            index,
+            render_index,
+            true,
+            Some(Box::new(parent_data)),
+        );
     }
 
     /// Called during layout to create, add, and layout the child before
@@ -332,7 +348,7 @@ impl RenderSliverList {
         }
         let index = first_index - 1;
         self.create_or_obtain_child(ctx, children, index, None);
-        tracing::debug!(
+        tracing::trace!(
             "first child index: {}, expect index: {}",
             child_index(&children[0]),
             index

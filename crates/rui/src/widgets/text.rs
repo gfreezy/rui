@@ -124,11 +124,6 @@ impl RenderObject<Text> for TextObject {
 
     fn update(&mut self, ctx: &mut UpdateCtx, props: Text, children: &mut Children) {
         if self.layout.text() != Some(&props.text) {
-            tracing::debug!(
-                "TextObject::update: {} {:?}",
-                &props.text,
-                self.layout.text()
-            );
             self.layout.set_text(props.text);
             ctx.request_layout();
         }
@@ -137,11 +132,9 @@ impl RenderObject<Text> for TextObject {
             self.style = props.style;
             self.update_style();
             ctx.request_layout();
-            tracing::debug!("TextObject::update: layout is None2");
         }
 
         if self.layout.layout().is_none() {
-            tracing::debug!("TextObject::update: layout is None3");
             ctx.request_layout();
         }
     }

@@ -233,7 +233,6 @@ impl Children {
             return None;
         }
         let mut el = self.renders.remove(index);
-        // el.set_parent_data(None);
         Some(el)
     }
 
@@ -451,7 +450,7 @@ impl ElementState {
     #[track_caller]
     pub(crate) fn mark_needs_layout(&mut self) {
         if !self.doing_this_layout_with_callback {
-            tracing::debug!(
+            tracing::trace!(
                 "mark_needs_layout, caller: {:?}",
                 std::panic::Location::caller()
             );
