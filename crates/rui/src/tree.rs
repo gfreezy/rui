@@ -233,12 +233,19 @@ impl Children {
             return None;
         }
         let mut el = self.renders.remove(index);
-        el.set_parent_data(None);
+        // el.set_parent_data(None);
         Some(el)
     }
 
     pub fn insert(&mut self, index: usize, child: Element) {
         self.renders.insert(index, child);
+    }
+
+    pub fn swap_elements(&mut self, mapping: impl Iterator<Item = (usize, usize)>) {
+        assert!(self.states.is_empty());
+        for (f, s) in mapping {
+            self.renders.swap(f, s);
+        }
     }
 }
 

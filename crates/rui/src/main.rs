@@ -27,6 +27,7 @@ pub mod widgets;
 pub mod window;
 
 use std::any::Any;
+use std::fmt::Debug;
 use std::panic::Location;
 use std::sync::{Arc, Mutex};
 
@@ -60,6 +61,7 @@ use crate::widgets::button::Button;
 use crate::widgets::text::Text;
 
 fn inspect(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
+    // 状态同步需要控制在某一个阶段
     let selected = ui.state_node(|| ElementId::ZERO);
 
     row(ui, |ui| {
@@ -95,29 +97,8 @@ fn inspect(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
             };
 
             sliver_list(ui, delegate);
-            // snapshot.debug_state.visit(
-            //     &mut |debug_state, level| {
-            //         sliver_to_box(ui, "center".to_string(), |ui| {
-            //             let ident = level * 4;
-            //             let current_id = debug_state.id;
-            //             button(
-            //                 ui,
-            //                 &format!(
-            //                     "{:ident$}{}(id: {}, len: {})",
-            //                     "",
-            //                     debug_state.display_name,
-            //                     debug_state.id,
-            //                     debug_state.children.len()
-            //                 ),
-            //                 move || {
-            //                     selected.set(current_id);
-            //                 },
-            //             );
-            //         });
-            //     },
-            //     0,
-            // );
         });
+
         viewport(ui, AxisDirection::Down, AxisDirection::Right, |ui| {
             if let Some(debug_state) = snapshot
                 .lock()
@@ -141,7 +122,6 @@ fn win(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
         });
 
         expand(ui, |ui| {
-            // debug(ui, |ui| {
             viewport(ui, AxisDirection::Down, AxisDirection::Right, |ui| {
                 for i in 0..10 {
                     sliver_to_box(ui, i.to_string(), |ui| {
@@ -156,7 +136,6 @@ fn win(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
                     },
                 )
             })
-            // });
         });
     });
 
@@ -261,7 +240,7 @@ struct VecSliverListDelegate<T, C: FnMut(&mut Ui, &T) + 'static> {
     content: C,
 }
 
-impl<T: PartialEq + 'static, C: FnMut(&mut Ui, &T) + 'static> SliverChildDelegate
+impl<T: PartialEq + Debug + 'static, C: FnMut(&mut Ui, &T) + 'static> SliverChildDelegate
     for VecSliverListDelegate<T, C>
 {
     fn as_any(&self) -> &dyn Any {
@@ -293,7 +272,11 @@ impl<T: PartialEq + 'static, C: FnMut(&mut Ui, &T) + 'static> SliverChildDelegat
 
     fn should_rebuild(&self, old_delegate: &dyn SliverChildDelegate) -> bool {
         let old = old_delegate.as_any().downcast_ref::<Self>().unwrap();
-        &old.data != &self.data
+        let should_rebuild = &old.data != &self.data;
+        if should_rebuild {
+            tracing::trace!("should_rebuild: {:?} {:?}", &self.data, &old.data);
+        }
+        should_rebuild
     }
 
     fn find_index_by_key(&self, key: &LocalKey) -> Option<usize> {

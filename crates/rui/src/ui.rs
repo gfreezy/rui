@@ -28,20 +28,6 @@ impl<'a> Ui<'a> {
         }
     }
 
-    pub(crate) fn new_in_the_middle(
-        tree: &'a mut Children,
-        context_state: &'a ContextState,
-        render_index: usize,
-    ) -> Self {
-        Ui {
-            tree,
-            context_state,
-            state_index: 0,
-            render_index,
-            parent_data: None,
-        }
-    }
-
     pub(crate) fn set_parent_data(&mut self, parent_data: Option<Box<dyn AnyParentData>>) {
         self.parent_data = parent_data;
     }
@@ -68,38 +54,60 @@ impl<'a> Ui<'a> {
         State::new(raw_box)
     }
 
-    /// Children is managed by parent node on fly.
-    pub fn render_object_dynamicly<Props, R>(
+    pub fn render_object_pro<Props, R, N>(
         &mut self,
         key: impl Into<(Key, LocalKey)>,
         props: Props,
+        at: Option<usize>,
+        insert: bool,
+        content: Option<N>,
     ) -> R::Action
     where
         Props: Properties<Object = R>,
         R: RenderObject<Props> + Any,
+        N: FnOnce(&mut Ui),
     {
+        if let Some(at) = at {
+            self.render_index = at;
+        }
         let mut action = R::Action::default();
         let (key, local_key) = key.into();
-        let index = if let Some(index) = self.find_render_object(key, &local_key) {
-            let node = &mut self.tree.renders[index];
-            if let Some(object) = node.object.as_any().downcast_mut::<R>() {
+        let index = match (insert, self.find_render_object(key, &local_key)) {
+            (true, _) | (false, None) => {
+                let object = R::create(props);
+                let index = self.insert_render_object(key, local_key.clone(), object);
+                let node = &mut self.tree.renders[index];
+                node.request_layout();
+                tracing::trace!(
+                    "Insert render object, key: {:?}, local_key: {}, index: {}",
+                    key,
+                    &local_key,
+                    index
+                );
+                index
+            }
+            (false, Some(index)) => {
+                let node = &mut self.tree.renders[index];
+                let object = node.object.as_any().downcast_mut::<R>().expect(&format!(
+                    "Wrong node type. Expected {}",
+                    std::any::type_name::<R>()
+                ));
+
                 let mut ctx = UpdateCtx {
                     context_state: self.context_state,
                     child_state: &mut node.state,
                 };
                 action = object.update(&mut ctx, props, &mut node.children);
-            } else {
-                // TODO: Think of something smart
-                panic!("Wrong node type. Expected {}", std::any::type_name::<R>())
+                tracing::trace!(
+                    "Update render object, key: {:?}, local_key: {}, index: {}",
+                    key,
+                    &local_key,
+                    index
+                );
+                index
             }
-            index
-        } else {
-            let object = R::create(props);
-            let index = self.insert_render_object(key, local_key.clone(), object);
-            let node = &mut self.tree.renders[index];
-            node.request_layout();
-            index
         };
+
         for node in &mut self.tree.renders[self.render_index..index] {
             node.dead = true;
         }
@@ -111,6 +119,16 @@ impl<'a> Ui<'a> {
         let changed = node.set_parent_data(self.parent_data.take());
         if changed {
             node.request_layout();
+        }
+
+        if let Some(content) = content {
+            let mut child_ui = Ui::new(&mut node.children, self.context_state);
+            content(&mut child_ui);
+
+            if child_ui.cleanup_tree() {
+                node.request_layout();
+            }
+            node.merge_child_states_up();
         }
 
         action
@@ -127,19 +145,7 @@ impl<'a> Ui<'a> {
         R: RenderObject<Props> + Any,
         N: FnOnce(&mut Ui),
     {
-        let action = self.render_object_dynamicly(key, props);
-        let node = &mut self.tree.renders[self.render_index - 1];
-
-        let mut child_ui = Ui::new(&mut node.children, self.context_state);
-        content(&mut child_ui);
-
-        if child_ui.cleanup_tree() {
-            node.request_layout();
-        }
-
-        node.merge_child_states_up();
-
-        action
+        self.render_object_pro(key, props, None, false, Some(content))
     }
 }
 

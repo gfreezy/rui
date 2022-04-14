@@ -14,7 +14,7 @@
             "sourceLanguages": [
                 "rust"
             ],
-            "preLaunchTask": "rust: cargo build"
+            "preLaunchTask": "rust: cargo build",
         }
     ]
 }

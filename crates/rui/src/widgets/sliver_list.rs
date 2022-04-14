@@ -19,6 +19,7 @@ use druid_shell::kurbo::{Point, Vec2};
 use std::{
     any::Any,
     collections::{BTreeMap, HashMap},
+    ops::Deref,
     panic::Location,
 };
 
@@ -54,7 +55,13 @@ impl SliverList {
 
     #[track_caller]
     pub fn build(self, ui: &mut Ui) {
-        ui.render_object_dynamicly(crate::key::Key::current(), self);
+        ui.render_object_pro(
+            crate::key::Key::current(),
+            self,
+            None,
+            false,
+            None::<Box<dyn FnMut(&mut Ui)>>,
+        );
     }
 }
 
@@ -66,7 +73,6 @@ impl RenderObject<SliverList> for RenderSliverList {
         RenderSliverList {
             delegate: props.delegate,
             keep_alive_bucket: HashMap::new(),
-            items: Vec::new(),
         }
     }
 
@@ -80,9 +86,8 @@ impl RenderObject<SliverList> for RenderSliverList {
         if props.delegate.should_rebuild(&*self.delegate) {
             tracing::debug!("rebuild sliver list");
             self.delegate = props.delegate;
-            self.keep_alive_bucket = HashMap::new();
+            self.keep_alive_bucket.clear();
             ctx.request_layout();
-        } else {
             self.perform_rebuild(ctx, children);
         }
     }
@@ -95,7 +100,6 @@ impl Properties for SliverList {
 pub struct RenderSliverList {
     delegate: Box<dyn SliverChildDelegate>,
     keep_alive_bucket: HashMap<usize, Element>,
-    items: Vec<SliverListItem>,
 }
 
 impl RenderSliverList {
@@ -108,64 +112,88 @@ impl RenderSliverList {
     }
 
     fn perform_rebuild(&mut self, ctx: &mut UpdateCtx, children: &mut Children) {
-        // for item in self.items.iter() {
-        //     let index = self.delegate.find_index_by_key(&item.local_key);
-        //     if index.is_none() {
-        //         children.remove_element(item.child_index);
-        //         continue;
-        //     };
-        // }
-        // assert_eq!(children.len(), self.items.len());
-        // let mut index_to_layout_offset = HashMap::new();
-        // let mut new_children = BTreeMap::new();
-        // for (child_index, item) in self.items.iter().enumerate() {
-        //     let element = &mut children[child_index];
-        //     let key = &element.local_key;
-        //     let new_index = self.delegate.find_index_by_key(key);
-        //     let parent_data = element
-        //         .parent_data_mut::<SliverListParentData>()
-        //         .expect("no parent data");
-        //     index_to_layout_offset.insert(child_index, parent_data.layout_offset);
-        //     match (new_index, child_index) {
-        //         (Some(new_index), child_index) if new_index != child_index => {
-        //             parent_data.layout_offset = None;
-        //         }
-        //         _ => {
-        //             new_children.insert(child_index, item.clone());
-        //         }
-        //     }
-        // }
+        let mut swap_mapping = Vec::new();
 
-        // let mut ui = Ui::new(children, &ctx.context_state);
-        // for item in self.items.iter() {
-        //     ui.set_parent_data(Some(Box::new(SliverListParentData {
-        //         index: item.child_index,
-        //         keep_alive: bool::default(),
-        //         kept_alive: bool::default(),
-        //         layout_offset: None,
-        //     })));
-        //     self.build_item(&mut ui, &item);
-        // }
-    }
+        for (old_child_index, key) in children
+            .iter()
+            .map(|c| (c.local_key.clone()))
+            .enumerate()
+            .collect::<Vec<_>>()
+        {
+            let new_index = self.delegate.find_index_by_key(&key);
+            swap_mapping.push((new_index, old_child_index));
+        }
 
-    fn build_item(&mut self, ui: &mut Ui, item: &SliverListItem) -> bool {
-        let caller = Key::current();
-        if let Some(count) = self.delegate.estimated_count() {
-            if item.index < count {
-                tracing::debug!(
-                    "build sliver list item, index: {}, child_index: {}",
-                    item.index,
-                    item.child_index
-                );
-                let local_key = self.delegate.key(item.index);
-                ui.render_object((caller, local_key), item.clone(), |ui| {
-                    self.delegate.build(ui, item.index);
-                });
+        // Sort by new index
+        swap_mapping.sort_unstable_by_key(|v| v.0);
 
-                return true;
+        // Update children's index
+        for (new_index, old_child_index) in &swap_mapping {
+            if let Some(new_index) = new_index {
+                let child = &mut children[*old_child_index];
+
+                if let Some(parent_data) = child.parent_data_mut::<SliverListParentData>() {
+                    parent_data.index = *new_index;
+                }
             }
         }
-        false
+
+        // Reorder children to match new index
+        let mappings = swap_mapping.iter().enumerate().map(
+            |(new_child_index, (new_index, old_child_index))| (new_child_index, *old_child_index),
+        );
+        children.swap_elements(mappings);
+
+        // Sort by old child index, cause we need to remove element from the end.
+        // If we remove from the beginning, the following index will be invalid.
+        swap_mapping.sort_unstable_by_key(|v| v.1);
+        for (new_child_index, old_child_index) in swap_mapping.iter().rev() {
+            if new_child_index.is_none() {
+                children.remove_element(*old_child_index);
+            }
+        }
+
+        // Take parent data from children
+        let mut children_parent_data = Vec::new();
+        for child in children.iter_mut() {
+            let parent_data = child.take_parent_data::<SliverListParentData>();
+            children_parent_data.push(parent_data);
+        }
+
+        // Build existing children
+        for (child_index, parent_data) in children_parent_data.into_iter().enumerate() {
+            let index = parent_data.as_ref().map(|v| v.index).unwrap();
+            let mut ui = Ui::new(children, &ctx.context_state);
+            ui.set_parent_data(parent_data.map(|v| v as Box<dyn AnyParentData>));
+            self.build_item(&mut ui, index, child_index, false);
+        }
+    }
+
+    fn build_item(&mut self, ui: &mut Ui, index: usize, child_index: usize, insert: bool) {
+        let caller = Key::current();
+        if let Some(count) = self.delegate.estimated_count() {
+            if index < count {
+                tracing::debug!(
+                    "build sliver list item, index: {}, child_index: {}",
+                    index,
+                    child_index
+                );
+                let local_key = self.delegate.key(index);
+                ui.render_object_pro(
+                    (caller, local_key.clone()),
+                    SliverListItem {
+                        local_key,
+                        index,
+                        child_index,
+                    },
+                    Some(child_index),
+                    insert,
+                    Some(|ui: &mut Ui| {
+                        self.delegate.build(ui, index);
+                    }),
+                );
+            }
+        }
     }
 
     fn remove(
@@ -200,8 +228,18 @@ impl RenderSliverList {
     ) {
         invoke_layout_callback(ctx, |ctx| {
             if let Some(mut child) = self.keep_alive_bucket.remove(&index) {
+                tracing::debug!(
+                    "obtain sliver list child, index: {}, after: {:?}",
+                    index,
+                    after
+                );
                 self.insert(children, child, after);
             } else {
+                tracing::debug!(
+                    "create sliver list child, index: {}, after: {:?}",
+                    index,
+                    after
+                );
                 self.create_child(ctx, children, index, after);
             }
         });
@@ -257,26 +295,15 @@ impl RenderSliverList {
         after: Option<usize>,
     ) {
         let render_index = after.map(|v| v + 1).unwrap_or(0);
-        let mut ui = Ui::new_in_the_middle(children, ctx.context_state, render_index);
+        let mut ui = Ui::new(children, ctx.context_state);
         let parent_data = SliverListParentData {
             keep_alive: true,
             layout_offset: None,
             index,
         };
-        ui.set_parent_data(Some(Box::new(parent_data.clone())));
+        ui.set_parent_data(Some(Box::new(parent_data)));
 
-        if Some(index) >= self.delegate.estimated_count() {
-            return;
-        }
-
-        let item = SliverListItem {
-            child_index: render_index,
-            local_key: self.delegate.key(index),
-            index,
-        };
-        if self.build_item(&mut ui, &item) {
-            self.items.insert(item.child_index, item);
-        }
+        self.build_item(&mut ui, index, render_index, true);
     }
 
     /// Called during layout to create, add, and layout the child before
@@ -305,6 +332,11 @@ impl RenderSliverList {
         }
         let index = first_index - 1;
         self.create_or_obtain_child(ctx, children, index, None);
+        tracing::debug!(
+            "first child index: {}, expect index: {}",
+            child_index(&children[0]),
+            index
+        );
         // insert successfully
         if child_index(&children[0]) == index {
             let _ = children[0].layout_box(ctx, child_constraints, true);
