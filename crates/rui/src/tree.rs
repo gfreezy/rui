@@ -1,6 +1,7 @@
 use std::any::type_name;
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::mem;
 use std::ops::Deref;
 
 use std::time::Instant;
@@ -25,6 +26,7 @@ use crate::key::{Key, LocalKey};
 use crate::lifecycle::{InternalLifeCycle, LifeCycle};
 use crate::object::{AnyParentData, AnyRenderObject};
 use crate::sliver_constraints::{SliverConstraints, SliverGeometry};
+use crate::widgets::empty_holder::EmptyHolderObject;
 
 #[derive(Default)]
 pub struct Children {
@@ -240,11 +242,17 @@ impl Children {
         self.renders.insert(index, child);
     }
 
-    pub fn swap_elements(&mut self, mapping: impl Iterator<Item = (usize, usize)>) {
+    /// remapping children, old index -> new index
+    pub fn swap_elements(&mut self, mut mapping: Vec<(usize, usize)>) {
         assert!(self.states.is_empty());
+        mapping.sort_unstable_by_key(|v| v.1);
+
+        let mut new_children = Vec::new();
         for (f, s) in mapping {
-            self.renders.swap(f, s);
+            let old = mem::take(&mut self.renders[f]);
+            new_children.insert(s, old);
         }
+        self.renders = new_children;
     }
 }
 
@@ -268,6 +276,12 @@ impl<'a> IntoIterator for &'a mut Children {
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
+    }
+}
+
+impl Default for Element {
+    fn default() -> Self {
+        Element::new(Key::current(), "".to_string(), EmptyHolderObject)
     }
 }
 

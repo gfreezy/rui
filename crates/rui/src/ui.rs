@@ -1,5 +1,6 @@
 use std::any::Any;
 
+use std::ops::Index;
 use std::panic::Location;
 
 use crate::context::{ContextState, UpdateCtx};
@@ -15,6 +16,12 @@ pub struct Ui<'a> {
     state_index: usize,
     render_index: usize,
     parent_data: Option<Box<dyn AnyParentData>>,
+}
+
+pub enum RenderAction {
+    Insert(usize),
+    Update(usize),
+    Auto,
 }
 
 impl<'a> Ui<'a> {
@@ -58,8 +65,7 @@ impl<'a> Ui<'a> {
         &mut self,
         key: impl Into<(Key, LocalKey)>,
         props: Props,
-        at: Option<usize>,
-        insert: bool,
+        render_action: RenderAction,
         parent_data: Option<Box<dyn AnyParentData>>,
         content: Option<N>,
     ) -> R::Action
@@ -68,14 +74,23 @@ impl<'a> Ui<'a> {
         R: RenderObject<Props> + Any,
         N: FnOnce(&mut Ui),
     {
-        if let Some(at) = at {
-            self.render_index = at;
+        match render_action {
+            RenderAction::Insert(at) => {
+                self.render_index = at;
+            }
+            RenderAction::Update(at) => {
+                self.render_index = at;
+            }
+            RenderAction::Auto => {}
         }
-        self.set_parent_data(parent_data);
+
+        if parent_data.is_some() {
+            self.set_parent_data(parent_data);
+        }
         let mut action = R::Action::default();
         let (key, local_key) = key.into();
-        let index = match (insert, self.find_render_object(key, &local_key)) {
-            (true, _) | (false, None) => {
+        let index = match (render_action, self.find_render_object(key, &local_key)) {
+            (RenderAction::Insert(_), _) | (RenderAction::Auto, None) => {
                 let object = R::create(props);
                 let index = self.insert_render_object(key, local_key.clone(), object);
                 let node = &mut self.tree.renders[index];
@@ -88,7 +103,7 @@ impl<'a> Ui<'a> {
                 );
                 index
             }
-            (false, Some(index)) => {
+            (RenderAction::Update(_), Some(index)) | (RenderAction::Auto, Some(index)) => {
                 let node = &mut self.tree.renders[index];
                 let object = node.object.as_any().downcast_mut::<R>().expect(&format!(
                     "Wrong node type. Expected {}",
@@ -107,6 +122,12 @@ impl<'a> Ui<'a> {
                     index
                 );
                 index
+            }
+            (RenderAction::Update(index), None) => {
+                panic!(
+                    "Update render object, but not found, key: {:?}, local_key: {}, index: {}",
+                    key, local_key, index
+                );
             }
         };
 
@@ -147,8 +168,7 @@ impl<'a> Ui<'a> {
         R: RenderObject<Props> + Any,
         N: FnOnce(&mut Ui),
     {
-        let current_parent_data = self.parent_data.take();
-        self.render_object_pro(key, props, None, false, current_parent_data, Some(content))
+        self.render_object_pro(key, props, RenderAction::Auto, None, Some(content))
     }
 }
 

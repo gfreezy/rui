@@ -18,7 +18,7 @@ impl ElementId {
 
 impl Display for ElementId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0.to_string())
+        write!(f, "ElementId({})", self.0.to_string())
     }
 }
 
