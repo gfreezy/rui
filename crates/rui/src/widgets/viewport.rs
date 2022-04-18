@@ -85,10 +85,20 @@ impl ViewportOffset {
             self.scroll_metrics.min_scroll_extent = min_scroll_extent;
             self.scroll_metrics.max_scroll_extent = max_scroll_extent;
             self.last_axis = self.axis;
-            return true;
-            // todo: more logics
+
+            // todo: correctForNewDimensions
+            self.correct_for_new_dimensions();
+
+            return false;
         }
         true
+    }
+
+    pub fn correct_for_new_dimensions(&mut self) {
+        self.correct_pixels(
+            self.pixels()
+                .clamp(self.min_scroll_extent(), self.max_scroll_extent()),
+        );
     }
 }
 

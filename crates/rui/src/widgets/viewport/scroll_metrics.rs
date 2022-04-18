@@ -71,6 +71,10 @@ pub trait IScrollMetrics {
     fn correct_by(&mut self, correction: f64) {
         self.base_mut().correct_by(correction)
     }
+
+    fn correct_pixels(&mut self, pixels: f64) {
+        self.base_mut().correct_pixels(pixels)
+    }
 }
 
 impl IScrollMetrics for ScrollMetrics {
@@ -154,6 +158,10 @@ impl IScrollMetrics for ScrollMetrics {
 
     fn correct_by(&mut self, correction: f64) {
         self.pixels += correction;
+    }
+
+    fn correct_pixels(&mut self, pixels: f64) {
+        self.pixels = pixels;
     }
 }
 
