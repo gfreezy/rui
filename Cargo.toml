@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/rui", "crates/style"]
+members = ["crates/rui", "crates/style", "crates/esplori"]
 
 [patch.crates-io]
 generational-indextree = { path = "/Users/feichao/Developer/generational-indextree" }

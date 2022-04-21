@@ -118,7 +118,7 @@ impl StyleWatcher {
     }
 }
 
-pub(crate) fn live_style(ui: &mut Ui, name: &str) -> Style {
+pub fn live_style(ui: &mut Ui, name: &str) -> Style {
     let instance = StyleWatcher::global(ui);
     instance.get_style(name)
 }

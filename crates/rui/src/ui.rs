@@ -11,7 +11,7 @@ use crate::perf::measure_time;
 use crate::tree::{Children, Element, State, StateNode};
 
 pub struct Ui<'a> {
-    pub(crate) tree: &'a mut Children,
+    pub tree: &'a mut Children,
     context_state: &'a ContextState<'a>,
     state_index: usize,
     render_index: usize,

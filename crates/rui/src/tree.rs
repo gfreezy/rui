@@ -306,7 +306,7 @@ impl Element {
     #[doc(hidden)]
     /// From the current data, get a best-effort description of the state of
     /// this widget and its children for debugging purposes.
-    pub(crate) fn debug_state(&self) -> DebugState {
+    pub fn debug_state(&self) -> DebugState {
         let children = self.children.iter().map(|c| c.debug_state()).collect();
         let mut map = HashMap::new();
         map.insert("children_len".to_string(), self.children.len().to_string());

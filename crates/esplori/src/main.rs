@@ -1,64 +1,32 @@
-#![allow(unused)]
-#[macro_use]
-mod macros;
-pub mod app;
-pub mod app_state;
-pub mod box_constraints;
-pub mod commands;
-pub mod constraints;
-pub mod context;
-mod debug_state;
-pub mod event;
-pub mod ext_event;
-pub mod id;
-pub mod key;
-pub mod lifecycle;
-mod live_style;
-pub mod menu;
-pub mod object;
-pub mod perf;
-mod physics;
-pub mod sliver_constraints;
-pub mod text;
-pub mod tree;
-pub mod ui;
-pub mod widgets;
-pub mod window;
-
 use std::any::Any;
 use std::fmt::Debug;
-use std::panic::Location;
 use std::sync::{Arc, Mutex};
 
-use app::WindowDesc;
-use commands::{sys, SingleUse, Target};
-use crossbeam_channel::{Receiver, Sender};
-use debug_state::DebugState;
-use druid_shell::kurbo::{Point, Size};
+use rui::app::WindowDesc;
 
-use id::ElementId;
-use key::{Key, LocalKey, EMPTY_LOCAL_KEY};
-use menu::mac::application::quit;
-use menu::mac::menu_bar;
-use menu::{Menu, MenuItem};
+use rui::debug_state::DebugState;
 
-use live_style::live_style;
-use object::{Properties, RenderObject};
-use sliver_constraints::CacheExtent;
+use rui::id::ElementId;
+use rui::key::{LocalKey, EMPTY_LOCAL_KEY};
+
+use rui::menu::mac::menu_bar;
+
+use rui::live_style::live_style;
+
+use rui::sliver_constraints::CacheExtent;
+use rui::widgets;
 use style::layout::AxisDirection;
 use style::Style;
 
+use rui::widgets::sliver_list::SliverChildDelegate;
+
 use style::alignment::Alignment;
-use widgets::sized_box::SizedBox;
-use widgets::sliver_list::SliverChildDelegate;
-use widgets::sliver_to_box;
-use widgets::viewport::ViewportOffset;
 
-use crate::app::AppLauncher;
-use crate::ui::Ui;
-use crate::widgets::button::Button;
+use rui::app::AppLauncher;
+use rui::ui::Ui;
+use rui::widgets::button::Button;
 
-use crate::widgets::text::Text;
+use rui::widgets::text::Text;
 
 fn inspect(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
     // 状态同步需要控制在某一个阶段
@@ -76,7 +44,7 @@ fn inspect(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
 
             let delegate = VecSliverListDelegate {
                 data,
-                key_fn: |(level, s)| s.id.to_string(),
+                key_fn: |(_level, s)| s.id.to_string(),
                 content: move |ui, (level, debug_state)| {
                     let ident = level * 4;
                     let current_id = debug_state.id;
@@ -123,7 +91,7 @@ fn win(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
 
         expand(ui, |ui| {
             viewport(ui, AxisDirection::Down, AxisDirection::Right, |ui| {
-                for i in 0..10 {
+                for i in 0..10usize {
                     sliver_to_box(ui, i.to_string(), |ui| {
                         let style = live_style(ui, ".text");
                         text(ui, &format!("hello{}", i), style);
@@ -180,22 +148,22 @@ fn row(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
 }
 
 fn debug(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
-    widgets::debug::Debug.build(ui, content);
+    rui::widgets::debug::Debug.build(ui, content);
 }
 
 fn flexible(ui: &mut Ui, style_name: &str, content: impl FnMut(&mut Ui)) {
     let style = live_style(ui, style_name);
     let flex = style.flex.value();
     let flex_fit = style.flex_fit;
-    widgets::flex::Flexible::new(flex, flex_fit).build(ui, content);
+    rui::widgets::flex::Flexible::new(flex, flex_fit).build(ui, content);
 }
 
 fn expand(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
-    widgets::flex::Flexible::new(1.0, style::layout::FlexFit::Tight).build(ui, content);
+    rui::widgets::flex::Flexible::new(1.0, style::layout::FlexFit::Tight).build(ui, content);
 }
 
 fn align(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
-    widgets::align::Align::new(
+    rui::widgets::align::Align::new(
         Alignment::bottom_center(),
         None,
         None,
@@ -261,11 +229,11 @@ impl<T: PartialEq + Debug + 'static, C: FnMut(&mut Ui, &T) + 'static> SliverChil
 
     fn estimate_max_scroll_offset(
         &self,
-        sc: &constraints::SliverConstraints,
-        first_index: usize,
-        last_index: usize,
-        leading_scroll_offset: f64,
-        trailing_scroll_offset: f64,
+        _sc: &rui::constraints::SliverConstraints,
+        _first_index: usize,
+        _last_index: usize,
+        _leading_scroll_offset: f64,
+        _trailing_scroll_offset: f64,
     ) -> Option<f64> {
         None
     }
@@ -301,7 +269,7 @@ impl SliverChildDelegate for Delegate {
 
     fn build(&mut self, ui: &mut Ui, index: usize) {
         // tracing::debug!("build in delegate: {index}");
-        let style = live_style(ui, ".inspect-text");
+        let _style = live_style(ui, ".inspect-text");
         button(ui, &format!("number {index}"), || {});
     }
 
@@ -312,16 +280,16 @@ impl SliverChildDelegate for Delegate {
 
     fn estimate_max_scroll_offset(
         &self,
-        sc: &constraints::SliverConstraints,
-        first_index: usize,
-        last_index: usize,
-        leading_scroll_offset: f64,
-        trailing_scroll_offset: f64,
+        _sc: &rui::constraints::SliverConstraints,
+        _first_index: usize,
+        _last_index: usize,
+        _leading_scroll_offset: f64,
+        _trailing_scroll_offset: f64,
     ) -> Option<f64> {
         None
     }
 
-    fn should_rebuild(&self, old_delegate: &dyn SliverChildDelegate) -> bool {
+    fn should_rebuild(&self, _old_delegate: &dyn SliverChildDelegate) -> bool {
         false
     }
 
@@ -329,7 +297,7 @@ impl SliverChildDelegate for Delegate {
         key.parse().ok()
     }
 
-    fn did_finish_layout(&self, first_index: usize, last_index: usize) {}
+    fn did_finish_layout(&self, _first_index: usize, _last_index: usize) {}
 }
 
 fn sliver_list(ui: &mut Ui, delegate: impl SliverChildDelegate + 'static) {

@@ -27,7 +27,7 @@ struct LayoutSize {
 
 /// A widget that just adds padding around its child.
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct Flex {
+pub struct Flex {
     direction: Axis,
     main_axis_size: MainAxisSize,
     main_axis_alignment: MainAxisAlignment,
@@ -66,7 +66,7 @@ impl Flex {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct Flexible {
+pub struct Flexible {
     flex: f64,
     fit: FlexFit,
 }
@@ -108,7 +108,7 @@ impl Default for FlexParentData {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct RenderFlex {
+pub struct RenderFlex {
     direction: Axis,
     main_axis_size: MainAxisSize,
     main_axis_alianment: MainAxisAlignment,
