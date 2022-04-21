@@ -12,12 +12,12 @@ use crate::context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx};
 use crate::event::Event;
 use crate::lifecycle::LifeCycle;
 use crate::object::{Properties, RenderObject, RenderObjectInterface};
-use crate::style::text::LineBreaking;
-use crate::style::Style;
 use crate::text::font_descriptor::FontDescriptor;
 use crate::text::layout::TextLayout;
 use crate::tree::Children;
 use crate::ui::Ui;
+use style::text::LineBreaking;
+use style::Style;
 
 // added padding between the edges of the widget and the text.
 const LABEL_X_PADDING: f64 = 2.0;

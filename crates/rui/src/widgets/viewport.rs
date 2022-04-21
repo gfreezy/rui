@@ -12,16 +12,16 @@ use crate::key::{Key, LocalKey};
 use crate::physics::tolerance::{near_equal, Tolerance};
 use crate::sliver_constraints::{
     apply_growth_direction_to_axis_direction, apply_growth_direction_to_scroll_direction,
-    axis_direction_to_axis, AxisDirection, CacheExtent, GrowthDirection, ScrollDirection,
-    SliverConstraints, SliverGeometry,
+    axis_direction_to_axis, CacheExtent, GrowthDirection, ScrollDirection, SliverConstraints,
+    SliverGeometry,
 };
-use crate::style::axis::Axis;
-use crate::style::layout::TextDirection;
 use crate::tree::{Children, Element};
 use crate::{
     object::{Properties, RenderObject, RenderObjectInterface},
     ui::Ui,
 };
+use style::axis::Axis;
+use style::layout::{AxisDirection, TextDirection};
 
 use self::scroll_metrics::{IScrollMetrics, ScrollMetrics};
 

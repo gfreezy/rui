@@ -1179,6 +1179,7 @@ dependencies = [
  "nom",
  "notify",
  "once_cell",
+ "style",
  "thiserror",
  "tracing",
  "tracing-subscriber",
@@ -1277,6 +1278,28 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "style"
+version = "0.0.0"
+dependencies = [
+ "anymap2",
+ "bumpalo",
+ "convert_case",
+ "crossbeam-channel",
+ "druid-shell",
+ "fxhash",
+ "generational-indextree",
+ "illicit",
+ "nom",
+ "notify",
+ "once_cell",
+ "thiserror",
+ "tracing",
+ "tracing-subscriber",
+ "unicode-segmentation",
+ "xi-unicode",
 ]
 
 [[package]]

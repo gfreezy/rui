@@ -2,11 +2,12 @@ use druid_shell::{
     kurbo::{Affine, Vec2},
     piet::RenderContext,
 };
+use style::layout::AxisDirection;
 
 use crate::{
     key::{Key, LocalKey},
     object::{Properties, RenderObject, RenderObjectInterface},
-    sliver_constraints::{apply_growth_direction_to_axis_direction, AxisDirection, SliverGeometry},
+    sliver_constraints::{apply_growth_direction_to_axis_direction, SliverGeometry},
     tree::Children,
     ui::Ui,
 };
@@ -83,8 +84,8 @@ impl RenderObjectInterface for SliverToBoxObject {
         let child_size =
             children[0].layout_box(ctx, &sc.as_box_constraints(0.0, f64::INFINITY, None), true);
         let child_extent = match sc.axis() {
-            crate::style::axis::Axis::Horizontal => child_size.width,
-            crate::style::axis::Axis::Vertical => child_size.height,
+            style::axis::Axis::Horizontal => child_size.width,
+            style::axis::Axis::Vertical => child_size.height,
         };
 
         let painted_child_size = calculate_paint_offset(sc, 0.0, child_extent);

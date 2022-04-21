@@ -11,9 +11,9 @@ use crate::context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx};
 use crate::event::Event;
 use crate::lifecycle::LifeCycle;
 use crate::object::{Properties, RenderObject, RenderObjectInterface};
-use crate::style::size::{Height, MaxHeight, MaxWidth, MinHeight, MinWidth, Width};
 use crate::tree::Children;
 use crate::ui::Ui;
+use style::size::{Height, MaxHeight, MaxWidth, MinHeight, MinWidth, Width};
 
 /// A widget with predefined size.
 ///

@@ -10,7 +10,7 @@ use crate::{
     object::{AnyParentData, Properties, RenderObject, RenderObjectInterface},
     physics::tolerance::{near_equal, Tolerance},
     sliver_constraints::{
-        apply_growth_direction_to_axis_direction, AxisDirection, SliverConstraints, SliverGeometry,
+        apply_growth_direction_to_axis_direction, SliverConstraints, SliverGeometry,
     },
     tree::{Children, Element},
     ui::{RenderAction, Ui},
@@ -22,6 +22,7 @@ use std::{
     ops::Deref,
     panic::Location,
 };
+use style::layout::AxisDirection;
 
 pub trait SliverChildDelegate {
     fn as_any(&self) -> &dyn Any;
@@ -903,8 +904,8 @@ fn find_child_with_index(children: &mut Children, index: Option<usize>) -> Optio
 fn paint_extent_of_child(sc: &SliverConstraints, child: &Element) -> f64 {
     assert!(!child.size().is_empty());
     match sc.axis() {
-        crate::style::axis::Axis::Horizontal => child.size().width,
-        crate::style::axis::Axis::Vertical => child.size().height,
+        style::axis::Axis::Horizontal => child.size().width,
+        style::axis::Axis::Vertical => child.size().height,
     }
 }
 /// Allows mutations to be made to this object's child list (and any

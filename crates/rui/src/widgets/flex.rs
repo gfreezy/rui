@@ -2,10 +2,6 @@ use crate::box_constraints::BoxConstraints;
 
 use crate::object::AnyParentData;
 use crate::physics::tolerance::{near_equal, Tolerance};
-use crate::style::axis::Axis;
-use crate::style::layout::{
-    CrossAxisAlignment, FlexFit, MainAxisAlignment, MainAxisSize, TextDirection, VerticalDirection,
-};
 use crate::tree::Element;
 use crate::{
     context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx},
@@ -16,6 +12,10 @@ use crate::{
     ui::Ui,
 };
 use druid_shell::kurbo::{Point, Size};
+use style::axis::Axis;
+use style::layout::{
+    CrossAxisAlignment, FlexFit, MainAxisAlignment, MainAxisSize, TextDirection, VerticalDirection,
+};
 
 use std::panic::Location;
 

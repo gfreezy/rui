@@ -5,7 +5,6 @@ use druid_shell::piet::{Color, PaintBrush, RenderContext};
 
 use crate::box_constraints::BoxConstraints;
 use crate::key::Key;
-use crate::style::draw;
 use crate::{
     context::{EventCtx, LayoutCtx, LifeCycleCtx, PaintCtx, UpdateCtx},
     event::Event,
@@ -14,6 +13,7 @@ use crate::{
     tree::Children,
     ui::Ui,
 };
+use style::draw;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Background {

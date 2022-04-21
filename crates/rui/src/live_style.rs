@@ -15,8 +15,8 @@ use tracing::{debug, error};
 
 use crate::ext_event::ExtEventSink;
 
-use crate::style::{parse_style_content, Style};
 use crate::ui::Ui;
+use style::{parse_style_content, Style};
 
 #[derive(Clone)]
 struct StyleWatcher {

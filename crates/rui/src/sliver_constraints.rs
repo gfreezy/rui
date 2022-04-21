@@ -1,8 +1,7 @@
 use druid_shell::kurbo::Size;
 
-use crate::{
-    box_constraints::BoxConstraints, physics::tolerance::default_near_equal, style::axis::Axis,
-};
+use crate::{box_constraints::BoxConstraints, physics::tolerance::default_near_equal};
+use style::{axis::Axis, layout::AxisDirection};
 
 /// The direction in which a sliver's contents are ordered, relative to the
 /// scroll offset axis.
@@ -26,38 +25,6 @@ pub enum GrowthDirection {
     /// This sliver's contents are ordered in the opposite direction of the
     /// [AxisDirection].
     Reverse,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum AxisDirection {
-    Up,
-    Right,
-    Down,
-    Left,
-}
-
-impl Default for AxisDirection {
-    fn default() -> Self {
-        AxisDirection::Down
-    }
-}
-
-impl AxisDirection {
-    pub fn flip(&self) -> AxisDirection {
-        match self {
-            AxisDirection::Down => AxisDirection::Up,
-            AxisDirection::Left => AxisDirection::Right,
-            AxisDirection::Right => AxisDirection::Left,
-            AxisDirection::Up => AxisDirection::Down,
-        }
-    }
-
-    pub fn is_reversed(&self) -> bool {
-        match self {
-            AxisDirection::Up | AxisDirection::Left => true,
-            AxisDirection::Right | AxisDirection::Down => false,
-        }
-    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]

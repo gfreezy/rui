@@ -14,7 +14,7 @@
 
 //! A component for building text editing widgets
 
-use crate::context::{PaintCtx};
+use crate::context::PaintCtx;
 use crate::text::backspace::offset_for_delete_backwards;
 use crate::text::editable_text::EditableText;
 use crate::text::layout::TextLayout;

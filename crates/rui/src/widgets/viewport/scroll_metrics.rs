@@ -1,9 +1,7 @@
 use druid_shell::kurbo::Vec2;
 
-use crate::{
-    sliver_constraints::{axis_direction_to_axis, AxisDirection, ScrollDirection},
-    style::axis::Axis,
-};
+use crate::sliver_constraints::{axis_direction_to_axis, ScrollDirection};
+use style::{axis::Axis, layout::AxisDirection};
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ScrollMetrics {

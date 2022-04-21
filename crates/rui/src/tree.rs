@@ -872,12 +872,10 @@ impl Element {
             .layout_sliver(&mut child_ctx, sc, &mut self.children);
 
         self.state.size = match sc.axis() {
-            crate::style::axis::Axis::Horizontal => {
+            style::axis::Axis::Horizontal => {
                 Size::new(geometry.scroll_extent, sc.cross_axis_extent)
             }
-            crate::style::axis::Axis::Vertical => {
-                Size::new(sc.cross_axis_extent, geometry.scroll_extent)
-            }
+            style::axis::Axis::Vertical => Size::new(sc.cross_axis_extent, geometry.scroll_extent),
         };
         self.state.geometry = geometry.clone();
 

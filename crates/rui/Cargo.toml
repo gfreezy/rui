@@ -22,3 +22,4 @@ generational-indextree = "1.1.4"
 fxhash = "0.2"
 illicit = "1.1.2"
 crossbeam-channel = "0.5.4"
+style = { path = "../style" }

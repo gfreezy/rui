@@ -5,10 +5,10 @@ use druid_shell::kurbo::Size;
 use crate::{
     key::Key,
     object::{Properties, RenderObject, RenderObjectInterface},
-    style::{alignment::Alignment, layout::TextDirection},
     tree::Children,
     ui::Ui,
 };
+use style::{alignment::Alignment, layout::TextDirection};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Align {

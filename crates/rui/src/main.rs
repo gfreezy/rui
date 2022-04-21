@@ -19,7 +19,6 @@ pub mod object;
 pub mod perf;
 mod physics;
 pub mod sliver_constraints;
-mod style;
 pub mod text;
 pub mod tree;
 pub mod ui;
@@ -45,7 +44,8 @@ use menu::{Menu, MenuItem};
 
 use live_style::live_style;
 use object::{Properties, RenderObject};
-use sliver_constraints::{AxisDirection, CacheExtent};
+use sliver_constraints::CacheExtent;
+use style::layout::AxisDirection;
 use style::Style;
 
 use style::alignment::Alignment;
