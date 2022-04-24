@@ -1,5 +1,6 @@
 [workspace]
 members = ["crates/rui", "crates/style", "crates/esplori"]
 
-# [patch.crates-io]
-# generational-indextree = { path = "/Users/feichao/Developer/generational-indextree" }
+[patch.crates-io]
+piet-common = { git = "https://github.com/linebender/piet", rev = "436c5d9" }
+piet-coregraphics = { git = "https://github.com/linebender/piet", rev = "436c5d9" }
