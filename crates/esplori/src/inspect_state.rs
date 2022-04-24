@@ -2,63 +2,60 @@ use std::collections::HashMap;
 
 use rui::{debug_state::DebugState, id::ElementId};
 
-pub struct InspectDebugState {
-    /// The widget's unique id.
-    pub id: ElementId,
-    /// The widget's type as a human-readable string.
-    pub display_name: String,
-    /// If a widget has a "central" value (for instance, a textbox's contents),
-    /// it is stored here.
-    pub main_value: String,
-    /// Untyped values that reveal useful information about the widget.
-    pub other_values: HashMap<String, String>,
-    pub expanded: bool,
-    pub level: usize,
-    pub children: Vec<InspectDebugState>,
+pub struct InspectDebugState<'a> {
+    debug_state: &'a DebugState,
 }
 
-impl InspectDebugState {
-    pub fn new(debug_state: &DebugState) -> Self {
-        Self::new_with_level(debug_state, 0)
+impl<'a> InspectDebugState<'a> {
+    pub fn new(debug_state: &'a DebugState) -> Self {
+        InspectDebugState { debug_state }
     }
 
     pub fn has_children(&self) -> bool {
-        !self.children.is_empty()
+        !self.debug_state.children.is_empty()
     }
 
-    fn new_with_level(debug_state: &DebugState, level: usize) -> Self {
-        InspectDebugState {
-            id: debug_state.id,
-            display_name: debug_state.display_name.clone(),
-            main_value: debug_state.main_value.clone(),
-            other_values: debug_state.other_values.clone(),
-            expanded: true,
-            level,
-            children: debug_state
-                .children
-                .iter()
-                .map(|child| InspectDebugState::new_with_level(child, level + 1))
-                .collect(),
+    pub fn flatten<R>(
+        &self,
+        mut filter: impl (FnMut(&DebugState, usize) -> bool),
+        mut line: impl (FnMut(&DebugState, usize) -> R) + Clone,
+    ) -> Vec<R> {
+        flatten(self, &self.debug_state, 0, &mut filter, &mut line)
+    }
+}
+
+fn flatten<R>(
+    inpspect: &InspectDebugState,
+    debug_state: &DebugState,
+    level: usize,
+    filter: &mut impl (FnMut(&DebugState, usize) -> bool),
+    line: &mut impl (FnMut(&DebugState, usize) -> R),
+) -> Vec<R> {
+    let mut ret = vec![line(debug_state, level)];
+    if filter(debug_state, level) {
+        for child in debug_state.children() {
+            ret.extend(flatten(inpspect, child, level + 1, filter, line));
         }
+    }
+    ret
+}
+
+#[derive(Default)]
+pub struct ExpandedState {
+    expanded: HashMap<ElementId, bool>,
+}
+
+impl ExpandedState {
+    const DEFAULT: bool = true;
+
+    pub fn expanded(&self, id: ElementId) -> bool {
+        self.expanded.get(&id).cloned().unwrap_or(Self::DEFAULT)
     }
 
     pub fn toggle(&mut self, id: ElementId) {
-        if self.id == id {
-            self.expanded = !self.expanded;
-        } else {
-            for child in &mut self.children {
-                child.toggle(id);
-            }
-        }
-    }
-
-    pub fn flatten<R>(&self, mut line: impl (FnMut(&Self) -> R) + Clone) -> Vec<R> {
-        let mut result = vec![(line.clone())(self)];
-        for child in &self.children {
-            if self.expanded {
-                result.append(&mut child.flatten(line.clone()));
-            }
-        }
-        result
+        self.expanded
+            .entry(id)
+            .and_modify(|e| *e = !*e)
+            .or_insert(!Self::DEFAULT);
     }
 }

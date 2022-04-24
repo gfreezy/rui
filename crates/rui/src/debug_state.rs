@@ -74,6 +74,14 @@ impl DebugState {
             None
         }
     }
+
+    pub fn has_children(&self) -> bool {
+        !self.children.is_empty()
+    }
+
+    pub fn children(&self) -> impl Iterator<Item = &DebugState> {
+        self.children.iter()
+    }
 }
 
 impl ToString for DebugState {

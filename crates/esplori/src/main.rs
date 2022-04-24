@@ -2,9 +2,11 @@
 mod inspect_state;
 
 use std::any::Any;
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 
+use inspect_state::ExpandedState;
 use rui::app::WindowDesc;
 
 use rui::debug_state::DebugState;
@@ -37,28 +39,34 @@ fn inspect(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
 
     row(ui, |ui| {
         viewport(ui, AxisDirection::Down, AxisDirection::Right, |ui| {
-            let mut data = ui.state_node(|| {
-                inspect_state::InspectDebugState::new(&snapshot.lock().unwrap().debug_state)
-            });
-            let rows = data.flatten(|debug_state| {
-                let ident = debug_state.level * 4;
-                let symbol = match (debug_state.has_children(), debug_state.expanded) {
-                    (true, true) => '-',
-                    (true, false) => '+',
-                    (false, _) => ' ',
-                };
-                (
-                    debug_state.id,
-                    format!(
-                        "{:ident$}{} {}(id: {}, len: {})",
-                        " ",
-                        symbol,
-                        debug_state.display_name,
+            let mut expanded = ui.state_node(|| ExpandedState::default());
+            let root_state = snapshot.lock().unwrap();
+            let mut data = inspect_state::InspectDebugState::new(&root_state.debug_state);
+            let rows = data.flatten(
+                |debug_state, _| expanded.expanded(debug_state.id),
+                |debug_state, level| {
+                    let ident = level * 4;
+                    let symbol = match (
+                        debug_state.has_children(),
+                        expanded.expanded(debug_state.id),
+                    ) {
+                        (true, true) => '-',
+                        (true, false) => '+',
+                        (false, _) => ' ',
+                    };
+                    (
                         debug_state.id,
-                        debug_state.children.len()
-                    ),
-                )
-            });
+                        format!(
+                            "{:ident$}{} {}(id: {}, len: {})",
+                            " ",
+                            symbol,
+                            debug_state.display_name,
+                            debug_state.id,
+                            debug_state.children.len()
+                        ),
+                    )
+                },
+            );
 
             let delegate = VecSliverListDelegate {
                 data: rows,
@@ -66,7 +74,7 @@ fn inspect(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
                 content: move |ui, &(id, ref row)| {
                     button(ui, &row, move || {
                         selected.set(id);
-                        data.toggle(id);
+                        expanded.toggle(id);
                     });
                 },
             };
