@@ -2,7 +2,7 @@ use std::any::type_name;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::mem;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 use std::time::Instant;
 use std::{
@@ -43,11 +43,20 @@ impl std::fmt::Debug for Children {
     }
 }
 
-#[derive(Clone, Copy)]
 pub struct State<T: 'static> {
     pub(crate) ptr: *mut dyn Any,
     phaton: PhantomData<T>,
 }
+impl<T> Clone for State<T> {
+    fn clone(&self) -> Self {
+        Self {
+            ptr: self.ptr.clone(),
+            phaton: self.phaton.clone(),
+        }
+    }
+}
+
+impl<T> Copy for State<T> {}
 
 impl<T> State<T> {
     pub(crate) fn new(raw_obx: *mut dyn Any) -> State<T> {
@@ -73,6 +82,13 @@ impl<T: 'static> Deref for State<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
+        let v = unsafe { &mut *self.ptr };
+        v.downcast_mut::<T>().unwrap()
+    }
+}
+
+impl<T: 'static> DerefMut for State<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         let v = unsafe { &mut *self.ptr };
         v.downcast_mut::<T>().unwrap()
     }

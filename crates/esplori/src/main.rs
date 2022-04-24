@@ -1,3 +1,6 @@
+#![allow(unused)]
+mod inspect_state;
+
 use std::any::Any;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
@@ -14,6 +17,7 @@ use rui::menu::mac::menu_bar;
 use rui::live_style::live_style;
 
 use rui::sliver_constraints::CacheExtent;
+use rui::tree::State;
 use rui::widgets;
 use style::layout::AxisDirection;
 use style::Style;
@@ -29,38 +33,41 @@ use rui::widgets::button::Button;
 use rui::widgets::text::Text;
 
 fn inspect(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
-    // 状态同步需要控制在某一个阶段
     let selected = ui.state_node(|| ElementId::ZERO);
 
     row(ui, |ui| {
         viewport(ui, AxisDirection::Down, AxisDirection::Right, |ui| {
-            let mut data = vec![];
-            snapshot.lock().unwrap().debug_state.visit(
-                &mut |debug_state, level| {
-                    data.push((level, debug_state.clone()));
-                },
-                0,
-            );
+            let mut data = ui.state_node(|| {
+                inspect_state::InspectDebugState::new(&snapshot.lock().unwrap().debug_state)
+            });
+            let rows = data.flatten(|debug_state| {
+                let ident = debug_state.level * 4;
+                let symbol = match (debug_state.has_children(), debug_state.expanded) {
+                    (true, true) => '-',
+                    (true, false) => '+',
+                    (false, _) => ' ',
+                };
+                (
+                    debug_state.id,
+                    format!(
+                        "{:ident$}{} {}(id: {}, len: {})",
+                        " ",
+                        symbol,
+                        debug_state.display_name,
+                        debug_state.id,
+                        debug_state.children.len()
+                    ),
+                )
+            });
 
             let delegate = VecSliverListDelegate {
-                data,
-                key_fn: |(_level, s)| s.id.to_string(),
-                content: move |ui, (level, debug_state)| {
-                    let ident = level * 4;
-                    let current_id = debug_state.id;
-                    button(
-                        ui,
-                        &format!(
-                            "{:ident$}{}(id: {}, len: {})",
-                            "",
-                            debug_state.display_name,
-                            debug_state.id,
-                            debug_state.children.len()
-                        ),
-                        move || {
-                            selected.set(current_id);
-                        },
-                    );
+                data: rows,
+                key_fn: |(id, row)| id.to_string(),
+                content: move |ui, &(id, ref row)| {
+                    button(ui, &row, move || {
+                        selected.set(id);
+                        data.toggle(id);
+                    });
                 },
             };
 
@@ -202,7 +209,7 @@ fn sliver_to_box(ui: &mut Ui, local_key: String, content: impl FnMut(&mut Ui)) {
     widgets::sliver_to_box::SliverToBox.build(ui, local_key, content);
 }
 
-struct VecSliverListDelegate<T, C: FnMut(&mut Ui, &T) + 'static> {
+struct VecSliverListDelegate<T: 'static, C: FnMut(&mut Ui, &T) + 'static> {
     data: Vec<T>,
     key_fn: fn(&T) -> String,
     content: C,

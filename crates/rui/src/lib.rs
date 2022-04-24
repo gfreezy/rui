@@ -1,3 +1,4 @@
+#![allow(unused)]
 #[macro_use]
 mod macros;
 pub mod app;
