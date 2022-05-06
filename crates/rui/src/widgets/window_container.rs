@@ -1,6 +1,9 @@
 use std::time::Instant;
 
-use druid_shell::kurbo::{Point, Size};
+use druid_shell::{
+    kurbo::{Point, Rect, Size, Vec2},
+    piet::{Color, PaintBrush, RenderContext},
+};
 
 use crate::{
     box_constraints::BoxConstraints,
@@ -8,10 +11,14 @@ use crate::{
     event::Event,
     lifecycle::LifeCycle,
     object::RenderObjectInterface,
+    perf::FPSCounter,
+    text::layout::TextLayout,
     tree::Children,
 };
 
-pub(crate) struct WindowContainer;
+pub(crate) struct WindowContainer {
+    fps_counter: FPSCounter,
+}
 
 const DEBUG: bool = false;
 
@@ -108,6 +115,31 @@ impl RenderObjectInterface for WindowContainer {
                 "windowcontainer paint took {} us",
                 instant.elapsed().as_micros()
             );
+        }
+        let fps = self.fps_counter.tick();
+        draw_fps(fps, ctx.size(), ctx);
+    }
+}
+
+fn draw_fps(fps: usize, window_size: Size, paint_ctx: &mut PaintCtx) {
+    let mut layout: TextLayout<String> = TextLayout::from_text(format!("{}", fps));
+    layout.rebuild_if_needed(&mut paint_ctx.text());
+    let text_size = layout.size();
+    let win_size = window_size;
+    let origin = Point::new(win_size.width - text_size.width, 0.);
+    let text_rect = Rect::from_origin_size(origin, text_size) - Vec2::new(5., 0.);
+    let bg_rect = text_rect.inset(5.);
+    paint_ctx.fill(
+        bg_rect,
+        &PaintBrush::Color(Color::from_hex_str("#fff").unwrap()),
+    );
+    paint_ctx.draw_text(layout.layout().unwrap(), text_rect.origin());
+}
+
+impl WindowContainer {
+    pub fn new() -> Self {
+        Self {
+            fps_counter: FPSCounter::new(),
         }
     }
 }

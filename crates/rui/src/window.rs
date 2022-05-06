@@ -35,7 +35,6 @@ pub struct Window {
     invalid: Region,
     pub(crate) menu: Option<MenuManager>,
     ext_handle: ExtEventSink,
-    fps_counter: FPSCounter,
 }
 
 impl Window {
@@ -53,10 +52,13 @@ impl Window {
             app: pending.root,
             menu: pending.menu,
             phatom_root_id: ElementId::next(),
-            root: Element::new(Key::current(), EMPTY_LOCAL_KEY.to_string(), WindowContainer),
+            root: Element::new(
+                Key::current(),
+                EMPTY_LOCAL_KEY.to_string(),
+                WindowContainer::new(),
+            ),
             invalid: Region::EMPTY,
             ext_handle,
-            fps_counter: FPSCounter::new(),
         }
     }
 
@@ -111,8 +113,6 @@ impl Window {
             render_ctx: piet,
         };
         root.paint(&mut paint_ctx);
-        let fps = self.fps_counter.tick();
-        draw_fps(fps, handle.get_size(), &mut paint_ctx);
     }
 
     // #[instrument(skip(self))]
@@ -276,19 +276,4 @@ impl Window {
         }
         invalid.clear();
     }
-}
-
-fn draw_fps(fps: usize, window_size: Size, paint_ctx: &mut PaintCtx) {
-    let mut layout: TextLayout<String> = TextLayout::from_text(format!("{}", fps));
-    layout.rebuild_if_needed(&mut paint_ctx.text());
-    let text_size = layout.size();
-    let win_size = window_size;
-    let origin = Point::new(win_size.width - text_size.width, 0.);
-    let text_rect = Rect::from_origin_size(origin, text_size) - Vec2::new(5., 0.);
-    let bg_rect = text_rect.inset(5.);
-    paint_ctx.fill(
-        bg_rect,
-        &PaintBrush::Color(Color::from_hex_str("#fff").unwrap()),
-    );
-    paint_ctx.draw_text(layout.layout().unwrap(), text_rect.origin());
 }

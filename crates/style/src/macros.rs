@@ -33,6 +33,7 @@ macro_rules! alt {
         alt!(nom::branch::alt(($a, $b, $c, $d, $e, $f, $g, $h, $i, $j)), $($more),*)
     };
 }
+
 ///
 /// ```rust
 /// style_parser!(
@@ -88,7 +89,7 @@ macro_rules! style_parser {
                 crate::utils::ws(nom::bytes::complete::tag(";")),
             )));
             let parse_attrs_block = nom::sequence::delimited(crate::utils::ws(nom::bytes::complete::tag("{")), crate::utils::ws(parse_attrs), crate::utils::ws(nom::bytes::complete::tag("}")));
-            let parse_class_name = nom::combinator::map(nom::sequence::pair(nom::bytes::complete::tag("."), nom::character::complete::alphanumeric1), |(_, name)| {
+            let parse_class_name = nom::combinator::map(nom::sequence::pair(nom::bytes::complete::tag("."), crate::utils::identifier), |(_, name)| {
                 format!(".{name}")
             });
             let mut parse_rule = nom::sequence::terminated(crate::utils::ws(parse_class_name), crate::utils::ws(parse_attrs_block));

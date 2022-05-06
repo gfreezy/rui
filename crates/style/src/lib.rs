@@ -39,7 +39,8 @@ use crate::{
 };
 
 use self::layout::{
-    CrossAxisAlignment, Flex, FlexFit, Layout, MainAxisAlignment, TextDirection, VerticalDirection,
+    AxisDirection, CrossAxisAlignment, Flex, FlexFit, Layout, MainAxisAlignment, TextDirection,
+    VerticalDirection,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -77,6 +78,8 @@ pub struct Style {
     pub cross_axis_alignment: CrossAxisAlignment,
     pub text_direction: TextDirection,
     pub vertical_direction: VerticalDirection,
+    pub axis_direction: AxisDirection,
+    pub cross_axis_direction: AxisDirection,
     pub flex_fit: FlexFit,
     pub flex: Flex,
 }
@@ -86,6 +89,8 @@ impl Default for Style {
         Self {
             name: Default::default(),
             axis: Default::default(),
+            axis_direction: AxisDirection::Down,
+            cross_axis_direction: AxisDirection::Right,
             spacing: Default::default(),
             vertical_alignment: Default::default(),
             horizontal_alignment: Default::default(),
@@ -128,6 +133,8 @@ style_parser!(
     Style,
     [
         axis => parse_axis => Axis,
+        axis_direction => parse_axis_direction => AxisDirection,
+        cross_axis_direction => parse_axis_direction => AxisDirection,
         spacing => parse_spacing => Spacing,
         vertical_alignment => parse_vertical_alignment => VerticalAlignment,
         horizontal_alignment => parse_horizontal_alignment => HorizontalAlignment,
@@ -169,8 +176,11 @@ style_parser!(
 pub struct ParseStyleError(String);
 
 pub fn parse_style_content(input: &str) -> Result<Vec<Style>, ParseStyleError> {
-    let (_, styles) =
+    let (left, styles) =
         ws(many1(ws(parse_rule)))(input).map_err(|e| ParseStyleError(e.to_string()))?;
+    if !left.is_empty() {
+        return Err(ParseStyleError(format!("unexpected input: {}", left)));
+    }
     Ok(styles)
 }
 
@@ -217,8 +227,17 @@ mod tests {
         line-breaking: clip;
         text-alignment: center;
     }
+
+    .text {
+        axis: vertical;
+        spacing: 20;
+        vertical-alignment: top;
+        horizontal-alignment: center;
+        vertical-arrangement: center;
+    }
     "#,
         );
         assert!(ret.is_ok(), "error: {:?}", ret);
+        assert_eq!(ret.as_ref().unwrap().len(), 2, "error: {:?}", ret);
     }
 }

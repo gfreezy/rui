@@ -1,18 +1,6 @@
 use nom::{number::complete::double, IResult};
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum AxisDirection {
-    Up,
-    Right,
-    Down,
-    Left,
-}
-
-impl Default for AxisDirection {
-    fn default() -> Self {
-        AxisDirection::Down
-    }
-}
+enum_type!(AxisDirection => [Up, Right, Down, Left], Down, parse_axis_direction);
 
 impl AxisDirection {
     pub fn flip(&self) -> AxisDirection {
@@ -73,7 +61,7 @@ impl TextDirection {
 enum_type!(VerticalDirection => [
     Up,
     Down,
-], Up, parse_vertical_direction);
+], Down, parse_vertical_direction);
 
 enum_type!(FlexFit => [
     Loose,

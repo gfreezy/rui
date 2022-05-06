@@ -18,6 +18,7 @@ pub mod menu;
 pub mod object;
 pub mod perf;
 mod physics;
+pub mod prelude;
 pub mod sliver_constraints;
 pub mod text;
 pub mod tree;

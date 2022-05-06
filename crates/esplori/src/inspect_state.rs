@@ -12,7 +12,7 @@ impl<'a> InspectDebugState<'a> {
     }
 
     pub fn has_children(&self) -> bool {
-        !self.debug_state.children.is_empty()
+        !self.debug_state.has_children()
     }
 
     pub fn flatten<R>(

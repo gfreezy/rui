@@ -6,8 +6,8 @@ use std::time::{Duration, Instant, SystemTime};
 /// Measures Frames Per Second (FPS).
 #[derive(Debug)]
 pub struct FPSCounter {
-    /// The last registered frames.
-    last_second_frames: Vec<u128>,
+    measure: f64,
+    prev_ts: Instant,
 }
 
 impl Default for FPSCounter {
@@ -20,22 +20,23 @@ impl FPSCounter {
     /// Creates a new FPSCounter.
     pub fn new() -> FPSCounter {
         FPSCounter {
-            last_second_frames: Vec::with_capacity(128),
+            measure: 1. / 60.,
+            prev_ts: Instant::now(),
         }
     }
 
     /// Updates the FPSCounter and returns number of frames.
     pub fn tick(&mut self) -> usize {
-        let ts = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_micros();
-        let a_second_ago = (ts / 1_000_000 - 1) * 1_000_000;
+        let now = Instant::now();
+        let duration = now - self.prev_ts;
+        self.prev_ts = now;
+        const SMOOTHING: f64 = 0.9;
+        self.measure = (self.measure * SMOOTHING) + (duration.as_secs_f64() * (1.0 - SMOOTHING));
+        self.fps()
+    }
 
-        self.last_second_frames.retain(|t| *t > a_second_ago);
-
-        self.last_second_frames.push(ts);
-        self.last_second_frames.len()
+    pub fn fps(&self) -> usize {
+        (1. / self.measure) as usize
     }
 }
 

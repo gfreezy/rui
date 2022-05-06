@@ -55,6 +55,7 @@ impl StyleCache {
             return;
         }
 
+        debug!("update style");
         let style = parse_style_content(&content).unwrap_or_else(|e| {
             error!("{}", e);
             Vec::new()
@@ -79,7 +80,7 @@ thread_local! {
 }
 
 impl StyleWatcher {
-    fn new(path: &str, ui: &mut Ui) -> Self {
+    fn new(path: &str, ui: &Ui) -> Self {
         let (tx, rx) = channel();
 
         let mut w = watcher(tx, Duration::from_millis(100)).unwrap();
@@ -111,14 +112,18 @@ impl StyleWatcher {
         STYLE.with(|s| s.borrow_mut().set_path(self.path.clone()).get_style(name))
     }
 
-    fn global(ui: &mut Ui) -> &'static StyleWatcher {
+    fn global(ui: &Ui) -> &'static StyleWatcher {
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("style.css");
         static INSTANCE: OnceCell<StyleWatcher> = OnceCell::new();
         INSTANCE.get_or_init(|| StyleWatcher::new(&*path.to_string_lossy(), ui))
     }
 }
 
-pub fn live_style(ui: &mut Ui, name: &str) -> Style {
+pub fn live_style(ui: &Ui, name: &str) -> Style {
+    if name.is_empty() {
+        return Default::default();
+    }
+
     let instance = StyleWatcher::global(ui);
     instance.get_style(name)
 }

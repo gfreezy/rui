@@ -45,3 +45,11 @@ pub(crate) fn parse_kebab_case(name: &str) -> impl FnMut(&str) -> nom::IResult<&
         ))(input)
     }
 }
+
+pub(crate) fn identifier(input: &str) -> nom::IResult<&str, &str> {
+    nom::combinator::recognize(nom::multi::many1_count(nom::branch::alt((
+        nom::character::complete::alphanumeric1,
+        nom::bytes::complete::tag("_"),
+        nom::bytes::complete::tag("-"),
+    ))))(input)
+}
