@@ -20,7 +20,7 @@ use rui::live_style::live_style;
 
 use rui::sliver_constraints::CacheExtent;
 use rui::tree::State;
-use rui::widgets;
+use rui::{live_s, widgets};
 use style::layout::AxisDirection;
 use style::Style;
 
@@ -100,7 +100,7 @@ fn inspect(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
 fn win(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
     column(ui, |ui| {
         expand(ui, |ui| {
-            let style = live_style(ui, ".text");
+            let style = live_s!(ui, ".text");
             text(ui, "haha", style);
         });
 
@@ -108,7 +108,7 @@ fn win(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
             viewport(ui, AxisDirection::Down, AxisDirection::Right, |ui| {
                 for i in 0..10usize {
                     sliver_to_box(ui, i.to_string(), |ui| {
-                        let style = live_style(ui, ".text");
+                        let style = live_s!(ui, ".text");
                         text(ui, &format!("hello{}", i), style);
                     });
                 }
@@ -126,7 +126,7 @@ fn win(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
 }
 
 fn flex(ui: &mut Ui, style_name: &str, content: impl FnMut(&mut Ui)) {
-    let style = live_style(ui, style_name);
+    let style = live_s!(ui, style_name);
     widgets::flex::Flex::new(
         style.axis,
         style.main_axis_size,
@@ -167,7 +167,7 @@ fn debug(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
 }
 
 fn flexible(ui: &mut Ui, style_name: &str, content: impl FnMut(&mut Ui)) {
-    let style = live_style(ui, style_name);
+    let style = live_s!(ui, style_name);
     let flex = style.flex.value();
     let flex_fit = style.flex_fit;
     rui::widgets::flex::Flexible::new(flex, flex_fit).build(ui, content);
@@ -284,7 +284,7 @@ impl SliverChildDelegate for Delegate {
 
     fn build(&mut self, ui: &mut Ui, index: usize) {
         // tracing::debug!("build in delegate: {index}");
-        let _style = live_style(ui, ".inspect-text");
+        let _style = live_s!(ui, ".inspect-text");
         button(ui, &format!("number {index}"), || {});
     }
 

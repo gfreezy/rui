@@ -52,7 +52,7 @@ macro_rules! alt {
 macro_rules! style_parser {
     ($fun:tt, $ty:ty, [$($attr_name:tt => $parse_fun:tt => $field_ty:ty),* $(,)?]) => {
 
-        pub(crate) fn $fun(input: &str) -> nom::IResult<&str, $ty> {
+        pub fn $fun(input: &str) -> nom::IResult<&str, $ty> {
             let attrs = std::rc::Rc::new(std::cell::RefCell::new(anymap2::AnyMap::new()));
 
             fn parse_attr_name(name: &str) -> impl FnMut(&str) -> nom::IResult<&str, &str> {

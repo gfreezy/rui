@@ -46,6 +46,7 @@ use self::layout::{
 #[derive(Debug, PartialEq, Clone)]
 pub struct Style {
     pub name: String,
+    pub widget_name: String,
     pub axis: Axis,
     pub spacing: Spacing,
     pub vertical_alignment: VerticalAlignment,
@@ -88,6 +89,7 @@ impl Default for Style {
     fn default() -> Self {
         Self {
             name: Default::default(),
+            widget_name: "".to_string(),
             axis: Default::default(),
             axis_direction: AxisDirection::Down,
             cross_axis_direction: AxisDirection::Right,

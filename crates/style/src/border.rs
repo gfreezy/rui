@@ -1,32 +1,22 @@
-use druid_shell::piet::{Color, LineJoin, StrokeStyle};
+use druid_shell::piet::{Color};
 use nom::{
-    branch::alt,
-    bytes::complete::tag_no_case,
-    combinator::{map, map_res},
+    combinator::{map},
     number::complete::double,
     sequence::tuple,
     IResult,
 };
 
-use super::{
-    draw::parse_color,
-    size::Width,
-    utils::{make_error, ws},
-};
+use super::{draw::parse_color, size::Width, utils::ws};
 
-const DASH: StrokeStyle = StrokeStyle::new()
-    .dash_pattern(&[4.0, 2.0])
-    .dash_offset(8.0)
-    .line_join(LineJoin::Round);
-const SOLID: StrokeStyle = StrokeStyle::new()
-    .dash_pattern(&[])
-    .line_join(LineJoin::Round);
+enum_type!(BorderStyle => [
+        Solid, Dash
+], Solid, parse_border_style);
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Border {
     width: Width,
     color: Color,
-    style: StrokeStyle,
+    style: BorderStyle,
 }
 
 impl Default for Border {
@@ -34,22 +24,14 @@ impl Default for Border {
         Self {
             width: Width(0.),
             color: Color::rgba8(0, 0, 0, 0),
-            style: SOLID,
+            style: BorderStyle::Solid,
         }
     }
 }
 
 pub(crate) fn parse_border(input: &str) -> IResult<&str, Border> {
-    let parse_border = map_res(
-        alt((tag_no_case("solid"), tag_no_case("dash"))),
-        |v: &str| match v.to_ascii_lowercase().as_str() {
-            "solid" => Ok(SOLID),
-            "dash" => Ok(DASH),
-            _ => Err(make_error("invalid border style")),
-        },
-    );
     map(
-        tuple((ws(double), ws(parse_border), ws(parse_color))),
+        tuple((ws(double), ws(parse_border_style), ws(parse_color))),
         |(width, style, color)| Border {
             width: width.into(),
             color,

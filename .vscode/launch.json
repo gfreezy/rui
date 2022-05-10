@@ -8,7 +8,7 @@
             "type": "lldb",
             "request": "launch",
             "name": "Launch",
-            "program": "${workspaceFolder}/target/debug/rui",
+            "program": "${workspaceFolder}/target/debug/examples/counter",
             "args": [],
             "cwd": "${workspaceFolder}",
             "sourceLanguages": [

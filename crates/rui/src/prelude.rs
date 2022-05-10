@@ -3,12 +3,12 @@ use style::Style;
 
 use style::alignment::Alignment;
 
-use crate::live_style::live_style;
 use crate::sliver_constraints::CacheExtent;
 use crate::ui::Ui;
 use crate::widgets::sliver_list::SliverChildDelegate;
 
-pub fn flex(ui: &mut Ui, style: Style, content: impl FnMut(&mut Ui)) {
+pub fn flex(ui: &mut Ui, mut style: Style, content: impl FnMut(&mut Ui)) {
+    style.widget_name = "flex".to_string();
     crate::widgets::flex::Flex::new(
         style.axis,
         style.main_axis_size,
@@ -22,11 +22,13 @@ pub fn flex(ui: &mut Ui, style: Style, content: impl FnMut(&mut Ui)) {
 
 pub fn column(ui: &mut Ui, mut style: Style, content: impl FnMut(&mut Ui)) {
     style.axis = style::axis::Axis::Vertical;
+    style.widget_name = "column".to_string();
     flex(ui, style, content);
 }
 
 pub fn row(ui: &mut Ui, mut style: Style, content: impl FnMut(&mut Ui)) {
     style.axis = style::axis::Axis::Horizontal;
+    style.widget_name = "row".to_string();
     flex(ui, style, content);
 }
 

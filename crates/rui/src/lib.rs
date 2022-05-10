@@ -13,6 +13,7 @@ pub mod ext_event;
 pub mod id;
 pub mod key;
 pub mod lifecycle;
+#[macro_use]
 pub mod live_style;
 pub mod menu;
 pub mod object;

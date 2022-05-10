@@ -1,6 +1,6 @@
 use rui::{
     app::{AppLauncher, WindowDesc},
-    live_style::live_style,
+    live_s,
     menu::mac::menu_bar,
     prelude::*,
     ui::Ui,
@@ -8,12 +8,37 @@ use rui::{
 
 fn win(ui: &mut Ui) {
     let count = ui.state_node(|| 0usize);
-    flex(ui, live_style(ui, ".counter"), |ui| {
-        text(ui, &format!("{}", *count), live_style(ui, ""));
-        button(ui, "Increment", move || {
-            count.update(|c| *c += 1);
-        });
-    });
+    flex(
+        ui,
+        live_s!(
+            ui,
+            r#"
+    .counter {
+        axis: horizontal;
+        main-axis-alignment: center;
+        cross-axis-alignment: center;
+    }
+    "#
+        ),
+        |ui| {
+            text(
+                ui,
+                &format!("{}", *count),
+                live_s!(
+                    ui,
+                    r#"
+                .a {
+                    color: rgb(255, 0, 0);
+                    font-size: 20.0;
+                }
+            "#
+                ),
+            );
+            button(ui, "Increment", move || {
+                count.update(|c| *c += 1);
+            });
+        },
+    );
 }
 
 fn main() {
