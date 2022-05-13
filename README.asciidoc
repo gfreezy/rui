@@ -1,0 +1,8 @@
+= Rust Ui framework
+:author: gfreezy@gmail.com
+
+== LiveReload
+Edit source code, live reload the App.
+
+.Live reload demostration
+video::YDt_hsz0PiY[youtube]

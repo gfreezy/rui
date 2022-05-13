@@ -47,6 +47,7 @@ pub struct State<T: 'static> {
     pub(crate) ptr: *mut dyn Any,
     phaton: PhantomData<T>,
 }
+
 impl<T> Clone for State<T> {
     fn clone(&self) -> Self {
         Self {
