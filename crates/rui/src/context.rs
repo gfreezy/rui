@@ -10,6 +10,7 @@ use crate::{
     tree::ElementState,
 };
 use crate::{ext_event::ExtEventSink, id::ElementId};
+use bumpalo::Bump;
 use druid_shell::kurbo::{Insets, Rect, Size};
 use druid_shell::piet::{Piet, PietText, RenderContext};
 use druid_shell::{Region, TimerToken, WindowHandle};
@@ -29,51 +30,52 @@ macro_rules! impl_context_method {
 }
 
 /// Static state that is shared between most contexts.
-pub(crate) struct ContextState<'a> {
+pub(crate) struct ContextState<'a, 'b> {
     pub(crate) window: WindowHandle,
     pub(crate) ext_handle: ExtEventSink,
     pub(crate) text: PietText,
     pub(crate) command_queue: &'a mut CommandQueue,
+    pub(crate) bump: &'b mut Bump,
 }
 
-pub struct UpdateCtx<'a> {
-    pub(crate) context_state: &'a ContextState<'a>,
-    pub(crate) child_state: &'a mut ElementState,
+pub struct UpdateCtx<'a, 'b, 'b2, 'c> {
+    pub(crate) context_state: &'a mut ContextState<'b, 'b2>,
+    pub(crate) child_state: &'c mut ElementState,
 }
 
-pub struct EventCtx<'a> {
-    pub(crate) context_state: &'a ContextState<'a>,
-    pub(crate) child_state: &'a mut ElementState,
+pub struct EventCtx<'a, 'b, 'b2, 'c> {
+    pub(crate) context_state: &'a mut ContextState<'b, 'b2>,
+    pub(crate) child_state: &'c mut ElementState,
     pub(crate) is_active: bool,
     pub(crate) is_handled: bool,
 }
 
-pub struct LifeCycleCtx<'a> {
-    pub(crate) context_state: &'a ContextState<'a>,
-    pub(crate) child_state: &'a mut ElementState,
+pub struct LifeCycleCtx<'a, 'b, 'b2, 'c> {
+    pub(crate) context_state: &'a mut ContextState<'b, 'b2>,
+    pub(crate) child_state: &'c mut ElementState,
 }
 
-pub struct LayoutCtx<'a> {
-    pub(crate) context_state: &'a ContextState<'a>,
-    pub(crate) child_state: &'a mut ElementState,
+pub struct LayoutCtx<'a, 'b, 'b2, 'c> {
+    pub(crate) context_state: &'a mut ContextState<'b, 'b2>,
+    pub(crate) child_state: &'c mut ElementState,
 }
 
-pub struct PaintCtx<'a, 'c> {
-    pub(crate) context_state: &'a ContextState<'a>,
-    pub(crate) child_state: &'a mut ElementState,
+pub struct PaintCtx<'a, 'b, 'b2, 'c, 'd, 'e> {
+    pub(crate) context_state: &'a mut ContextState<'b, 'b2>,
+    pub(crate) child_state: &'c mut ElementState,
     /// The render context for actually painting.
-    pub render_ctx: &'a mut Piet<'c>,
+    pub render_ctx: &'e mut Piet<'d>,
     /// The currently visible region.
     pub(crate) region: Region,
 }
 
 // methods on everyone
 impl_context_method!(
-    EventCtx<'_>,
-    UpdateCtx<'_>,
-    LifeCycleCtx<'_>,
-    LayoutCtx<'_>,
-    PaintCtx<'_, '_>,
+    EventCtx<'_, '_, '_, '_>,
+    UpdateCtx<'_, '_, '_, '_>,
+    LifeCycleCtx<'_, '_, '_, '_>,
+    LayoutCtx<'_, '_, '_, '_>,
+    PaintCtx<'_, '_, '_, '_, '_, '_>,
     {
         /// get the `ChildId` of the current widget.
         pub fn child_id(&self) -> ElementId {
@@ -134,10 +136,10 @@ impl_context_method!(
 
 // methods on everyone but layoutctx
 impl_context_method!(
-    EventCtx<'_>,
-    UpdateCtx<'_>,
-    LifeCycleCtx<'_>,
-    PaintCtx<'_, '_>,
+    EventCtx<'_, '_, '_, '_>,
+    UpdateCtx<'_, '_, '_, '_>,
+    LifeCycleCtx<'_, '_, '_, '_>,
+    PaintCtx<'_, '_, '_, '_, '_, '_>,
     {
         /// The layout size.
         ///
@@ -155,50 +157,55 @@ impl_context_method!(
 );
 
 // methods on event, update, and lifecycle
-impl_context_method!(EventCtx<'_>, UpdateCtx<'_>, LifeCycleCtx<'_>, {
-    /// Request a [`paint`] pass. This is equivalent to calling
-    /// [`request_paint_rect`] for the widget's [`paint_rect`].
-    ///
-    /// [`paint`]: trait.Widget.html#tymethod.paint
-    /// [`request_paint_rect`]: #method.request_paint_rect
-    /// [`paint_rect`]: struct.WidgetPod.html#method.paint_rect
-    pub fn request_paint(&mut self) {
-        self.child_state.invalid.set_rect(
-            self.child_state.paint_rect() - self.child_state.layout_rect().origin().to_vec2(),
-        );
-        // tracing::debug!("request paint: {:?}", self.child_state.paint_rect());
-    }
+impl_context_method!(
+    EventCtx<'_, '_, '_, '_>,
+    UpdateCtx<'_, '_, '_, '_>,
+    LifeCycleCtx<'_, '_, '_, '_>,
+    {
+        /// Request a [`paint`] pass. This is equivalent to calling
+        /// [`request_paint_rect`] for the widget's [`paint_rect`].
+        ///
+        /// [`paint`]: trait.Widget.html#tymethod.paint
+        /// [`request_paint_rect`]: #method.request_paint_rect
+        /// [`paint_rect`]: struct.WidgetPod.html#method.paint_rect
+        pub fn request_paint(&mut self) {
+            self.child_state.invalid.set_rect(
+                self.child_state.paint_rect() - self.child_state.layout_rect().origin().to_vec2(),
+            );
+            // tracing::debug!("request paint: {:?}", self.child_state.paint_rect());
+        }
 
-    /// Request a [`paint`] pass for redrawing a rectangle, which is given
-    /// relative to our layout rectangle.
-    ///
-    /// [`paint`]: trait.Widget.html#tymethod.paint
-    pub fn request_paint_rect(&mut self, rect: Rect) {
-        self.child_state.invalid.add_rect(rect);
-    }
+        /// Request a [`paint`] pass for redrawing a rectangle, which is given
+        /// relative to our layout rectangle.
+        ///
+        /// [`paint`]: trait.Widget.html#tymethod.paint
+        pub fn request_paint_rect(&mut self, rect: Rect) {
+            self.child_state.invalid.add_rect(rect);
+        }
 
-    /// Request a layout pass.
-    ///
-    /// A Widget's [`layout`] method is always called when the widget tree
-    /// changes, or the window is resized.
-    ///
-    /// If your widget would like to have layout called at any other time,
-    /// (such as if it would like to change the layout of children in
-    /// response to some event) it must call this method.
-    ///
-    /// [`layout`]: trait.Widget.html#tymethod.layout
-    #[track_caller]
-    pub fn request_layout(&mut self) {
-        self.child_state.mark_needs_layout();
+        /// Request a layout pass.
+        ///
+        /// A Widget's [`layout`] method is always called when the widget tree
+        /// changes, or the window is resized.
+        ///
+        /// If your widget would like to have layout called at any other time,
+        /// (such as if it would like to change the layout of children in
+        /// response to some event) it must call this method.
+        ///
+        /// [`layout`]: trait.Widget.html#tymethod.layout
+        #[track_caller]
+        pub fn request_layout(&mut self) {
+            self.child_state.mark_needs_layout();
+        }
     }
-});
+);
 
 // methods on everyone but paintctx
 impl_context_method!(
-    EventCtx<'_>,
-    UpdateCtx<'_>,
-    LifeCycleCtx<'_>,
-    LayoutCtx<'_>,
+    EventCtx<'_, '_, '_, '_>,
+    UpdateCtx<'_, '_, '_, '_>,
+    LifeCycleCtx<'_, '_, '_, '_>,
+    LayoutCtx<'_, '_, '_, '_>,
     {
         /// Request a timer event.
         ///
@@ -211,7 +218,7 @@ impl_context_method!(
     }
 );
 
-impl<'a> ContextState<'a> {
+impl ContextState<'_, '_> {
     fn request_timer(&self, child_state: &mut ElementState, deadline: Duration) -> TimerToken {
         let timer_token = self.window.request_timer(deadline);
         child_state.add_timer(timer_token);
@@ -243,7 +250,7 @@ impl<'a> ContextState<'a> {
     }
 }
 
-impl UpdateCtx<'_> {
+impl UpdateCtx<'_, '_, '_, '_> {
     /// Returns `true` if this widget or a descendent as explicitly requested
     /// an update call.
     ///
@@ -256,7 +263,7 @@ impl UpdateCtx<'_> {
     }
 }
 
-impl LayoutCtx<'_> {
+impl LayoutCtx<'_, '_, '_, '_> {
     /// Set explicit paint [`Insets`] for this widget.
     ///
     /// You are not required to set explicit paint bounds unless you need
@@ -285,7 +292,7 @@ impl LayoutCtx<'_> {
         self.child_state.baseline_offset = baseline
     }
 }
-impl EventCtx<'_> {
+impl EventCtx<'_, '_, '_, '_> {
     /// Set the "active" state of the widget.
     ///
     /// See [`EventCtx::is_active`](struct.EventCtx.html#method.is_active).
@@ -318,21 +325,21 @@ impl EventCtx<'_> {
     }
 }
 
-impl<'c> Deref for PaintCtx<'_, 'c> {
-    type Target = Piet<'c>;
+impl<'d> Deref for PaintCtx<'_, '_, '_, '_, 'd, '_> {
+    type Target = Piet<'d>;
 
     fn deref(&self) -> &Self::Target {
         self.render_ctx
     }
 }
 
-impl<'c> DerefMut for PaintCtx<'_, 'c> {
+impl<'c> DerefMut for PaintCtx<'_, '_, '_, '_, '_, '_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.render_ctx
     }
 }
 
-impl PaintCtx<'_, '_> {
+impl PaintCtx<'_, '_, '_, '_, '_, '_> {
     /// Returns the region that needs to be repainted.
     #[inline]
     pub fn region(&self) -> &Region {

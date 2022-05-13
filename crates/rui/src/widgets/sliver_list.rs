@@ -213,7 +213,7 @@ impl RenderSliverList {
                 parent_data.index,
                 &children[child_index].local_key
             );
-            let mut ui = Ui::new(children, &ctx.context_state);
+            let mut ui = Ui::new(children, &mut *ctx.context_state);
             self.build_item(
                 &mut ui,
                 parent_data.index,
@@ -355,7 +355,7 @@ impl RenderSliverList {
         after: Option<usize>,
     ) {
         let render_index = after.map(|v| v + 1).unwrap_or(0);
-        let mut ui = Ui::new(children, ctx.context_state);
+        let mut ui = Ui::new(children, &mut *ctx.context_state);
         let parent_data = SliverListParentData {
             keep_alive: true,
             layout_offset: None,

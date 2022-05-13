@@ -32,7 +32,6 @@ use crate::widgets::empty_holder::EmptyHolderObject;
 pub struct Children {
     pub(crate) states: Vec<StateNode>,
     pub(crate) renders: Vec<Element>,
-    pub(crate) bump: Bump,
 }
 
 impl std::fmt::Debug for Children {
@@ -1046,7 +1045,7 @@ impl Element {
         child: &mut dyn AnyRenderObject,
         child_state: &mut ElementState,
         children: &mut Children,
-        context_state: &ContextState,
+        context_state: &mut ContextState,
         rect: Rect,
         mouse_pos: Option<Point>,
     ) -> bool {

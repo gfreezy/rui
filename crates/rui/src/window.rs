@@ -1,5 +1,6 @@
 use std::{panic::Location, time::Instant};
 
+use bumpalo::Bump;
 use druid_shell::{
     kurbo::{Point, Rect, Size, Vec2},
     piet::{Color, PaintBrush, Piet, RenderContext},
@@ -35,6 +36,7 @@ pub struct Window {
     invalid: Region,
     pub(crate) menu: Option<MenuManager>,
     ext_handle: ExtEventSink,
+    bump: Bump,
 }
 
 impl Window {
@@ -59,6 +61,7 @@ impl Window {
             ),
             invalid: Region::EMPTY,
             ext_handle,
+            bump: Bump::new(),
         }
     }
 
@@ -94,6 +97,7 @@ impl Window {
             phatom_root_id,
             root,
             size,
+            bump,
             ..
         } = self;
 
@@ -103,6 +107,7 @@ impl Window {
 
             text: handle.text(),
             command_queue: queue,
+            bump,
         };
 
         let mut root_state = ElementState::new(*phatom_root_id, Some(size.clone()));
@@ -124,6 +129,7 @@ impl Window {
             phatom_root_id,
             size,
             invalid,
+            bump,
             ..
         } = self;
 
@@ -132,6 +138,7 @@ impl Window {
             ext_handle: ext_handle.clone(),
             text: handle.text(),
             command_queue,
+            bump,
         };
         let mut root_state = ElementState::new(*phatom_root_id, Some(size.clone()));
 
@@ -173,6 +180,7 @@ impl Window {
             phatom_root_id,
             size,
             invalid,
+            bump,
             ..
         } = self;
 
@@ -181,6 +189,7 @@ impl Window {
             ext_handle: ext_handle.clone(),
             text: handle.text(),
             command_queue: queue,
+            bump,
         };
         let mut root_state = ElementState::new(*phatom_root_id, Some(size.clone()));
 
@@ -215,6 +224,7 @@ impl Window {
             phatom_root_id,
             size,
             invalid,
+            bump,
             ..
         } = self;
 
@@ -223,6 +233,7 @@ impl Window {
             ext_handle: ext_handle.clone(),
             text: handle.text(),
             command_queue,
+            bump,
         };
         let mut root_state = ElementState::new(*phatom_root_id, Some(size.clone()));
 
@@ -241,6 +252,7 @@ impl Window {
             ext_handle,
             root,
             app,
+            bump,
             ..
         } = self;
 
@@ -249,6 +261,7 @@ impl Window {
             ext_handle: ext_handle.clone(),
             text: handle.text(),
             command_queue,
+            bump,
         };
         let mut cx = Ui::new(&mut root.children, &mut context_state);
         measure_time("app::update", || {

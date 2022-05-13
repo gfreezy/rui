@@ -55,7 +55,7 @@ pub fn text(ui: &mut Ui, text: &str, style: Style) {
     crate::widgets::text::Text::new(text).style(style).build(ui);
 }
 
-pub fn button<'a>(ui: &'a mut Ui<'_>, text: &str, click: impl FnMut() + 'static) {
+pub fn button(ui: &mut Ui, text: &str, click: impl FnMut() + 'static) {
     crate::widgets::button::Button::new()
         .text_align(druid_shell::piet::TextAlignment::Start)
         .labeled(ui, text, click);

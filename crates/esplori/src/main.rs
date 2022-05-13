@@ -191,7 +191,7 @@ fn text(ui: &mut Ui, text: &str, style: Style) {
     Text::new(text).style(style).build(ui);
 }
 
-fn button<'a>(ui: &'a mut Ui<'_>, text: &str, click: impl FnMut() + 'static) {
+fn button(ui: &mut Ui, text: &str, click: impl FnMut() + 'static) {
     Button::new()
         .text_align(druid_shell::piet::TextAlignment::Start)
         .labeled(ui, text, click);

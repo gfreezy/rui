@@ -10,9 +10,9 @@ use crate::object::{AnyParentData, AnyRenderObject, Properties, RenderObject};
 use crate::perf::measure_time;
 use crate::tree::{Children, Element, State, StateNode};
 
-pub struct Ui<'a> {
+pub struct Ui<'a, 'b, 'c, 'c2> {
     pub tree: &'a mut Children,
-    context_state: &'a ContextState<'a>,
+    context_state: &'b mut ContextState<'c, 'c2>,
     state_index: usize,
     render_index: usize,
     parent_data: Option<Box<dyn AnyParentData>>,
@@ -24,8 +24,11 @@ pub enum RenderAction {
     Auto,
 }
 
-impl<'a> Ui<'a> {
-    pub(crate) fn new(tree: &'a mut Children, context_state: &'a ContextState) -> Self {
+impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
+    pub(crate) fn new(
+        tree: &'a mut Children,
+        context_state: &'b mut ContextState<'c, 'c2>,
+    ) -> Self {
         Ui {
             tree,
             context_state,
@@ -33,6 +36,10 @@ impl<'a> Ui<'a> {
             render_index: 0,
             parent_data: None,
         }
+    }
+
+    fn alloc<T>(&mut self, val: T) -> &mut T {
+        self.context_state.bump.alloc(val)
     }
 
     pub fn set_parent_data(&mut self, parent_data: Option<Box<dyn AnyParentData>>) {
@@ -45,7 +52,7 @@ impl<'a> Ui<'a> {
         let idx = self.find_state_node(key);
         let index = match idx {
             None => {
-                let init_value: *mut dyn Any = self.tree.bump.alloc(init());
+                let init_value: *mut dyn Any = self.alloc(init());
                 self.insert_state_node(key, init_value)
             }
             Some(index) => index,
@@ -172,7 +179,7 @@ impl<'a> Ui<'a> {
     }
 }
 
-impl Ui<'_> {
+impl Ui<'_, '_, '_, '_> {
     fn find_state_node(&mut self, key: Key) -> Option<usize> {
         let mut ix = self.state_index;
         for node in &mut self.tree.states[ix..] {
