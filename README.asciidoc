@@ -4,5 +4,6 @@
 == LiveReload
 Edit source code, live reload the App.
 
-.Live reload demostration
-video::YDt_hsz0PiY[youtube]
+++++
+<iframe width="560" height="315" src="https://www.youtube.com/embed/YDt_hsz0PiY" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+++++
