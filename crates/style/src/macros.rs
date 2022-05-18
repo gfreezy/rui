@@ -84,7 +84,7 @@ macro_rules! style_parser {
                 ))
             ),*);
 
-            let parse_attrs = nom::multi::many1(crate::utils::ws(nom::sequence::terminated(
+            let parse_attrs = nom::multi::many0(crate::utils::ws(nom::sequence::terminated(
                 crate::utils::ws(parser_tuple),
                 crate::utils::ws(nom::bytes::complete::tag(";")),
             )));

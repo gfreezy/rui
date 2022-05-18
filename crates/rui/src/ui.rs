@@ -5,6 +5,7 @@ use std::panic::Location;
 
 use crate::context::{ContextState, UpdateCtx};
 use crate::ext_event::ExtEventSink;
+use crate::id::ElementId;
 use crate::key::{Key, LocalKey};
 use crate::object::{AnyParentData, AnyRenderObject, Properties, RenderObject};
 use crate::perf::measure_time;
@@ -111,17 +112,22 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
                 index
             }
             (RenderAction::Update(_), Some(index)) | (RenderAction::Auto, Some(index)) => {
-                let node = &mut self.tree.renders[index];
-                let object = node.object.as_any().downcast_mut::<R>().expect(&format!(
-                    "Wrong node type. Expected {}",
-                    std::any::type_name::<R>()
-                ));
+                let mut guard = self.tree.renders[index].inner.borrow_mut();
+                let inner_node = &mut *guard;
+                let object = inner_node
+                    .object
+                    .as_any()
+                    .downcast_mut::<R>()
+                    .expect(&format!(
+                        "Wrong node type. Expected {}",
+                        std::any::type_name::<R>()
+                    ));
 
                 let mut ctx = UpdateCtx {
                     context_state: self.context_state,
-                    child_state: &mut node.state,
+                    child_state: &mut inner_node.state,
                 };
-                action = object.update(&mut ctx, props, &mut node.children);
+                action = object.update(&mut ctx, props, &mut inner_node.children);
                 tracing::trace!(
                     "Update render object, key: {:?}, local_key: {}, index: {}",
                     key,
@@ -139,26 +145,26 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
         };
 
         for node in &mut self.tree.renders[self.render_index..index] {
-            node.dead = true;
+            node.mark_dead();
         }
         self.render_index = index + 1;
 
-        let node = &mut self.tree.renders[index];
-        node.local_key = local_key;
+        let mut inner_node = self.tree.renders[index].inner.borrow_mut();
+        inner_node.local_key = local_key;
 
-        let changed = node.set_parent_data(self.parent_data.take());
+        let changed = inner_node.set_parent_data(self.parent_data.take());
         if changed {
-            node.request_layout();
+            inner_node.request_layout();
         }
 
         if let Some(content) = content {
-            let mut child_ui = Ui::new(&mut node.children, self.context_state);
+            let mut child_ui = Ui::new(&mut inner_node.children, self.context_state);
             content(&mut child_ui);
 
             if child_ui.cleanup_tree() {
-                node.request_layout();
+                inner_node.request_layout();
             }
-            node.merge_child_states_up();
+            inner_node.merge_child_states_up();
         }
 
         action
@@ -203,7 +209,7 @@ impl Ui<'_, '_, '_, '_> {
     fn find_render_object(&mut self, key: Key, local_key: &LocalKey) -> Option<usize> {
         let mut ix = self.render_index;
         for node in &mut self.tree.renders[ix..] {
-            if node.key == key && &node.local_key == local_key {
+            if node.key() == key && &node.local_key() == local_key {
                 return Some(ix);
             }
             ix += 1;
@@ -239,8 +245,8 @@ impl Ui<'_, '_, '_, '_> {
             renders.truncate(self.render_index);
             request_layout = true;
         }
-        if renders.iter().any(|s| s.dead) {
-            renders.retain(|c| !c.dead);
+        if renders.iter().any(|s| s.dead()) {
+            renders.retain(|c| !c.dead());
             request_layout = true;
         }
         request_layout

@@ -453,7 +453,7 @@ impl ViewportObject {
 
         let mut leading_negative_children: Vec<_> = children
             .iter_mut()
-            .take_while(|c| Some(&c.local_key) != self.center.as_ref())
+            .take_while(|c| Some(c.local_key()) != self.center)
             .collect();
         leading_negative_children.reverse();
         let leading_negative_count = leading_negative_children.len();
@@ -478,7 +478,7 @@ impl ViewportObject {
         }
         let following_children: Vec<_> = children
             .iter_mut()
-            .skip_while(|c| Some(&c.local_key) != self.center.as_ref())
+            .skip_while(|c| Some(c.local_key()) != self.center)
             .collect();
         return self.layout_child_sequence(
             ctx,
@@ -604,7 +604,7 @@ impl RenderObjectInterface for ViewportObject {
         };
 
         if self.center.is_none() {
-            self.center = children.first().map(|c| c.local_key.clone());
+            self.center = children.first().map(|c| c.local_key());
         }
 
         if self.center.is_none() {
@@ -657,7 +657,7 @@ impl RenderObjectInterface for ViewportObject {
         ctx.clip(clip);
 
         for child in children {
-            if child.geometry().visible {
+            if child.visible() {
                 child.paint(ctx);
             }
         }

@@ -55,8 +55,12 @@ impl StyleCache {
     fn init_style(&mut self, style_id: &StyleId, content: &str) -> Option<()> {
         if !self.styles.contains_key(style_id) {
             tracing::trace!("init style: {:?}", style_id);
-            let mut styles = parse_style_content(&content).unwrap();
-            self.styles.insert(style_id.clone(), styles.remove(0));
+            if content.trim().is_empty() {
+                self.styles.insert(style_id.clone(), Default::default());
+            } else {
+                let mut styles = parse_style_content(&content).unwrap();
+                self.styles.insert(style_id.clone(), styles.remove(0));
+            }
             Some(())
         } else {
             None
@@ -247,11 +251,20 @@ fn parse_styles_from_file_content(content: &str) -> Vec<Style> {
     let blocks = find_live_s_blocks(&content);
     blocks
         .into_iter()
-        .filter_map(|block| match parse_rule(&block) {
-            Ok((_, rule)) => Some(rule),
-            Err(e) => {
-                tracing::error!("parse rule error: {:?}, content: {}", e, block);
-                None
+        .filter_map(|block| {
+            if block.trim().is_empty() {
+                return Some(Default::default());
+            }
+
+            match parse_rule(&block) {
+                Ok((_, rule)) => {
+                    tracing::trace!("parse rule successfully: {}", block);
+                    Some(rule)
+                }
+                Err(e) => {
+                    tracing::error!("parse rule error: {:?}, content: {}", e, block);
+                    None
+                }
             }
         })
         .collect()
@@ -265,7 +278,10 @@ macro_rules! regex {
 }
 
 fn find_live_s_blocks(content: &str) -> Vec<String> {
-    let rexp = format!(r#"(?s){}\s*\(\s*.*?,\s*r#"(.*?)"\#\s*\)"#, LIVE_MACRO);
+    let rexp = format!(
+        r##"(?s){}\s*\(\s*.*?,\s*(?:r#"|")(.*?)(:?"#|")\s*\)"##,
+        LIVE_MACRO
+    );
     tracing::trace!("regexp: {}", rexp);
     let re = regex!(&rexp);
     re.captures_iter(content)
@@ -277,7 +293,7 @@ pub fn live_style(ui: &Ui, style_pos: &StylePos, style: &str) -> Style {
     let instance = StyleWatcher::global(ui);
     match instance.get_style(style_pos) {
         Some(s) => {
-            tracing::trace!("found style");
+            tracing::trace!("found style: {:?}", style_pos);
             s
         }
         None => {
@@ -323,11 +339,7 @@ mod tests {
                 &format!("{}", *count),
                 live_s!(
                     ui,
-                    r#".a {
-                        background: #aaa;
-                        font-size: 32.0;
-                    }
-                "#
+                    ".a { }"
                 ),
             );
             button(ui, "Increment", move || {

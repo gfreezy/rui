@@ -2,8 +2,9 @@
 
 use std::hash::Hash;
 use std::panic::Location;
+use std::rc::Rc;
 
-pub type LocalKey = String;
+pub type LocalKey = Rc<str>;
 
 pub const EMPTY_LOCAL_KEY: &str = "";
 
@@ -65,6 +66,6 @@ impl From<&'static Location<'static>> for Key {
 
 impl From<Key> for (Key, LocalKey) {
     fn from(key: Key) -> Self {
-        (key, String::new())
+        (key, "".into())
     }
 }

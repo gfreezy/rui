@@ -3,6 +3,7 @@ use style::Style;
 
 use style::alignment::Alignment;
 
+use crate::key::LocalKey;
 use crate::sliver_constraints::CacheExtent;
 use crate::ui::Ui;
 use crate::widgets::sliver_list::SliverChildDelegate;
@@ -55,9 +56,9 @@ pub fn text(ui: &mut Ui, text: &str, style: Style) {
     crate::widgets::text::Text::new(text).style(style).build(ui);
 }
 
-pub fn button(ui: &mut Ui, text: &str, click: impl FnMut() + 'static) {
+pub fn button(ui: &mut Ui, text: &str, click: impl FnMut() + 'static, style: Style) {
     crate::widgets::button::Button::new()
-        .text_align(druid_shell::piet::TextAlignment::Start)
+        .text_align(style.text_alignment)
         .labeled(ui, text, click);
 }
 
@@ -72,7 +73,7 @@ pub fn viewport(ui: &mut Ui, style: Style, content: impl FnMut(&mut Ui)) {
     .build(ui, content)
 }
 
-pub fn sliver_to_box(ui: &mut Ui, local_key: String, content: impl FnMut(&mut Ui)) {
+pub fn sliver_to_box(ui: &mut Ui, local_key: LocalKey, content: impl FnMut(&mut Ui)) {
     crate::widgets::sliver_to_box::SliverToBox.build(ui, local_key, content);
 }
 

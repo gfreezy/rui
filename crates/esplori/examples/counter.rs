@@ -28,7 +28,7 @@ fn win(ui: &mut Ui) {
                     ui,
                     r#"
                 .a {
-                    color: rgb(43, 30, 190);
+                    color: rgb(43, 130, 190);
                     font-size: 50.0;
                 }
             "#

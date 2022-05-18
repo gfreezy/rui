@@ -56,7 +56,7 @@ impl Window {
             phatom_root_id: ElementId::next(),
             root: Element::new(
                 Key::current(),
-                EMPTY_LOCAL_KEY.to_string(),
+                EMPTY_LOCAL_KEY.into(),
                 WindowContainer::new(),
             ),
             invalid: Region::EMPTY,
@@ -263,12 +263,13 @@ impl Window {
             command_queue,
             bump,
         };
-        let mut cx = Ui::new(&mut root.children, &mut context_state);
+        let mut inner_root = root.inner.borrow_mut();
+        let mut cx = Ui::new(&mut inner_root.children, &mut context_state);
         measure_time("app::update", || {
             app(&mut cx);
         });
         cx.cleanup_tree();
-        root.merge_child_states_up();
+        inner_root.merge_child_states_up();
     }
 
     pub(crate) fn invalidate_and_finalize(&mut self) {

@@ -1,9 +1,11 @@
 use std::any::type_name;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
 
+use std::rc::Rc;
 use std::time::Instant;
 use std::{
     any::Any,
@@ -108,7 +110,12 @@ impl Drop for StateNode {
     }
 }
 
+#[derive(Clone)]
 pub struct Element {
+    pub(crate) inner: Rc<RefCell<InnerElement>>,
+}
+
+pub(crate) struct InnerElement {
     pub(crate) name: &'static str,
     pub(crate) key: Key,
     pub(crate) local_key: LocalKey,
@@ -297,24 +304,159 @@ impl<'a> IntoIterator for &'a mut Children {
 
 impl Default for Element {
     fn default() -> Self {
-        Element::new(Key::current(), "".to_string(), EmptyHolderObject)
+        Element::new(Key::current(), "".into(), EmptyHolderObject)
     }
 }
 
-/// [`RenderObject`] API for `Element` nodes.
 impl Element {
     pub(crate) fn new<T>(key: Key, local_key: LocalKey, object: T) -> Self
     where
         T: AnyRenderObject,
     {
-        let id = ElementId::next();
         Element {
+            inner: Rc::new(RefCell::new(InnerElement::new(key, local_key, object))),
+        }
+    }
+
+    pub fn debug_state(&self) -> DebugState {
+        self.inner.borrow().debug_state()
+    }
+
+    pub(crate) fn merge_child_states_up(&self) {
+        self.inner.borrow_mut().merge_child_states_up()
+    }
+
+    pub fn clean_relayout_boundary(&self) {
+        self.inner.borrow_mut().clean_relayout_boundary()
+    }
+    pub fn event(&self, ctx: &mut EventCtx, event: &Event) {
+        self.inner.borrow_mut().event(ctx, event)
+    }
+
+    pub fn lifecycle(&self, ctx: &mut LifeCycleCtx, event: &LifeCycle) {
+        self.inner.borrow_mut().lifecycle(ctx, event)
+    }
+
+    pub fn paint(&self, ctx: &mut PaintCtx) {
+        self.inner.borrow_mut().paint(ctx)
+    }
+
+    pub(crate) fn request_layout(&self) {
+        self.inner.borrow_mut().request_layout()
+    }
+
+    pub(crate) fn dead(&self) -> bool {
+        self.inner.borrow().dead
+    }
+
+    pub(crate) fn mark_dead(&self) {
+        self.inner.borrow_mut().dead = true;
+    }
+
+    pub(crate) fn local_key(&self) -> LocalKey {
+        self.inner.borrow().local_key.clone()
+    }
+
+    pub(crate) fn set_local_key(&self, local_key: LocalKey) {
+        self.inner.borrow_mut().local_key = local_key;
+    }
+
+    pub(crate) fn key(&self) -> Key {
+        self.inner.borrow().key
+    }
+
+    #[track_caller]
+    pub(crate) fn set_parent_data(&self, parent_data: Option<Box<dyn AnyParentData>>) -> bool {
+        self.inner.borrow_mut().set_parent_data(parent_data)
+    }
+    pub fn dry_layout_box(&mut self, ctx: &mut LayoutCtx, c: &BoxConstraints) -> Size {
+        self.inner.borrow_mut().dry_layout_box(ctx, c)
+    }
+
+    pub fn layout_box(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        bc: &BoxConstraints,
+        parent_use_size: bool,
+    ) -> Size {
+        self.inner.borrow_mut().layout_box(ctx, bc, parent_use_size)
+    }
+
+    pub fn layout_sliver(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        sc: &SliverConstraints,
+        parent_use_size: bool,
+    ) -> SliverGeometry {
+        let mut inner = self.inner.borrow_mut();
+        let geom = inner.layout_sliver(ctx, sc, parent_use_size);
+        inner.set_visible(geom.visible);
+        geom
+    }
+
+    pub fn set_origin(&mut self, ctx: &mut LayoutCtx, origin: Point) {
+        self.inner.borrow_mut().set_origin(ctx, origin)
+    }
+
+    pub(crate) fn parent_data<T: 'static, R, F: FnOnce(&T) -> R>(&self, map: F) -> Option<R> {
+        self.inner.borrow().parent_data().map(map)
+    }
+
+    pub(crate) fn parent_data_mut<T: 'static, R, F: FnOnce(&mut T) -> R>(
+        &self,
+        map: F,
+    ) -> Option<R> {
+        self.inner.borrow_mut().parent_data_mut().map(map)
+    }
+
+    pub fn size(&self) -> Size {
+        self.inner.borrow().size()
+    }
+
+    pub(crate) fn take_parent_data<T: 'static>(&mut self) -> Option<Box<T>> {
+        self.inner.borrow_mut().take_parent_data()
+    }
+
+    pub(crate) fn set_visible(&mut self, visible: bool) {
+        self.inner.borrow_mut().set_visible(visible)
+    }
+
+    pub(crate) fn visible(&mut self) -> bool {
+        self.inner.borrow().visible()
+    }
+
+    pub fn paint_rect(&self) -> Rect {
+        self.inner.borrow().paint_rect()
+    }
+    pub fn layout_rect(&self) -> Rect {
+        self.inner.borrow().layout_rect()
+    }
+    pub fn set_viewport_offset(&mut self, offset: Vec2) {
+        self.inner.borrow_mut().set_viewport_offset(offset)
+    }
+
+    pub fn set_paint_insets(&mut self, insets: Insets) {
+        self.inner.borrow_mut().set_paint_insets(insets)
+    }
+
+    pub(crate) fn needs_layout(&self) -> bool {
+        self.inner.borrow().needs_layout()
+    }
+}
+
+/// [`RenderObject`] API for `Element` nodes.
+impl InnerElement {
+    pub(crate) fn new<T>(key: Key, local_key: LocalKey, object: T) -> Self
+    where
+        T: AnyRenderObject,
+    {
+        InnerElement {
             name: type_name::<T>(),
             key,
             local_key,
             object: Box::new(object),
             children: Children::new(),
-            state: ElementState::new(id, None),
+            state: ElementState::new(ElementId::next(), None),
             dead: false,
         }
     }
@@ -345,7 +487,7 @@ impl Element {
         );
         map.insert("size".to_string(), format!("{:?}", self.state.size));
         if !self.local_key.is_empty() {
-            map.insert("key".to_string(), self.local_key.clone());
+            map.insert("key".to_string(), self.local_key.to_string());
         }
         let custom_debug_state = self.object.debug_state();
         map.extend(custom_debug_state.into_iter());
@@ -614,7 +756,7 @@ impl ElementState {
 }
 
 /// [`RenderObject`] API for `Element` nodes.
-impl Element {
+impl InnerElement {
     pub fn event(&mut self, ctx: &mut EventCtx, event: &Event) {
         let object_name = self.object.name();
         let instant = Instant::now();
@@ -640,7 +782,7 @@ impl Element {
                 true
             }
             Event::MouseDown(mouse_event) => {
-                Element::set_hot_state(
+                Self::set_hot_state(
                     self.object.as_mut(),
                     &mut self.state,
                     &mut self.children,
@@ -658,7 +800,7 @@ impl Element {
                 }
             }
             Event::MouseUp(mouse_event) => {
-                Element::set_hot_state(
+                Self::set_hot_state(
                     self.object.as_mut(),
                     &mut self.state,
                     &mut self.children,
@@ -676,7 +818,7 @@ impl Element {
                 }
             }
             Event::MouseMove(mouse_event) => {
-                let hot_changed = Element::set_hot_state(
+                let hot_changed = Self::set_hot_state(
                     self.object.as_mut(),
                     &mut self.state,
                     &mut self.children,
@@ -694,7 +836,7 @@ impl Element {
                 }
             }
             Event::Wheel(mouse_event) => {
-                Element::set_hot_state(
+                Self::set_hot_state(
                     &mut *self.object,
                     &mut self.state,
                     &mut self.children,
@@ -922,10 +1064,7 @@ impl Element {
         //     instant.elapsed().as_micros()
         // );
     }
-}
 
-/// Public API for child nodes.
-impl Element {
     pub fn as_any(&mut self) -> &mut dyn Any {
         self.object.as_any()
     }
@@ -1035,6 +1174,7 @@ impl Element {
     pub fn name(&self) -> &'static str {
         self.name
     }
+
     /// Determines if the provided `mouse_pos` is inside `rect`
     /// and if so updates the hot state and sends `LifeCycle::HotChanged`.
     ///
@@ -1133,7 +1273,7 @@ impl Element {
 
     pub(crate) fn merge_child_states_up(&mut self) {
         for child in &mut self.children {
-            self.state.merge_up(&mut child.state);
+            self.state.merge_up(&mut child.inner.borrow_mut().state);
         }
     }
 }

@@ -218,8 +218,7 @@ impl RenderFlex {
 
                     // get child fit
                     let child_fit = child
-                        .parent_data::<FlexParentData>()
-                        .map(|d| d.fit)
+                        .parent_data::<FlexParentData, _, _>(|p| p.fit)
                         .unwrap_or(FlexFit::Loose);
 
                     let min_child_extent = match child_fit {
@@ -277,8 +276,7 @@ impl RenderFlex {
 
     fn get_flex(&self, child: &Element) -> f64 {
         child
-            .parent_data::<FlexParentData>()
-            .map(|d| d.flex)
+            .parent_data::<FlexParentData, _, _>(|p| p.flex)
             .unwrap_or(1.)
     }
 }

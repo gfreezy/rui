@@ -29,6 +29,7 @@ use rui::widgets::sliver_list::SliverChildDelegate;
 use style::alignment::Alignment;
 
 use rui::app::AppLauncher;
+use rui::prelude::*;
 use rui::ui::Ui;
 use rui::widgets::button::Button;
 
@@ -37,8 +38,8 @@ use rui::widgets::text::Text;
 fn inspect(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
     let selected = ui.state_node(|| ElementId::ZERO);
 
-    row(ui, |ui| {
-        viewport(ui, AxisDirection::Down, AxisDirection::Right, |ui| {
+    row(ui, live_s!(ui, ""), |ui| {
+        viewport(ui, live_s!(ui, ""), |ui| {
             let mut expanded = ui.state_node(|| ExpandedState::default());
             let root_state = snapshot.lock().unwrap();
             let mut data = inspect_state::InspectDebugState::new(&root_state.debug_state);
@@ -70,27 +71,42 @@ fn inspect(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
 
             let delegate = VecSliverListDelegate {
                 data: rows,
-                key_fn: |(id, row)| id.to_string(),
+                key_fn: |(id, row)| id.to_string().into(),
                 content: move |ui, &(id, ref row)| {
-                    button(ui, &row, move || {
-                        selected.set(id);
-                        expanded.toggle(id);
-                    });
+                    button(
+                        ui,
+                        &row,
+                        move || {
+                            selected.set(id);
+                            expanded.toggle(id);
+                        },
+                        live_s!(ui, ""),
+                    );
                 },
             };
 
             sliver_list(ui, delegate);
         });
 
-        viewport(ui, AxisDirection::Down, AxisDirection::Right, |ui| {
+        viewport(ui, live_s!(ui, ""), |ui| {
             if let Some(debug_state) = snapshot
                 .lock()
                 .unwrap()
                 .debug_state
                 .debug_state_for_id(*selected)
             {
-                sliver_to_box(ui, "center13".to_string(), |ui| {
-                    text(ui, &debug_state.to_string(), Default::default());
+                sliver_to_box(ui, "center13".into(), |ui| {
+                    text(
+                        ui,
+                        &debug_state.to_string(),
+                        live_s!(
+                            ui,
+                            r#".s {
+                            font-size: 18;
+                            color: rgb(10, 20, 30);
+                        }"#
+                        ),
+                    );
                 });
             }
         });
@@ -98,128 +114,64 @@ fn inspect(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
 }
 
 fn win(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
-    column(ui, |ui| {
-        expand(ui, |ui| {
-            let style = live_s!(ui, ".text");
-            text(ui, "haha", style);
-        });
-
-        expand(ui, |ui| {
-            viewport(ui, AxisDirection::Down, AxisDirection::Right, |ui| {
-                for i in 0..10usize {
-                    sliver_to_box(ui, i.to_string(), |ui| {
-                        let style = live_s!(ui, ".text");
-                        text(ui, &format!("hello{}", i), style);
-                    });
-                }
-                sliver_list(
+    column(
+        ui,
+        live_s!(
+            ui,
+            r#".style {
+                axis: horizontal;
+                main-axis-alignment: center;
+                cross-axis-alignment: center;
+            }
+        "#
+        ),
+        |ui| {
+            expand(ui, |ui| {
+                text(
                     ui,
-                    Delegate {
-                        center: EMPTY_LOCAL_KEY.to_string(),
-                    },
-                )
-            })
-        });
-    });
+                    "haha",
+                    live_s!(
+                        ui,
+                        r#".text {
+                            font-size: 30;
+                 color: rgb(0, 10, 10);
+                }"#
+                    ),
+                );
+            });
+
+            expand(ui, |ui| {
+                viewport(ui, live_s!(ui, ""), |ui| {
+                    for i in 0..10usize {
+                        sliver_to_box(ui, i.to_string().into(), |ui| {
+                            let style = live_s!(
+                                ui,
+                                r#"
+                            .text {
+                            font-size: 30;
+                            color: rgb(43, 10, 10);
+                        }"#
+                            );
+                            text(ui, &format!("hello{}", i), style);
+                        });
+                    }
+                    sliver_list(
+                        ui,
+                        Delegate {
+                            center: EMPTY_LOCAL_KEY.into(),
+                        },
+                    )
+                })
+            });
+        },
+    );
 
     snapshot.lock().unwrap().debug_state = ui.tree[0].debug_state();
 }
 
-fn flex(ui: &mut Ui, style_name: &str, content: impl FnMut(&mut Ui)) {
-    let style = live_s!(ui, style_name);
-    widgets::flex::Flex::new(
-        style.axis,
-        style.main_axis_size,
-        style.main_axis_alignment,
-        style.cross_axis_alignment,
-        style.text_direction,
-        style.vertical_direction,
-    )
-    .build(ui, content);
-}
-
-fn column(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
-    widgets::flex::Flex::new(
-        style::axis::Axis::Vertical,
-        style::layout::MainAxisSize::Min,
-        style::layout::MainAxisAlignment::Start,
-        style::layout::CrossAxisAlignment::Center,
-        style::layout::TextDirection::Ltr,
-        style::layout::VerticalDirection::Down,
-    )
-    .build(ui, content);
-}
-
-fn row(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
-    widgets::flex::Flex::new(
-        style::axis::Axis::Horizontal,
-        style::layout::MainAxisSize::Min,
-        style::layout::MainAxisAlignment::Start,
-        style::layout::CrossAxisAlignment::Center,
-        style::layout::TextDirection::Ltr,
-        style::layout::VerticalDirection::Down,
-    )
-    .build(ui, content);
-}
-
-fn debug(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
-    rui::widgets::debug::Debug.build(ui, content);
-}
-
-fn flexible(ui: &mut Ui, style_name: &str, content: impl FnMut(&mut Ui)) {
-    let style = live_s!(ui, style_name);
-    let flex = style.flex.value();
-    let flex_fit = style.flex_fit;
-    rui::widgets::flex::Flexible::new(flex, flex_fit).build(ui, content);
-}
-
-fn expand(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
-    rui::widgets::flex::Flexible::new(1.0, style::layout::FlexFit::Tight).build(ui, content);
-}
-
-fn align(ui: &mut Ui, content: impl FnMut(&mut Ui)) {
-    rui::widgets::align::Align::new(
-        Alignment::bottom_center(),
-        None,
-        None,
-        style::layout::TextDirection::Ltr,
-    )
-    .build(ui, content);
-}
-
-fn text(ui: &mut Ui, text: &str, style: Style) {
-    Text::new(text).style(style).build(ui);
-}
-
-fn button(ui: &mut Ui, text: &str, click: impl FnMut() + 'static) {
-    Button::new()
-        .text_align(druid_shell::piet::TextAlignment::Start)
-        .labeled(ui, text, click);
-}
-
-fn viewport(
-    ui: &mut Ui,
-    axis_direction: AxisDirection,
-    cross_axis_direction: AxisDirection,
-    content: impl FnMut(&mut Ui),
-) {
-    widgets::viewport::Viewport::new(
-        axis_direction,
-        cross_axis_direction,
-        0.0,
-        None,
-        CacheExtent::Viewport(1.),
-    )
-    .build(ui, content)
-}
-
-fn sliver_to_box(ui: &mut Ui, local_key: String, content: impl FnMut(&mut Ui)) {
-    widgets::sliver_to_box::SliverToBox.build(ui, local_key, content);
-}
-
 struct VecSliverListDelegate<T: 'static, C: FnMut(&mut Ui, &T) + 'static> {
     data: Vec<T>,
-    key_fn: fn(&T) -> String,
+    key_fn: fn(&T) -> LocalKey,
     content: C,
 }
 
@@ -270,7 +222,7 @@ impl<T: PartialEq + Debug + 'static, C: FnMut(&mut Ui, &T) + 'static> SliverChil
 }
 
 struct Delegate {
-    center: String,
+    center: LocalKey,
 }
 
 impl SliverChildDelegate for Delegate {
@@ -278,14 +230,12 @@ impl SliverChildDelegate for Delegate {
         self
     }
 
-    fn key(&self, index: usize) -> String {
-        index.to_string()
+    fn key(&self, index: usize) -> LocalKey {
+        index.to_string().into()
     }
 
     fn build(&mut self, ui: &mut Ui, index: usize) {
-        // tracing::debug!("build in delegate: {index}");
-        let _style = live_s!(ui, ".inspect-text");
-        button(ui, &format!("number {index}"), || {});
+        button(ui, &format!("number {index}"), || {}, live_s!(ui, ""));
     }
 
     fn estimated_count(&self) -> Option<usize> {
@@ -313,10 +263,6 @@ impl SliverChildDelegate for Delegate {
     }
 
     fn did_finish_layout(&self, _first_index: usize, _last_index: usize) {}
-}
-
-fn sliver_list(ui: &mut Ui, delegate: impl SliverChildDelegate + 'static) {
-    widgets::sliver_list::SliverList::new(Box::new(delegate)).build(ui)
 }
 
 #[derive(Debug)]
