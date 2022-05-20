@@ -19,7 +19,7 @@ use rui::menu::mac::menu_bar;
 use rui::live_style::live_style;
 
 use rui::sliver_constraints::CacheExtent;
-use rui::tree::State;
+use rui::tree::StateHandle;
 use rui::{live_s, widgets};
 use style::layout::AxisDirection;
 use style::Style;
@@ -44,12 +44,12 @@ fn inspect(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
             let root_state = snapshot.lock().unwrap();
             let mut data = inspect_state::InspectDebugState::new(&root_state.debug_state);
             let rows = data.flatten(
-                |debug_state, _| expanded.expanded(debug_state.id),
+                |debug_state, _| expanded.update(|e| e.expanded(debug_state.id)),
                 |debug_state, level| {
                     let ident = level * 4;
                     let symbol = match (
                         debug_state.has_children(),
-                        expanded.expanded(debug_state.id),
+                        expanded.update(|e| e.expanded(debug_state.id)),
                     ) {
                         (true, true) => '-',
                         (true, false) => '+',
@@ -78,7 +78,7 @@ fn inspect(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
                         &row,
                         move || {
                             selected.set(id);
-                            expanded.toggle(id);
+                            expanded.update(|e| e.toggle(id));
                         },
                         live_s!(ui, ""),
                     );
@@ -93,7 +93,7 @@ fn inspect(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
                 .lock()
                 .unwrap()
                 .debug_state
-                .debug_state_for_id(*selected)
+                .debug_state_for_id(ui[selected])
             {
                 sliver_to_box(ui, "center13".into(), |ui| {
                     text(

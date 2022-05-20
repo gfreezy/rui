@@ -21,7 +21,9 @@ pub trait RenderObject<Props>: RenderObjectInterface {
     type Action: Default;
 
     fn create(props: Props) -> Self;
-    fn update(&mut self, ctx: &mut UpdateCtx, props: Props) -> Self::Action;
+    fn update(&mut self, ctx: &mut UpdateCtx, props: Props) -> Self::Action {
+        Default::default()
+    }
 }
 
 pub trait RenderObjectInterface {

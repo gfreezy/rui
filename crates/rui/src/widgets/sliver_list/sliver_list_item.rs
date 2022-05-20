@@ -38,8 +38,6 @@ impl RenderObject<SliverListItem> for SliverListItemObject {
     fn create(props: SliverListItem) -> Self {
         SliverListItemObject
     }
-
-    fn update(&mut self, ctx: &mut UpdateCtx, props: SliverListItem) {}
 }
 
 impl RenderObjectInterface for SliverListItemObject {

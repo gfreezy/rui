@@ -28,6 +28,7 @@ use crate::key::{Key, LocalKey};
 use crate::lifecycle::{InternalLifeCycle, LifeCycle};
 use crate::object::{AnyParentData, AnyRenderObject};
 use crate::sliver_constraints::{SliverConstraints, SliverGeometry};
+use crate::ui::Ui;
 use crate::widgets::empty_holder::EmptyHolderObject;
 
 #[derive(Default)]
@@ -44,12 +45,60 @@ impl std::fmt::Debug for Children {
     }
 }
 
-pub struct State<T: 'static> {
+struct Subscriber<T> {
+    element: Weak<T>,
+    callback: Box<dyn FnMut()>,
+}
+
+pub(crate) struct GenericState<T, El> {
+    pub(crate) val: T,
+    subscribers: Vec<Subscriber<El>>,
+}
+
+impl<T, El> GenericState<T, El> {
+    fn set(&mut self, val: T) {
+        self.val = val;
+        self.notify_subscribers();
+    }
+
+    fn get(&self) -> &T {
+        &self.val
+    }
+
+    fn update<R>(&mut self, updater: impl FnOnce(&mut T) -> R) -> R {
+        let ret = updater(&mut self.val);
+        self.notify_subscribers();
+        ret
+    }
+
+    fn add_subscriber(&mut self, element: Weak<El>, callback: Box<dyn FnMut()>) {
+        self.subscribers.push(Subscriber { element, callback });
+    }
+
+    fn notify_subscribers(&mut self) {
+        self.subscribers.retain_mut(|subscriber| {
+            if let Some(element) = subscriber.element.upgrade() {
+                (subscriber.callback)();
+                true
+            } else {
+                false
+            }
+        });
+    }
+
+    fn clear_subscribers(&mut self) {
+        self.subscribers.clear();
+    }
+}
+
+type State<T> = GenericState<T, RefCell<InnerElement>>;
+
+pub struct StateHandle<T: 'static> {
     pub(crate) ptr: *mut dyn Any,
     phaton: PhantomData<T>,
 }
 
-impl<T> Clone for State<T> {
+impl<T> Clone for StateHandle<T> {
     fn clone(&self) -> Self {
         Self {
             ptr: self.ptr.clone(),
@@ -58,41 +107,42 @@ impl<T> Clone for State<T> {
     }
 }
 
-impl<T> Copy for State<T> {}
+impl<T> Copy for StateHandle<T> {}
 
-impl<T> State<T> {
-    pub(crate) fn new(raw_obx: *mut dyn Any) -> State<T> {
-        State {
+impl<T> StateHandle<T> {
+    pub(crate) fn new(raw_obx: *mut dyn Any) -> StateHandle<T> {
+        StateHandle {
             ptr: raw_obx,
             phaton: PhantomData,
         }
     }
 
+    pub(crate) fn get<'ui>(&self, ui: &Ui) -> &'ui T {
+        let v = unsafe { &mut *self.ptr };
+        let state = v.downcast_mut::<State<T>>().unwrap();
+        if let Some(parent_element) = ui.parent_element() {
+            state.add_subscriber(
+                parent_element.clone(),
+                Box::new(move || {
+                    if let Some(p) = parent_element.upgrade() {
+                        p.borrow_mut().request_update();
+                    }
+                }),
+            );
+        }
+        state.get()
+    }
+
     pub fn set(&self, val: T) {
         let v = unsafe { &mut *self.ptr };
-        *v.downcast_mut::<T>().unwrap() = val;
+        let state = v.downcast_mut::<State<T>>().unwrap();
+        state.set(val);
     }
 
-    pub fn update(&self, updater: impl FnOnce(&mut T)) {
+    pub fn update<R>(&self, updater: impl FnOnce(&mut T) -> R) -> R {
         let v = unsafe { &mut *self.ptr };
-        let old = v.downcast_mut::<T>().unwrap();
-        updater(old);
-    }
-}
-
-impl<T: 'static> Deref for State<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        let v = unsafe { &mut *self.ptr };
-        v.downcast_mut::<T>().unwrap()
-    }
-}
-
-impl<T: 'static> DerefMut for State<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        let v = unsafe { &mut *self.ptr };
-        v.downcast_mut::<T>().unwrap()
+        let old = v.downcast_mut::<State<T>>().unwrap();
+        old.update(updater)
     }
 }
 
@@ -1146,6 +1196,10 @@ impl InnerElement {
     }
 
     pub fn request_update(&mut self) {
+        if self.state.request_update {
+            return;
+        }
+
         self.state.request_update = true;
         if let Some(parent) = self.parent.as_ref().and_then(|p| p.upgrade()) {
             parent.borrow_mut().request_update();

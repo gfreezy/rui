@@ -21,6 +21,22 @@ fn win(ui: &mut Ui) {
     "#
         ),
         |ui| {
+            ui.memoize(ui, *count, |ui, count: usize| {
+                text(
+                    ui,
+                    &format!("{}", count),
+                    live_s!(
+                        ui,
+                        r#"
+                    .a {
+                        color: rgb(43, 130, 190);
+                        font-size: 50.0;
+                    }
+                "#
+                    ),
+                );
+            });
+
             text(
                 ui,
                 &format!("{}", *count),

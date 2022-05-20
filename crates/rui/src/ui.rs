@@ -11,7 +11,7 @@ use crate::id::ElementId;
 use crate::key::{Key, LocalKey};
 use crate::object::{AnyParentData, AnyRenderObject, Properties, RenderObject};
 use crate::perf::measure_time;
-use crate::tree::{Children, Element, InnerElement, State, StateNode};
+use crate::tree::{Children, Element, InnerElement, StateHandle, StateNode};
 
 pub struct Ui<'a, 'b, 'c, 'c2> {
     pub tree: &'a mut Children,
@@ -48,12 +48,16 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
         self.context_state.bump.alloc(val)
     }
 
+    pub(crate) fn parent_element(&self) -> Option<Weak<RefCell<InnerElement>>> {
+        self.parent_element.clone()
+    }
+
     pub fn set_parent_data(&mut self, parent_data: Option<Box<dyn AnyParentData>>) {
         self.parent_data = parent_data;
     }
 
     #[track_caller]
-    pub fn state_node<T: 'static>(&mut self, init: impl FnOnce() -> T) -> State<T> {
+    pub fn state_node<T: 'static>(&mut self, init: impl FnOnce() -> T) -> StateHandle<T> {
         let key = Location::caller().into();
         let idx = self.find_state_node(key);
         let index = match idx {
@@ -71,7 +75,7 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
         let state = &self.tree.states[index].state;
         let raw_box: *mut dyn Any = unsafe { &mut **state };
 
-        State::new(raw_box)
+        StateHandle::new(raw_box)
     }
 
     pub fn render_object_pro<Props, R, N>(
@@ -195,6 +199,21 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
         N: FnOnce(&mut Ui),
     {
         self.render_object_pro(key, props, RenderAction::Auto, None, Some(content))
+    }
+
+    pub fn memoize<Params: PartialEq + Clone, Callback: FnOnce(&Ui, Params)>(
+        &mut self,
+        prams: Params,
+        callback: Callback,
+    ) {
+    }
+}
+
+impl<T> Index<StateHandle<T>> for Ui<'_, '_, '_, '_> {
+    type Output = T;
+
+    fn index(&self, index: StateHandle<T>) -> &Self::Output {
+        index.get(self)
     }
 }
 
