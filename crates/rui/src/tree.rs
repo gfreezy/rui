@@ -133,7 +133,8 @@ impl<T> StateHandle<T> {
                 parent_element.clone(),
                 Box::new(move || {
                     if let Some(p) = parent_element.upgrade() {
-                        // p.borrow_mut().request_update();
+                        // todo: hittest to collect all element, then call `event`
+                        p.borrow_mut().request_update();
                     }
                 }),
             );

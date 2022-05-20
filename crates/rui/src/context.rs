@@ -317,6 +317,19 @@ impl EventCtx<'_, '_, '_, '_> {
     pub fn is_handled(&self) -> bool {
         self.is_handled
     }
+
+    /// Request an update cycle.
+    ///
+    /// After this, `update` will be called on the widget in the next update cycle, even
+    /// if there's not a data change.
+    ///
+    /// The use case for this method is when a container widget synthesizes data for its
+    /// children. This is appropriate in specialized cases, but before reaching for this
+    /// method, consider whether it might be better to refactor to be more idiomatic, in
+    /// particular to make that data available in the app state.
+    pub fn request_update(&mut self) {
+        self.child_state.request_update = true;
+    }
 }
 
 impl<'d> Deref for PaintCtx<'_, '_, '_, '_, 'd, '_> {
