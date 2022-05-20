@@ -1,6 +1,7 @@
 use std::any::Any;
 
 use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 use std::ops::Index;
 use std::panic::Location;
 use std::rc::{Rc, Weak};
@@ -11,14 +12,15 @@ use crate::id::ElementId;
 use crate::key::{Key, LocalKey};
 use crate::object::{AnyParentData, AnyRenderObject, Properties, RenderObject};
 use crate::perf::measure_time;
-use crate::tree::{Children, Element, InnerElement, StateHandle, StateNode};
+use crate::tree::{Children, Element, InnerElement, Meoizee, State, StateHandle, StateNode};
 
 pub struct Ui<'a, 'b, 'c, 'c2> {
-    pub tree: &'a mut Children,
+    tree: &'a mut Children,
     parent_element: Option<Weak<RefCell<InnerElement>>>,
     context_state: &'b mut ContextState<'c, 'c2>,
     state_index: usize,
     render_index: usize,
+    memoizee_index: usize,
     parent_data: Option<Box<dyn AnyParentData>>,
 }
 
@@ -40,8 +42,24 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
             context_state,
             state_index: 0,
             render_index: 0,
+            memoizee_index: 0,
             parent_data: None,
         }
+    }
+
+    pub fn tree(&self) -> &Children {
+        &self.tree
+    }
+
+    pub fn next_element_needs_update(&self) -> bool {
+        self.tree
+            .get(self.render_index)
+            .map(|e| e.needs_update())
+            .unwrap_or(true)
+    }
+
+    pub fn skip_next_element(&mut self) {
+        self.render_index += 1;
     }
 
     fn alloc<T>(&mut self, val: T) -> &mut T {
@@ -62,7 +80,7 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
         let idx = self.find_state_node(key);
         let index = match idx {
             None => {
-                let init_value: *mut dyn Any = self.alloc(init());
+                let init_value: *mut dyn Any = self.alloc(State::new(init()));
                 self.insert_state_node(key, init_value)
             }
             Some(index) => index,
@@ -72,10 +90,52 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
         }
         self.state_index = index + 1;
 
-        let state = &self.tree.states[index].state;
-        let raw_box: *mut dyn Any = unsafe { &mut **state };
+        let state = self.tree.states[index].state;
 
-        StateHandle::new(raw_box)
+        StateHandle::new(state)
+    }
+
+    #[track_caller]
+    pub fn memoize<Params: PartialEq + Clone + 'static, Content: FnOnce(&mut Ui)>(
+        &mut self,
+        component: fn(&mut Ui, Params, Content),
+        params: Params,
+        content: Content,
+    ) {
+        let key = Location::caller().into();
+        let mut params_changed = false;
+        let idx = self.find_memoizee(key);
+        let index = match idx {
+            None => {
+                params_changed = true;
+                self.insert_memoizee(key, Box::new(params.clone()))
+            }
+            Some(index) => {
+                if let Some(old_params) = self.tree.memoizees[index].val.downcast_mut::<Params>() {
+                    if old_params != &params {
+                        params_changed = true;
+                        *old_params = params.clone();
+                    }
+                }
+                index
+            }
+        };
+        for node in &mut self.tree.memoizees[self.memoizee_index..index] {
+            node.dead = true;
+        }
+        self.memoizee_index = index + 1;
+
+        if params_changed || self.next_element_needs_update() {
+            println!(
+                "params_changed: {params_changed}, next element needs update: {needs_update}",
+                params_changed = params_changed,
+                needs_update = self.next_element_needs_update()
+            );
+            component(self, params, content);
+        } else {
+            println!("skip");
+            self.skip_next_element();
+        }
     }
 
     pub fn render_object_pro<Props, R, N>(
@@ -200,13 +260,6 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
     {
         self.render_object_pro(key, props, RenderAction::Auto, None, Some(content))
     }
-
-    pub fn memoize<Params: PartialEq + Clone, Callback: FnOnce(&Ui, Params)>(
-        &mut self,
-        prams: Params,
-        callback: Callback,
-    ) {
-    }
 }
 
 impl<T> Index<StateHandle<T>> for Ui<'_, '_, '_, '_> {
@@ -220,6 +273,30 @@ impl<T> Index<StateHandle<T>> for Ui<'_, '_, '_, '_> {
 impl Ui<'_, '_, '_, '_> {
     fn parent(&self) -> Option<Weak<RefCell<InnerElement>>> {
         self.parent_element.clone()
+    }
+
+    fn find_memoizee(&mut self, key: Key) -> Option<usize> {
+        let mut ix = self.memoizee_index;
+        for node in &mut self.tree.memoizees[ix..] {
+            if node.key == key {
+                return Some(ix);
+            }
+            ix += 1;
+        }
+        None
+    }
+
+    fn insert_memoizee(&mut self, key: Key, meoizee: Box<dyn Any>) -> usize {
+        let dead = false;
+        self.tree.memoizees.insert(
+            self.memoizee_index,
+            Meoizee {
+                key,
+                val: meoizee,
+                dead,
+            },
+        );
+        self.memoizee_index
     }
 
     fn find_state_node(&mut self, key: Key) -> Option<usize> {
@@ -270,14 +347,8 @@ impl Ui<'_, '_, '_, '_> {
         let mut request_layout = false;
         let states = &mut self.tree.states;
         let renders = &mut self.tree.renders;
-        if states.len() > self.state_index {
-            states.truncate(self.state_index);
-            request_layout = true;
-        }
-        if states.iter().any(|s| s.dead) {
-            states.retain(|s| !s.dead);
-            request_layout = true;
-        }
+        let meoizees = &mut self.tree.memoizees;
+
         if renders.len() > self.render_index {
             renders.truncate(self.render_index);
             request_layout = true;
@@ -286,6 +357,13 @@ impl Ui<'_, '_, '_, '_> {
             renders.retain(|c| !c.dead());
             request_layout = true;
         }
+
+        states.truncate(self.state_index);
+        states.retain(|s| !s.dead);
+
+        meoizees.truncate(self.memoizee_index);
+        meoizees.retain(|c| !c.dead);
+
         request_layout
     }
 

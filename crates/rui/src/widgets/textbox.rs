@@ -250,7 +250,7 @@ impl RenderObjectInterface for TextBoxObject {
                         if let Some(edit) = self.input_handler.handle_event(k_e) {
                             self.suppress_adjust_hscroll = matches!(edit, EditAction::SelectAll);
                             self.editor.do_edit(edit, &mut new_text);
-                            ctx.request_update();
+                            // ctx.request_update();
                             ctx.request_paint();
                         }
                     }

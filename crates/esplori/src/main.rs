@@ -114,59 +114,60 @@ fn inspect(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
 }
 
 fn win(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
-    column(
-        ui,
-        live_s!(
-            ui,
-            r#".style {
-                axis: horizontal;
-                main-axis-alignment: center;
-                cross-axis-alignment: center;
-            }
-        "#
-        ),
-        |ui| {
-            expand(ui, |ui| {
-                text(
-                    ui,
-                    "haha",
-                    live_s!(
-                        ui,
-                        r#".text {
-                            font-size: 30;
-                 color: rgb(0, 10, 10);
-                }"#
-                    ),
-                );
-            });
+    // column(
+    //     ui,
+    //     live_s!(
+    //         ui,
+    //         r#".style {
+    //             axis: horizontal;
+    //             main-axis-alignment: center;
+    //             cross-axis-alignment: center;
+    //         }
+    //     "#
+    //     ),
+    //     |ui| {
+    //         expand(ui, |ui| {
+    //             text(
+    //                 ui,
+    //                 "haha",
+    //                 live_s!(
+    //                     ui,
+    //                     r#".text {
+    //                         font-size: 30;
+    //              color: rgb(0, 10, 10);
+    //             }"#
+    //                 ),
+    //             );
+    //         });
 
-            expand(ui, |ui| {
-                viewport(ui, live_s!(ui, ""), |ui| {
-                    for i in 0..10usize {
-                        sliver_to_box(ui, i.to_string().into(), |ui| {
-                            let style = live_s!(
-                                ui,
-                                r#"
-                            .text {
-                            font-size: 30;
-                            color: rgb(43, 10, 10);
-                        }"#
-                            );
-                            text(ui, &format!("hello{}", i), style);
-                        });
-                    }
-                    sliver_list(
-                        ui,
-                        Delegate {
-                            center: EMPTY_LOCAL_KEY.into(),
-                        },
-                    )
-                })
-            });
-        },
-    );
+    //         expand(ui, |ui| {
+    //             viewport(ui, live_s!(ui, ""), |ui| {
+    //                 for i in 0..10usize {
+    //                     sliver_to_box(ui, i.to_string().into(), |ui| {
+    //                         let style = live_s!(
+    //                             ui,
+    //                             r#"
+    //                         .text {
+    //                         font-size: 30;
+    //                         color: rgb(43, 10, 10);
+    //                     }"#
+    //                         );
+    //                         text(ui, &format!("hello{}", i), style);
+    //                     });
+    //                 }
+    //                 sliver_list(
+    //                     ui,
+    //                     Delegate {
+    //                         center: EMPTY_LOCAL_KEY.into(),
+    //                     },
+    //                 )
+    //             })
+    //         });
+    //     },
+    // );
+    win2(ui);
 
-    snapshot.lock().unwrap().debug_state = ui.tree[0].debug_state();
+    snapshot.lock().unwrap().debug_state = ui.tree()[0].debug_state();
 }
 
 struct VecSliverListDelegate<T: 'static, C: FnMut(&mut Ui, &T) + 'static> {
@@ -268,6 +269,65 @@ impl SliverChildDelegate for Delegate {
 #[derive(Debug)]
 struct Snapshot {
     debug_state: DebugState,
+}
+
+fn win2(ui: &mut Ui) {
+    let count = ui.state_node(|| 0usize);
+    flex(
+        ui,
+        live_s!(
+            ui,
+            r#"
+    .counter {
+        axis: horizontal;
+        main-axis-alignment: center;
+        cross-axis-alignment: center;
+    }
+    "#
+        ),
+        |ui| {
+            ui.memoize(comp, ui[count], |_| {});
+
+            text(
+                ui,
+                &format!("{}", ui[count]),
+                live_s!(
+                    ui,
+                    r#"
+                .a {
+                    color: rgb(43, 130, 190);
+                    font-size: 50.0;
+                }
+            "#
+                ),
+            );
+            button(
+                ui,
+                "Increment",
+                move || {
+                    count.update(|c| *c += 1);
+                },
+                live_s!(ui, ""),
+            );
+        },
+    );
+}
+
+fn comp(ui: &mut Ui, count: usize, content: impl FnOnce(&mut Ui)) {
+    println!("comp");
+    text(
+        ui,
+        &format!("{}", count),
+        live_s!(
+            ui,
+            r#"
+    .a {
+        color: rgb(43, 130, 190);
+        font-size: 50.0;
+    }
+"#
+        ),
+    );
 }
 
 fn main() {

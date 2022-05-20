@@ -35,6 +35,7 @@ use crate::widgets::empty_holder::EmptyHolderObject;
 pub struct Children {
     pub(crate) states: Vec<StateNode>,
     pub(crate) renders: Vec<Element>,
+    pub(crate) memoizees: Vec<Meoizee>,
 }
 
 impl std::fmt::Debug for Children {
@@ -56,6 +57,13 @@ pub(crate) struct GenericState<T, El> {
 }
 
 impl<T, El> GenericState<T, El> {
+    pub(crate) fn new(v: T) -> Self {
+        Self {
+            val: v,
+            subscribers: Vec::new(),
+        }
+    }
+
     fn set(&mut self, val: T) {
         self.val = val;
         self.notify_subscribers();
@@ -91,7 +99,7 @@ impl<T, El> GenericState<T, El> {
     }
 }
 
-type State<T> = GenericState<T, RefCell<InnerElement>>;
+pub(crate) type State<T> = GenericState<T, RefCell<InnerElement>>;
 
 pub struct StateHandle<T: 'static> {
     pub(crate) ptr: *mut dyn Any,
@@ -125,7 +133,7 @@ impl<T> StateHandle<T> {
                 parent_element.clone(),
                 Box::new(move || {
                     if let Some(p) = parent_element.upgrade() {
-                        p.borrow_mut().request_update();
+                        // p.borrow_mut().request_update();
                     }
                 }),
             );
@@ -158,6 +166,12 @@ impl Drop for StateNode {
         let boxed = unsafe { bumpalo::boxed::Box::from_raw(as_mut) };
         drop(boxed);
     }
+}
+
+pub(crate) struct Meoizee {
+    pub(crate) key: Key,
+    pub(crate) val: Box<dyn Any>,
+    pub(crate) dead: bool,
 }
 
 #[derive(Clone)]
@@ -496,6 +510,10 @@ impl Element {
     pub(crate) fn needs_layout(&self) -> bool {
         self.inner.borrow().needs_layout()
     }
+
+    pub(crate) fn needs_update(&self) -> bool {
+        self.inner.borrow().needs_update()
+    }
 }
 
 /// [`RenderObject`] API for `Element` nodes.
@@ -674,7 +692,7 @@ impl ElementState {
             paint_insets: Insets::ZERO,
             parent_window_origin: Point::ORIGIN,
             visible: true,
-            request_update: false,
+            request_update: true,
             doing_this_layout_with_callback: false,
         }
     }

@@ -120,7 +120,6 @@ impl RenderObjectInterface for ButtonObject {
                     ctx.set_active(false);
                     if ctx.is_hot() {
                         (*self.props.handler)();
-                        ctx.request_update();
                         ctx.set_handled();
                     }
                 }
