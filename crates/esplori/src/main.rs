@@ -103,7 +103,7 @@ fn inspect(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
                             ui,
                             r#".s {
                             font-size: 18;
-                            color: rgb(10, 20, 30);
+                            color: rgb(10, 120, 30);
                         }"#
                         ),
                     );

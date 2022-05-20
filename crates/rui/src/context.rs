@@ -1,5 +1,7 @@
 use std::{
+    cell::RefCell,
     ops::{Deref, DerefMut},
+    rc::Weak,
     time::Duration,
 };
 
@@ -7,7 +9,7 @@ use crate::{
     app::WindowDesc,
     app_state::CommandQueue,
     commands::{sys, Command, SingleUse, Target},
-    tree::ElementState,
+    tree::{ElementState, InnerElement},
 };
 use crate::{ext_event::ExtEventSink, id::ElementId};
 use bumpalo::Bump;
@@ -41,6 +43,7 @@ pub(crate) struct ContextState<'a, 'b> {
 pub struct UpdateCtx<'a, 'b, 'b2, 'c> {
     pub(crate) context_state: &'a mut ContextState<'b, 'b2>,
     pub(crate) child_state: &'c mut ElementState,
+    pub(crate) parent: Option<Weak<RefCell<InnerElement>>>,
 }
 
 pub struct EventCtx<'a, 'b, 'b2, 'c> {
@@ -48,16 +51,19 @@ pub struct EventCtx<'a, 'b, 'b2, 'c> {
     pub(crate) child_state: &'c mut ElementState,
     pub(crate) is_active: bool,
     pub(crate) is_handled: bool,
+    pub(crate) parent: Option<Weak<RefCell<InnerElement>>>,
 }
 
 pub struct LifeCycleCtx<'a, 'b, 'b2, 'c> {
     pub(crate) context_state: &'a mut ContextState<'b, 'b2>,
     pub(crate) child_state: &'c mut ElementState,
+    pub(crate) parent: Option<Weak<RefCell<InnerElement>>>,
 }
 
 pub struct LayoutCtx<'a, 'b, 'b2, 'c> {
     pub(crate) context_state: &'a mut ContextState<'b, 'b2>,
     pub(crate) child_state: &'c mut ElementState,
+    pub(crate) parent: Option<Weak<RefCell<InnerElement>>>,
 }
 
 pub struct PaintCtx<'a, 'b, 'b2, 'c, 'd, 'e> {
@@ -67,6 +73,7 @@ pub struct PaintCtx<'a, 'b, 'b2, 'c, 'd, 'e> {
     pub render_ctx: &'e mut Piet<'d>,
     /// The currently visible region.
     pub(crate) region: Region,
+    pub(crate) parent: Option<Weak<RefCell<InnerElement>>>,
 }
 
 // methods on everyone
@@ -391,6 +398,7 @@ impl PaintCtx<'_, '_, '_, '_, '_, '_> {
             context_state: self.context_state,
             render_ctx: self.render_ctx,
             region: region.into(),
+            parent: self.parent.clone(),
         };
         f(&mut child_ctx);
     }

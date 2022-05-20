@@ -34,9 +34,14 @@ fn win(ui: &mut Ui) {
             "#
                 ),
             );
-            button(ui, "Increment", move || {
-                count.update(|c| *c += 1);
-            });
+            button(
+                ui,
+                "Increment",
+                move || {
+                    count.update(|c| *c += 1);
+                },
+                live_s!(ui, ""),
+            );
         },
     );
 }

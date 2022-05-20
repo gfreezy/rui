@@ -1,4 +1,4 @@
-use std::{panic::Location, time::Instant};
+use std::{panic::Location, rc::Rc, time::Instant};
 
 use bumpalo::Bump;
 use druid_shell::{
@@ -58,6 +58,7 @@ impl Window {
                 Key::current(),
                 EMPTY_LOCAL_KEY.into(),
                 WindowContainer::new(),
+                None,
             ),
             invalid: Region::EMPTY,
             ext_handle,
@@ -116,6 +117,7 @@ impl Window {
             child_state: &mut root_state,
             region: invalid.clone(),
             render_ctx: piet,
+            parent: None,
         };
         root.paint(&mut paint_ctx);
     }
@@ -145,6 +147,7 @@ impl Window {
         let mut layout_ctx = LayoutCtx {
             context_state: &mut context_state,
             child_state: &mut root_state,
+            parent: None,
         };
 
         root_state.size = root.layout_box(
@@ -155,6 +158,7 @@ impl Window {
         let mut ctx = LifeCycleCtx {
             context_state: &mut context_state,
             child_state: &mut root_state,
+            parent: None,
         };
         root.lifecycle(
             &mut ctx,
@@ -198,6 +202,7 @@ impl Window {
             child_state: &mut root_state,
             is_active: false,
             is_handled: false,
+            parent: None,
         };
 
         self.root.event(&mut event_ctx, &event);
@@ -240,6 +245,7 @@ impl Window {
         let mut ctx = LifeCycleCtx {
             child_state: &mut root_state,
             context_state: &mut context_state,
+            parent: None,
         };
 
         root.lifecycle(&mut ctx, event);
@@ -264,7 +270,11 @@ impl Window {
             bump,
         };
         let mut inner_root = root.inner.borrow_mut();
-        let mut cx = Ui::new(&mut inner_root.children, &mut context_state);
+        let mut cx = Ui::new(
+            &mut inner_root.children,
+            &mut context_state,
+            Some(Rc::downgrade(&root.inner)),
+        );
         measure_time("app::update", || {
             app(&mut cx);
         });

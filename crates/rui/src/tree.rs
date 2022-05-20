@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
 
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use std::time::Instant;
 use std::{
     any::Any,
@@ -121,6 +121,7 @@ pub(crate) struct InnerElement {
     pub(crate) local_key: LocalKey,
     pub(crate) object: Box<dyn AnyRenderObject>,
     pub(crate) children: Children,
+    pub(crate) parent: Option<Weak<RefCell<InnerElement>>>,
     pub(crate) state: ElementState,
     pub(crate) dead: bool,
 }
@@ -304,17 +305,24 @@ impl<'a> IntoIterator for &'a mut Children {
 
 impl Default for Element {
     fn default() -> Self {
-        Element::new(Key::current(), "".into(), EmptyHolderObject)
+        Element::new(Key::current(), "".into(), EmptyHolderObject, None)
     }
 }
 
 impl Element {
-    pub(crate) fn new<T>(key: Key, local_key: LocalKey, object: T) -> Self
+    pub(crate) fn new<T>(
+        key: Key,
+        local_key: LocalKey,
+        object: T,
+        parent: Option<Weak<RefCell<InnerElement>>>,
+    ) -> Self
     where
         T: AnyRenderObject,
     {
         Element {
-            inner: Rc::new(RefCell::new(InnerElement::new(key, local_key, object))),
+            inner: Rc::new(RefCell::new(InnerElement::new(
+                key, local_key, object, parent,
+            ))),
         }
     }
 
@@ -446,7 +454,12 @@ impl Element {
 
 /// [`RenderObject`] API for `Element` nodes.
 impl InnerElement {
-    pub(crate) fn new<T>(key: Key, local_key: LocalKey, object: T) -> Self
+    pub(crate) fn new<T>(
+        key: Key,
+        local_key: LocalKey,
+        object: T,
+        parent: Option<Weak<RefCell<InnerElement>>>,
+    ) -> Self
     where
         T: AnyRenderObject,
     {
@@ -456,6 +469,7 @@ impl InnerElement {
             local_key,
             object: Box::new(object),
             children: Children::new(),
+            parent,
             state: ElementState::new(ElementId::next(), None),
             dead: false,
         }
@@ -785,6 +799,7 @@ impl InnerElement {
                 Self::set_hot_state(
                     self.object.as_mut(),
                     &mut self.state,
+                    self.parent.clone(),
                     &mut self.children,
                     ctx.context_state,
                     rect,
@@ -803,6 +818,7 @@ impl InnerElement {
                 Self::set_hot_state(
                     self.object.as_mut(),
                     &mut self.state,
+                    self.parent.clone(),
                     &mut self.children,
                     ctx.context_state,
                     rect,
@@ -821,6 +837,7 @@ impl InnerElement {
                 let hot_changed = Self::set_hot_state(
                     self.object.as_mut(),
                     &mut self.state,
+                    self.parent.clone(),
                     &mut self.children,
                     ctx.context_state,
                     rect,
@@ -839,6 +856,7 @@ impl InnerElement {
                 Self::set_hot_state(
                     &mut *self.object,
                     &mut self.state,
+                    self.parent.clone(),
                     &mut self.children,
                     ctx.context_state,
                     rect,
@@ -869,6 +887,7 @@ impl InnerElement {
                 child_state: &mut self.state,
                 is_active: false,
                 is_handled: false,
+                parent: self.parent.clone(),
             };
             let inner_event = modified_event.as_ref().unwrap_or(event);
             inner_ctx.child_state.has_active = false;
@@ -903,6 +922,7 @@ impl InnerElement {
         let mut child_ctx = LifeCycleCtx {
             context_state: ctx.context_state,
             child_state: &mut self.state,
+            parent: self.parent.clone(),
         };
 
         self.object
@@ -923,6 +943,7 @@ impl InnerElement {
         let mut child_ctx = LayoutCtx {
             context_state: ctx.context_state,
             child_state: &mut self.state,
+            parent: self.parent.clone(),
         };
 
         self.object
@@ -986,6 +1007,7 @@ impl InnerElement {
         let mut child_ctx = LayoutCtx {
             context_state: ctx.context_state,
             child_state: &mut self.state,
+            parent: self.parent.clone(),
         };
 
         let new_size = self
@@ -1023,6 +1045,7 @@ impl InnerElement {
         let mut child_ctx = LayoutCtx {
             context_state: ctx.context_state,
             child_state: &mut self.state,
+            parent: self.parent.clone(),
         };
 
         let geometry = self
@@ -1184,6 +1207,7 @@ impl InnerElement {
     fn set_hot_state(
         child: &mut dyn AnyRenderObject,
         child_state: &mut ElementState,
+        parent: Option<Weak<RefCell<InnerElement>>>,
         children: &mut Children,
         context_state: &mut ContextState,
         rect: Rect,
@@ -1199,6 +1223,7 @@ impl InnerElement {
             let mut child_ctx = LifeCycleCtx {
                 context_state,
                 child_state,
+                parent,
             };
             child.lifecycle(&mut child_ctx, &hot_changed_event, children);
             // if hot changes and we're showing widget ids, always repaint
@@ -1227,6 +1252,7 @@ impl InnerElement {
             context_state: ctx.context_state,
             region: ctx.region.clone(),
             child_state: &mut self.state,
+            parent: self.parent.clone(),
         };
         self.object.paint(&mut inner_ctx, &mut self.children);
 
