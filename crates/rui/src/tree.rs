@@ -330,10 +330,6 @@ impl Element {
         self.inner.borrow().debug_state()
     }
 
-    pub(crate) fn merge_child_states_up(&self) {
-        self.inner.borrow_mut().merge_child_states_up()
-    }
-
     pub fn clean_relayout_boundary(&self) {
         self.inner.borrow_mut().clean_relayout_boundary()
     }
@@ -1151,6 +1147,9 @@ impl InnerElement {
 
     pub fn request_update(&mut self) {
         self.state.request_update = true;
+        if let Some(parent) = self.parent.as_ref().and_then(|p| p.upgrade()) {
+            parent.borrow_mut().request_update();
+        }
     }
 
     #[track_caller]
@@ -1269,6 +1268,10 @@ impl InnerElement {
         //     1.,
         //     &STYLE,
         // );
+    }
+
+    pub(crate) fn clear_needs_update(&mut self) {
+        self.state.request_update = false;
     }
 
     pub(crate) fn needs_update(&self) -> bool {

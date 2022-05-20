@@ -15,7 +15,7 @@ use crate::tree::{Children, Element, InnerElement, State, StateNode};
 
 pub struct Ui<'a, 'b, 'c, 'c2> {
     pub tree: &'a mut Children,
-    parent: Option<Weak<RefCell<InnerElement>>>,
+    parent_element: Option<Weak<RefCell<InnerElement>>>,
     context_state: &'b mut ContextState<'c, 'c2>,
     state_index: usize,
     render_index: usize,
@@ -32,10 +32,10 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
     pub(crate) fn new(
         tree: &'a mut Children,
         context_state: &'b mut ContextState<'c, 'c2>,
-        parent: Option<Weak<RefCell<InnerElement>>>,
+        parent_element: Option<Weak<RefCell<InnerElement>>>,
     ) -> Self {
         Ui {
-            parent,
+            parent_element,
             tree,
             context_state,
             state_index: 0,
@@ -131,7 +131,7 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
                 let mut ctx = UpdateCtx {
                     context_state: self.context_state,
                     child_state: &mut inner_node.state,
-                    parent: self.parent.clone(),
+                    parent: self.parent_element.clone(),
                 };
                 action = object.update(&mut ctx, props, &mut inner_node.children);
                 tracing::trace!(
@@ -156,23 +156,28 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
         self.render_index = index + 1;
 
         let node = &self.tree.renders[index].inner;
-        let parent = Rc::downgrade(node);
-        let mut inner_node = node.borrow_mut();
-        inner_node.local_key = local_key;
+        let parent_element = Rc::downgrade(node);
+        let mut current_element = node.borrow_mut();
+        current_element.local_key = local_key;
+        current_element.clear_needs_update();
 
-        let changed = inner_node.set_parent_data(self.parent_data.take());
+        let changed = current_element.set_parent_data(self.parent_data.take());
         if changed {
-            inner_node.request_layout();
+            current_element.request_layout();
         }
 
         if let Some(content) = content {
-            let mut child_ui = Ui::new(&mut inner_node.children, self.context_state, Some(parent));
+            let mut child_ui = Ui::new(
+                &mut current_element.children,
+                self.context_state,
+                Some(parent_element),
+            );
             content(&mut child_ui);
 
             if child_ui.cleanup_tree() {
-                inner_node.request_layout();
+                current_element.request_layout();
             }
-            inner_node.merge_child_states_up();
+            current_element.merge_child_states_up();
         }
 
         action
@@ -195,7 +200,7 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
 
 impl Ui<'_, '_, '_, '_> {
     fn parent(&self) -> Option<Weak<RefCell<InnerElement>>> {
-        self.parent.clone()
+        self.parent_element.clone()
     }
 
     fn find_state_node(&mut self, key: Key) -> Option<usize> {
