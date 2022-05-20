@@ -79,7 +79,7 @@ impl RenderObject<Padding> for Padding {
         props
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, props: Padding, children: &mut Children) {
+    fn update(&mut self, ctx: &mut UpdateCtx, props: Padding) {
         if self != &props {
             *self = props;
             ctx.request_layout();

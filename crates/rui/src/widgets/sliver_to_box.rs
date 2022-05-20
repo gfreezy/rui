@@ -36,13 +36,7 @@ impl RenderObject<SliverToBox> for SliverToBoxObject {
         }
     }
 
-    fn update(
-        &mut self,
-        ctx: &mut crate::context::UpdateCtx,
-        props: SliverToBox,
-        children: &mut Children,
-    ) -> Self::Action {
-    }
+    fn update(&mut self, ctx: &mut crate::context::UpdateCtx, props: SliverToBox) -> Self::Action {}
 }
 
 pub struct SliverToBoxObject {

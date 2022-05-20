@@ -49,7 +49,7 @@ impl RenderObject<Debug> for DebugObject {
         DebugObject
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, props: Debug, children: &mut Children) {}
+    fn update(&mut self, ctx: &mut UpdateCtx, props: Debug) {}
 }
 
 impl RenderObjectInterface for DebugObject {

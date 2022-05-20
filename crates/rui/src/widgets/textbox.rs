@@ -142,12 +142,7 @@ impl RenderObject<TextBox> for TextBoxObject {
         }
     }
 
-    fn update(
-        &mut self,
-        ctx: &mut UpdateCtx,
-        props: TextBox,
-        children: &mut Children,
-    ) -> Self::Action {
+    fn update(&mut self, ctx: &mut UpdateCtx, props: TextBox) -> Self::Action {
         if self.text != props.editable {
             self.text = props.editable.to_owned();
             self.editor.set_text(self.text.clone());

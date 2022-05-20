@@ -65,12 +65,7 @@ impl RenderObject<Align> for RenderAlign {
         }
     }
 
-    fn update(
-        &mut self,
-        ctx: &mut crate::context::UpdateCtx,
-        props: Align,
-        children: &mut Children,
-    ) -> Self::Action {
+    fn update(&mut self, ctx: &mut crate::context::UpdateCtx, props: Align) -> Self::Action {
         let new = Self::create(props);
         if self != &new {
             *self = new;

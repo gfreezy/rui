@@ -42,7 +42,7 @@ impl RenderObject<Background> for Background {
         props
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, props: Background, children: &mut Children) {
+    fn update(&mut self, ctx: &mut UpdateCtx, props: Background) {
         if self != &props {
             *self = props;
             ctx.request_layout();

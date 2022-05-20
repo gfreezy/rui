@@ -32,7 +32,7 @@ impl RenderObject<EmptyHolder> for EmptyHolderObject {
         EmptyHolderObject
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, props: EmptyHolder, children: &mut Children) {}
+    fn update(&mut self, ctx: &mut UpdateCtx, props: EmptyHolder) {}
 }
 
 impl RenderObjectInterface for EmptyHolderObject {}

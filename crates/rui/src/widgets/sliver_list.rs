@@ -73,22 +73,17 @@ impl RenderObject<SliverList> for RenderSliverList {
         RenderSliverList {
             delegate: props.delegate,
             keep_alive_bucket: HashMap::new(),
+            need_rebuild: true,
         }
     }
 
-    fn update(
-        &mut self,
-        ctx: &mut UpdateCtx,
-        props: SliverList,
-        children: &mut Children,
-    ) -> Self::Action {
+    fn update(&mut self, ctx: &mut UpdateCtx, props: SliverList) -> Self::Action {
         if props.delegate.should_rebuild(&*self.delegate) {
             tracing::trace!("rebuild sliver list");
             self.delegate = props.delegate;
             self.keep_alive_bucket.clear();
             ctx.request_layout();
-            self.perform_rebuild(ctx, children);
-            tracing::debug!("rebuild sliver list done, len: {}", children.len());
+            self.need_rebuild = true;
         }
     }
 }
@@ -100,6 +95,7 @@ impl Properties for SliverList {
 pub struct RenderSliverList {
     delegate: Box<dyn SliverChildDelegate>,
     keep_alive_bucket: HashMap<usize, Element>,
+    need_rebuild: bool,
 }
 
 impl RenderSliverList {
@@ -111,7 +107,7 @@ impl RenderSliverList {
         children.insert(after.map(|v| v + 1).unwrap_or(0), child);
     }
 
-    fn perform_rebuild(&mut self, ctx: &mut UpdateCtx, children: &mut Children) {
+    fn perform_rebuild(&mut self, ctx: &mut LayoutCtx, children: &mut Children) {
         let mut swap_mapping = Vec::new();
 
         for (old_child_index, key) in children
@@ -178,7 +174,6 @@ impl RenderSliverList {
             if new_index.is_none() {
                 let real_index = mappings[old_child_index];
                 let removed = children.remove_element(real_index);
-                ctx.request_layout();
 
                 tracing::trace!(
                     "remove child, key: {}, local_key: {}, old_child_index: {}, new_child_index: {}, new_index: {:?}",
@@ -528,6 +523,12 @@ impl RenderObjectInterface for RenderSliverList {
         sc: &SliverConstraints,
         children: &mut crate::tree::Children,
     ) -> SliverGeometry {
+        if self.need_rebuild {
+            self.need_rebuild = false;
+            self.perform_rebuild(ctx, children);
+            tracing::debug!("rebuild sliver list done, len: {}", children.len());
+        }
+
         let scroll_offset = sc.scroll_offset + sc.cache_origin;
         assert!(scroll_offset >= 0.0);
         let remaining_extent = sc.remaining_cache_extent;

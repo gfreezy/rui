@@ -120,7 +120,7 @@ impl RenderObject<SizedBox> for SizedBoxObject {
         SizedBoxObject { props }
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, props: SizedBox, children: &mut Children) {
+    fn update(&mut self, ctx: &mut UpdateCtx, props: SizedBox) {
         if &self.props != &props {
             ctx.request_layout();
             self.props = props;

@@ -133,7 +133,7 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
                     child_state: &mut inner_node.state,
                     parent: self.parent_element.clone(),
                 };
-                action = object.update(&mut ctx, props, &mut inner_node.children);
+                action = object.update(&mut ctx, props);
                 tracing::trace!(
                     "Update render object, key: {:?}, local_key: {}, index: {}",
                     key,

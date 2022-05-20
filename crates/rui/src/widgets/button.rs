@@ -98,12 +98,7 @@ impl RenderObject<Button> for ButtonObject {
         }
     }
 
-    fn update(
-        &mut self,
-        ctx: &mut UpdateCtx,
-        props: Button,
-        children: &mut Children,
-    ) -> Self::Action {
+    fn update(&mut self, ctx: &mut UpdateCtx, props: Button) -> Self::Action {
         if self.props != props {
             ctx.request_layout();
         }
