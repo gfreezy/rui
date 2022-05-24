@@ -140,6 +140,19 @@ fn win(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
                         ),
                     );
                 });
+                expand(ui, |ui| {
+                    text(
+                        ui,
+                        "haha",
+                        live_s!(
+                            ui,
+                            r#".text {
+                            font-size: 30;
+                 color: rgb(0, 10, 10);
+                }"#
+                        ),
+                    );
+                });
 
                 expand(ui, |ui| {
                     viewport(ui, live_s!(ui, ""), |ui| {

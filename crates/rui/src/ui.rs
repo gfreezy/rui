@@ -171,7 +171,7 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
                     .val
                     .downcast_mut::<Params>()
                     .unwrap();
-                tracing::debug!("old_params: {:?}, new_params: {:?}", old_params, params);
+                tracing::trace!("old_params: {:?}, new_params: {:?}", old_params, params);
                 if old_params != &params {
                     params_changed = true;
                     *old_params = params.clone();

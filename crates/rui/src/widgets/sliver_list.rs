@@ -780,7 +780,7 @@ impl RenderObjectInterface for RenderSliverList {
         }
 
         // Finally count up all the remaining children and label them as garbage. keep one
-        let trailing_garbage = children.len() - child;
+        let trailing_garbage = children.len() - (child + 1).min(children.len());
 
         // At this point everything should be good to go, we just have to clean up
         // the garbage and report the geometry.
