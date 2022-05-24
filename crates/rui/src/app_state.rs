@@ -659,7 +659,7 @@ impl WinHandler for WindowHandler {
 
     fn mouse_move(&mut self, event: &MouseEvent) {
         let event = Event::MouseMove(event.clone().into());
-        // self.app_state.do_window_event(event, self.window_id);
+        self.app_state.do_window_event(event, self.window_id);
     }
 
     fn key_down(&mut self, event: KeyEvent) -> bool {
