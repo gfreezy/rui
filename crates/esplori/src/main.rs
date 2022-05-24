@@ -120,11 +120,11 @@ fn win(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
             live_s!(
                 ui,
                 r#".style {
-                axis: horizontal;
-                main-axis-alignment: center;
-                cross-axis-alignment: center;
-            }
-        "#
+                        axis: horizontal;
+                        main-axis-alignment: center;
+                        cross-axis-alignment: center;
+                    }
+                "#
             ),
             |ui| {
                 expand(ui, |ui| {
@@ -134,9 +134,9 @@ fn win(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
                         live_s!(
                             ui,
                             r#".text {
-                            font-size: 30;
-                 color: rgb(0, 10, 10);
-                }"#
+                                font-size: 30;
+                                color: rgb(0, 10, 10);
+                            }"#
                         ),
                     );
                 });
@@ -147,9 +147,9 @@ fn win(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
                         live_s!(
                             ui,
                             r#".text {
-                            font-size: 30;
-                 color: rgb(0, 10, 10);
-                }"#
+                                font-size: 30;
+                                color: rgb(0, 10, 10);
+                            }"#
                         ),
                     );
                 });
@@ -161,10 +161,10 @@ fn win(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
                                 let style = live_s!(
                                     ui,
                                     r#"
-                            .text {
-                            font-size: 30;
-                            color: rgb(43, 10, 10);
-                        }"#
+                                        .text {
+                                        font-size: 30;
+                                        color: rgb(43, 10, 10);
+                                    }"#
                                 );
                                 text(ui, &format!("hello{}", i), style);
                             });
@@ -292,13 +292,12 @@ fn win2(ui: &mut Ui) {
         ui,
         live_s!(
             ui,
-            r#"
-    .counter {
-        axis: vertical;
-        main-axis-alignment: end;
-        cross-axis-alignment: center;
-    }
-    "#
+            r#".counter {
+                    axis: vertical;
+                    main-axis-alignment: end;
+                    cross-axis-alignment: center;
+                }
+            "#
         ),
         |ui| {
             ui.memoize(comp, (10,));
@@ -308,12 +307,11 @@ fn win2(ui: &mut Ui) {
                 &format!("win2: {}", ui[count]),
                 live_s!(
                     ui,
-                    r#"
-                .a {
-                    color: rgb(43, 130, 190);
-                    font-size: 50.0;
-                }
-            "#
+                    r#".a {
+                            color: rgb(43, 130, 190);
+                            font-size: 50.0;
+                        }
+                    "#
                 ),
             );
             button(
@@ -334,12 +332,11 @@ fn comp(ui: &mut Ui, size: usize) {
         &format!("{}", size),
         live_s!(
             ui,
-            r#"
-    .a {
-        color: rgb(43, 130, 190);
-        font-size: 50.0;
-    }
-"#
+            r#".a {
+                    color: rgb(43, 130, 190);
+                    font-size: 50.0;
+                }
+            "#
         ),
     );
 }
