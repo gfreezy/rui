@@ -526,7 +526,7 @@ impl RenderObjectInterface for RenderSliverList {
         if self.need_rebuild {
             self.need_rebuild = false;
             self.perform_rebuild(ctx, children);
-            tracing::debug!("rebuild sliver list done, len: {}", children.len());
+            tracing::trace!("rebuild sliver list done, len: {}", children.len());
         }
 
         let scroll_offset = sc.scroll_offset + sc.cache_origin;

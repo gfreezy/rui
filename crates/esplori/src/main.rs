@@ -329,7 +329,6 @@ fn win2(ui: &mut Ui) {
 }
 
 fn comp(ui: &mut Ui, size: usize) {
-    println!("comp");
     text(
         ui,
         &format!("{}", size),
