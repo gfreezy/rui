@@ -1,6 +1,7 @@
 use std::any::type_name;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::hash::Hash;
 use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
@@ -46,21 +47,36 @@ impl std::fmt::Debug for Children {
     }
 }
 
-struct Subscriber<T> {
+struct Subscriber<Id, T> {
+    id: Id,
     element: Weak<T>,
     callback: Box<dyn FnMut()>,
 }
 
-pub(crate) struct GenericState<T, El> {
-    pub(crate) val: T,
-    subscribers: Vec<Subscriber<El>>,
+impl<Id: PartialEq + Eq + Hash, T> PartialEq<Subscriber<Id, T>> for Subscriber<Id, T> {
+    fn eq(&self, other: &Subscriber<Id, T>) -> bool {
+        self.id == other.id
+    }
 }
 
-impl<T, El> GenericState<T, El> {
+impl<Id: PartialEq + Eq + Hash, T> Eq for Subscriber<Id, T> {}
+
+impl<Id: PartialEq + Eq + Hash, T> Hash for Subscriber<Id, T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
+pub(crate) struct GenericState<T, Id, El> {
+    pub(crate) val: T,
+    subscribers: HashSet<Subscriber<Id, El>>,
+}
+
+impl<T, Id: PartialEq + Eq + Hash, El> GenericState<T, Id, El> {
     pub(crate) fn new(v: T) -> Self {
         Self {
             val: v,
-            subscribers: Vec::new(),
+            subscribers: HashSet::new(),
         }
     }
 
@@ -79,19 +95,28 @@ impl<T, El> GenericState<T, El> {
         ret
     }
 
-    fn add_subscriber(&mut self, element: Weak<El>, callback: Box<dyn FnMut()>) {
-        self.subscribers.push(Subscriber { element, callback });
+    fn add_subscriber(&mut self, id: Id, element: Weak<El>, callback: Box<dyn FnMut()>) {
+        self.subscribers.insert(Subscriber {
+            id,
+            element,
+            callback,
+        });
     }
 
     fn notify_subscribers(&mut self) {
-        self.subscribers.retain_mut(|subscriber| {
-            if let Some(element) = subscriber.element.upgrade() {
-                (subscriber.callback)();
-                true
-            } else {
-                false
-            }
-        });
+        tracing::trace!("subscribers = {:?}", self.subscribers.len());
+        self.subscribers = self
+            .subscribers
+            .drain()
+            .filter_map(|mut subscriber| {
+                if let Some(element) = subscriber.element.upgrade() {
+                    (subscriber.callback)();
+                    Some(subscriber)
+                } else {
+                    None
+                }
+            })
+            .collect();
     }
 
     fn clear_subscribers(&mut self) {
@@ -99,7 +124,7 @@ impl<T, El> GenericState<T, El> {
     }
 }
 
-pub(crate) type State<T> = GenericState<T, RefCell<InnerElement>>;
+pub(crate) type State<T> = GenericState<T, usize, RefCell<InnerElement>>;
 
 pub struct StateHandle<T: 'static> {
     pub(crate) ptr: *mut dyn Any,
@@ -128,13 +153,15 @@ impl<T> StateHandle<T> {
     pub(crate) fn get<'ui>(&self, ui: &Ui) -> &'ui T {
         let v = unsafe { &mut *self.ptr };
         let state = v.downcast_mut::<State<T>>().unwrap();
-        if let Some(parent_element) = ui.parent_element() {
+        if let Some(parent_element) = ui.parent_element().and_then(|p| p.upgrade()) {
+            let dirty_elements = Rc::downgrade(&ui.dirty_elements());
+            let weak_parent = Rc::downgrade(&parent_element);
             state.add_subscriber(
-                parent_element.clone(),
+                self.ptr as *const () as usize,
+                weak_parent.clone(),
                 Box::new(move || {
-                    if let Some(p) = parent_element.upgrade() {
-                        // todo: hittest to collect all element, then call `event`
-                        p.borrow_mut().request_update();
+                    if let Some(els) = dirty_elements.upgrade() {
+                        els.borrow_mut().push(weak_parent.clone());
                     }
                 }),
             );
@@ -152,6 +179,12 @@ impl<T> StateHandle<T> {
         let v = unsafe { &mut *self.ptr };
         let old = v.downcast_mut::<State<T>>().unwrap();
         old.update(updater)
+    }
+
+    pub(crate) fn clear_subscribers(&self) {
+        let v = unsafe { &mut *self.ptr };
+        let state = v.downcast_mut::<State<T>>().unwrap();
+        state.clear_subscribers();
     }
 }
 
@@ -514,6 +547,10 @@ impl Element {
 
     pub(crate) fn needs_update(&self) -> bool {
         self.inner.borrow().needs_update()
+    }
+
+    pub(crate) fn name(&self) -> &'static str {
+        self.inner.borrow().name()
     }
 }
 

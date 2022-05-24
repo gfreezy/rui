@@ -1,4 +1,9 @@
-use std::{panic::Location, rc::Rc, time::Instant};
+use std::{
+    cell::RefCell,
+    panic::Location,
+    rc::{Rc, Weak},
+    time::Instant,
+};
 
 use bumpalo::Bump;
 use druid_shell::{
@@ -20,7 +25,7 @@ use crate::{
     menu::{MenuItemId, MenuManager},
     perf::{measure_time, FPSCounter},
     text::layout::TextLayout,
-    tree::{Element, ElementState},
+    tree::{Element, ElementState, InnerElement},
     ui::Ui,
     widgets::window_container::WindowContainer,
 };
@@ -36,15 +41,17 @@ pub struct Window {
     invalid: Region,
     pub(crate) menu: Option<MenuManager>,
     ext_handle: ExtEventSink,
+    dirty_elements: Rc<RefCell<Vec<Weak<RefCell<InnerElement>>>>>,
     bump: Bump,
 }
 
 impl Window {
-    pub fn new(
+    pub(crate) fn new(
         id: WindowId,
         handle: WindowHandle,
         pending: PendingWindow,
         ext_handle: ExtEventSink,
+        dirty_elements: Rc<RefCell<Vec<Weak<RefCell<InnerElement>>>>>,
     ) -> Self {
         Window {
             id,
@@ -62,6 +69,7 @@ impl Window {
             ),
             invalid: Region::EMPTY,
             ext_handle,
+            dirty_elements,
             bump: Bump::new(),
         }
     }
@@ -99,6 +107,7 @@ impl Window {
             root,
             size,
             bump,
+            dirty_elements,
             ..
         } = self;
 
@@ -108,6 +117,7 @@ impl Window {
 
             text: handle.text(),
             command_queue: queue,
+            dirty_elements: dirty_elements.clone(),
             bump,
         };
 
@@ -132,6 +142,7 @@ impl Window {
             size,
             invalid,
             bump,
+            dirty_elements,
             ..
         } = self;
 
@@ -141,6 +152,7 @@ impl Window {
             text: handle.text(),
             command_queue,
             bump,
+            dirty_elements: dirty_elements.clone(),
         };
         let mut root_state = ElementState::new(*phatom_root_id, Some(size.clone()));
 
@@ -185,6 +197,7 @@ impl Window {
             size,
             invalid,
             bump,
+            dirty_elements,
             ..
         } = self;
 
@@ -193,6 +206,7 @@ impl Window {
             ext_handle: ext_handle.clone(),
             text: handle.text(),
             command_queue: queue,
+            dirty_elements: dirty_elements.clone(),
             bump,
         };
         let mut root_state = ElementState::new(*phatom_root_id, Some(size.clone()));
@@ -230,6 +244,7 @@ impl Window {
             size,
             invalid,
             bump,
+            dirty_elements,
             ..
         } = self;
 
@@ -238,6 +253,7 @@ impl Window {
             ext_handle: ext_handle.clone(),
             text: handle.text(),
             command_queue,
+            dirty_elements: dirty_elements.clone(),
             bump,
         };
         let mut root_state = ElementState::new(*phatom_root_id, Some(size.clone()));
@@ -259,6 +275,7 @@ impl Window {
             root,
             app,
             bump,
+            dirty_elements,
             ..
         } = self;
 
@@ -267,6 +284,7 @@ impl Window {
             ext_handle: ext_handle.clone(),
             text: handle.text(),
             command_queue,
+            dirty_elements: dirty_elements.clone(),
             bump,
         };
         let mut inner_root = root.inner.borrow_mut();
@@ -274,6 +292,7 @@ impl Window {
             &mut inner_root.children,
             &mut context_state,
             Some(Rc::downgrade(&root.inner)),
+            true,
         );
         measure_time("app::update", || {
             app(&mut cx);

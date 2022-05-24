@@ -114,58 +114,60 @@ fn inspect(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
 }
 
 fn win(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
-    // column(
-    //     ui,
-    //     live_s!(
-    //         ui,
-    //         r#".style {
-    //             axis: horizontal;
-    //             main-axis-alignment: center;
-    //             cross-axis-alignment: center;
-    //         }
-    //     "#
-    //     ),
-    //     |ui| {
-    //         expand(ui, |ui| {
-    //             text(
-    //                 ui,
-    //                 "haha",
-    //                 live_s!(
-    //                     ui,
-    //                     r#".text {
-    //                         font-size: 30;
-    //              color: rgb(0, 10, 10);
-    //             }"#
-    //                 ),
-    //             );
-    //         });
+    row(ui, live_s!(ui, ""), |ui| {
+        column(
+            ui,
+            live_s!(
+                ui,
+                r#".style {
+                axis: horizontal;
+                main-axis-alignment: center;
+                cross-axis-alignment: center;
+            }
+        "#
+            ),
+            |ui| {
+                expand(ui, |ui| {
+                    text(
+                        ui,
+                        "haha",
+                        live_s!(
+                            ui,
+                            r#".text {
+                            font-size: 30;
+                 color: rgb(0, 10, 10);
+                }"#
+                        ),
+                    );
+                });
 
-    //         expand(ui, |ui| {
-    //             viewport(ui, live_s!(ui, ""), |ui| {
-    //                 for i in 0..10usize {
-    //                     sliver_to_box(ui, i.to_string().into(), |ui| {
-    //                         let style = live_s!(
-    //                             ui,
-    //                             r#"
-    //                         .text {
-    //                         font-size: 30;
-    //                         color: rgb(43, 10, 10);
-    //                     }"#
-    //                         );
-    //                         text(ui, &format!("hello{}", i), style);
-    //                     });
-    //                 }
-    //                 sliver_list(
-    //                     ui,
-    //                     Delegate {
-    //                         center: EMPTY_LOCAL_KEY.into(),
-    //                     },
-    //                 )
-    //             })
-    //         });
-    //     },
-    // );
-    win2(ui);
+                expand(ui, |ui| {
+                    viewport(ui, live_s!(ui, ""), |ui| {
+                        for i in 0..10usize {
+                            sliver_to_box(ui, i.to_string().into(), |ui| {
+                                let style = live_s!(
+                                    ui,
+                                    r#"
+                            .text {
+                            font-size: 30;
+                            color: rgb(43, 10, 10);
+                        }"#
+                                );
+                                text(ui, &format!("hello{}", i), style);
+                            });
+                        }
+                        sliver_list(
+                            ui,
+                            Delegate {
+                                center: EMPTY_LOCAL_KEY.into(),
+                            },
+                        )
+                    })
+                });
+            },
+        );
+        ui.memoize(win2, ());
+    });
 
     snapshot.lock().unwrap().debug_state = ui.tree()[0].debug_state();
 }
@@ -279,18 +281,18 @@ fn win2(ui: &mut Ui) {
             ui,
             r#"
     .counter {
-        axis: horizontal;
-        main-axis-alignment: center;
+        axis: vertical;
+        main-axis-alignment: end;
         cross-axis-alignment: center;
     }
     "#
         ),
         |ui| {
-            ui.memoize(comp, ui[count], |_| {});
+            ui.memoize(comp, (10,));
 
             text(
                 ui,
-                &format!("{}", ui[count]),
+                &format!("win2: {}", ui[count]),
                 live_s!(
                     ui,
                     r#"
@@ -313,11 +315,11 @@ fn win2(ui: &mut Ui) {
     );
 }
 
-fn comp(ui: &mut Ui, count: usize, content: impl FnOnce(&mut Ui)) {
+fn comp(ui: &mut Ui, size: usize) {
     println!("comp");
     text(
         ui,
-        &format!("{}", count),
+        &format!("{}", size),
         live_s!(
             ui,
             r#"

@@ -2,7 +2,7 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use std::time::Instant;
 
 use druid_shell::kurbo::Size;
@@ -22,6 +22,7 @@ use crate::id::WindowId;
 
 use crate::menu::{MenuItemId, MenuManager};
 use crate::perf::measure_time;
+use crate::tree::InnerElement;
 use crate::window::Window;
 
 pub(crate) const RUN_COMMANDS_TOKEN: IdleToken = IdleToken::new(1);
@@ -73,6 +74,7 @@ pub struct InnerAppState {
     /// The id of the most-recently-focused window that has a menu. On macOS, this
     /// is the window that's currently in charge of the app menu.
     menu_window: Option<WindowId>,
+    dirty_elements: Rc<RefCell<Vec<Weak<RefCell<InnerElement>>>>>,
 }
 
 #[derive(Default)]
@@ -83,9 +85,15 @@ struct Windows {
 }
 
 impl Windows {
-    fn connect(&mut self, id: WindowId, handle: WindowHandle, ext_handle: ExtEventSink) {
+    fn connect(
+        &mut self,
+        id: WindowId,
+        handle: WindowHandle,
+        ext_handle: ExtEventSink,
+        dirty_elements: Rc<RefCell<Vec<Weak<RefCell<InnerElement>>>>>,
+    ) {
         if let Some(pending) = self.pending.remove(&id) {
-            let win = Window::new(id, handle, pending, ext_handle);
+            let win = Window::new(id, handle, pending, ext_handle, dirty_elements);
             assert!(self.windows.insert(id, win).is_none(), "duplicate window");
         } else {
             tracing::error!("no window for connecting handle {:?}", id);
@@ -125,6 +133,7 @@ impl AppState {
             menu_window: None,
             command_queue: VecDeque::new(),
             windows: Windows::default(),
+            dirty_elements: Rc::new(RefCell::new(Vec::new())),
             ext_event_host,
         }));
 
@@ -150,8 +159,12 @@ impl InnerAppState {
     }
 
     fn connect(&mut self, id: WindowId, handle: WindowHandle) {
-        self.windows
-            .connect(id, handle, self.ext_event_host.make_sink());
+        self.windows.connect(
+            id,
+            handle,
+            self.ext_event_host.make_sink(),
+            self.dirty_elements.clone(),
+        );
 
         // If the external event host has no handle, it cannot wake us
         // when an event arrives.
@@ -413,7 +426,20 @@ impl AppState {
                 Some(cmd) => self.handle_cmd(cmd),
                 None => break,
             }
-        })
+        });
+
+        for el in self
+            .inner
+            .borrow()
+            .dirty_elements
+            .borrow_mut()
+            .drain(0..)
+            .rev()
+        {
+            if let Some(inner) = el.upgrade() {
+                inner.borrow_mut().request_update();
+            }
+        }
     }
 
     fn process_ext_events(&mut self) {
@@ -633,7 +659,7 @@ impl WinHandler for WindowHandler {
 
     fn mouse_move(&mut self, event: &MouseEvent) {
         let event = Event::MouseMove(event.clone().into());
-        self.app_state.do_window_event(event, self.window_id);
+        // self.app_state.do_window_event(event, self.window_id);
     }
 
     fn key_down(&mut self, event: KeyEvent) -> bool {

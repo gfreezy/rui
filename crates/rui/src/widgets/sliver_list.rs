@@ -56,7 +56,7 @@ impl SliverList {
 
     #[track_caller]
     pub fn build(self, ui: &mut Ui) {
-        ui.render_object_pro(
+        ui.render_object_advanced(
             crate::key::Key::current(),
             self,
             crate::ui::RenderAction::Auto,
@@ -208,7 +208,7 @@ impl RenderSliverList {
                 parent_data.index,
                 children[child_index].local_key()
             );
-            let mut ui = Ui::new(children, &mut *ctx.context_state, ctx.parent.clone());
+            let mut ui = Ui::new(children, &mut *ctx.context_state, ctx.parent.clone(), true);
             self.build_item(
                 &mut ui,
                 parent_data.index,
@@ -237,7 +237,7 @@ impl RenderSliverList {
                     child_index
                 );
                 let local_key = self.delegate.key(index);
-                ui.render_object_pro(
+                ui.render_object_advanced(
                     (caller, local_key.clone()),
                     SliverListItem {
                         local_key,
@@ -348,7 +348,7 @@ impl RenderSliverList {
         after: Option<usize>,
     ) {
         let render_index = after.map(|v| v + 1).unwrap_or(0);
-        let mut ui = Ui::new(children, &mut *ctx.context_state, ctx.parent.clone());
+        let mut ui = Ui::new(children, &mut *ctx.context_state, ctx.parent.clone(), true);
         let parent_data = SliverListParentData {
             keep_alive: true,
             layout_offset: None,

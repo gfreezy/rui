@@ -2,6 +2,8 @@ use std::any::Any;
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::fmt::Debug;
+use std::marker::PhantomData;
 use std::ops::Index;
 use std::panic::Location;
 use std::rc::{Rc, Weak};
@@ -14,6 +16,50 @@ use crate::object::{AnyParentData, AnyRenderObject, Properties, RenderObject};
 use crate::perf::measure_time;
 use crate::tree::{Children, Element, InnerElement, Meoizee, State, StateHandle, StateNode};
 
+pub trait Component<Params> {
+    fn call(self, ui: &mut Ui, params: Params);
+}
+
+macro_rules! component_args {
+    () => {
+        impl<F: FnOnce(&mut Ui)> Component<()> for F {
+            fn call(self, ui: &mut Ui, params: ()) {
+                self(ui);
+            }
+        }
+    };
+    ($P: tt) => {
+        impl<P: Clone + PartialEq + 'static, F: FnOnce(&mut Ui, P)> Component<(P,)> for F {
+            fn call(self, ui: &mut Ui, params: (P,)) {
+                let (p,) = params;
+                self(ui, p);
+            }
+        }
+    };
+    ($($P: tt),*) => {
+        #[allow(non_snake_case)]
+        impl<$($P: Clone + PartialEq + 'static),*, F: FnOnce(&mut Ui, $($P),*)> Component<($($P),*)>
+            for F
+        {
+            fn call(self, ui: &mut Ui, params: ($($P),*)) {
+                let ($($P),*) = params;
+                self(ui, $($P),*);
+            }
+        }
+    };
+}
+component_args!();
+component_args!(P1);
+component_args!(P1, P2);
+component_args!(P1, P2, P3);
+component_args!(P1, P2, P3, P4);
+component_args!(P1, P2, P3, P4, P5);
+component_args!(P1, P2, P3, P4, P5, P6);
+component_args!(P1, P2, P3, P4, P5, P6, P7);
+component_args!(P1, P2, P3, P4, P5, P6, P7, P8);
+component_args!(P1, P2, P3, P4, P5, P6, P7, P8, P9);
+component_args!(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10);
+
 pub struct Ui<'a, 'b, 'c, 'c2> {
     tree: &'a mut Children,
     parent_element: Option<Weak<RefCell<InnerElement>>>,
@@ -21,6 +67,7 @@ pub struct Ui<'a, 'b, 'c, 'c2> {
     state_index: usize,
     render_index: usize,
     memoizee_index: usize,
+    need_update: bool,
     parent_data: Option<Box<dyn AnyParentData>>,
 }
 
@@ -35,6 +82,7 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
         tree: &'a mut Children,
         context_state: &'b mut ContextState<'c, 'c2>,
         parent_element: Option<Weak<RefCell<InnerElement>>>,
+        need_update: bool,
     ) -> Self {
         Ui {
             parent_element,
@@ -43,23 +91,32 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
             state_index: 0,
             render_index: 0,
             memoizee_index: 0,
+            need_update,
             parent_data: None,
         }
+    }
+
+    pub(crate) fn dirty_elements(&self) -> Rc<RefCell<Vec<Weak<RefCell<InnerElement>>>>> {
+        self.context_state.dirty_elements()
     }
 
     pub fn tree(&self) -> &Children {
         &self.tree
     }
 
-    pub fn next_element_needs_update(&self) -> bool {
-        self.tree
-            .get(self.render_index)
-            .map(|e| e.needs_update())
-            .unwrap_or(true)
-    }
-
-    pub fn skip_next_element(&mut self) {
-        self.render_index += 1;
+    pub fn element_needs_update(&self, index: usize) -> bool {
+        let element = self.tree.get(index);
+        let need_update = element.map(|e| e.needs_update()).unwrap_or(true);
+        let name = element
+            .map(|e| e.name().to_string())
+            .unwrap_or_else(|| "".to_string());
+        tracing::trace!(
+            "name: {name}, index: {}, need_update: {}, element_needs_update: {:?}",
+            index,
+            self.need_update,
+            need_update,
+        );
+        need_update || self.need_update
     }
 
     fn alloc<T>(&mut self, val: T) -> &mut T {
@@ -96,11 +153,10 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
     }
 
     #[track_caller]
-    pub fn memoize<Params: PartialEq + Clone + 'static, Content: FnOnce(&mut Ui)>(
+    pub fn memoize<Params: PartialEq + Clone + Debug + 'static, Comp: Component<Params>>(
         &mut self,
-        component: fn(&mut Ui, Params, Content),
+        component: Comp,
         params: Params,
-        content: Content,
     ) {
         let key = Location::caller().into();
         let mut params_changed = false;
@@ -111,12 +167,16 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
                 self.insert_memoizee(key, Box::new(params.clone()))
             }
             Some(index) => {
-                if let Some(old_params) = self.tree.memoizees[index].val.downcast_mut::<Params>() {
-                    if old_params != &params {
-                        params_changed = true;
-                        *old_params = params.clone();
-                    }
+                let old_params = self.tree.memoizees[index]
+                    .val
+                    .downcast_mut::<Params>()
+                    .unwrap();
+                tracing::debug!("old_params: {:?}, new_params: {:?}", old_params, params);
+                if old_params != &params {
+                    params_changed = true;
+                    *old_params = params.clone();
                 }
+
                 index
             }
         };
@@ -125,20 +185,12 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
         }
         self.memoizee_index = index + 1;
 
-        if params_changed || self.next_element_needs_update() {
-            println!(
-                "params_changed: {params_changed}, next element needs update: {needs_update}",
-                params_changed = params_changed,
-                needs_update = self.next_element_needs_update()
-            );
-            component(self, params, content);
-        } else {
-            println!("skip");
-            self.skip_next_element();
-        }
+        self.need_update = params_changed;
+        component.call(self, params);
+        self.need_update = true;
     }
 
-    pub fn render_object_pro<Props, R, N>(
+    pub fn render_object_advanced<Props, R, N>(
         &mut self,
         key: impl Into<(Key, LocalKey)>,
         props: Props,
@@ -170,40 +222,44 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
             (RenderAction::Insert(_), _) | (RenderAction::Auto, None) => {
                 let object = R::create(props);
                 let index = self.insert_render_object(key, local_key.clone(), object);
-                let node = &mut self.tree.renders[index];
-                node.request_layout();
-                tracing::trace!(
-                    "Insert render object, key: {:?}, local_key: {}, index: {}",
-                    key,
-                    &local_key,
-                    index
-                );
+                if self.element_needs_update(index) {
+                    let node = &mut self.tree.renders[index];
+                    node.request_layout();
+                    tracing::trace!(
+                        "Insert render object, key: {:?}, local_key: {}, index: {}",
+                        key,
+                        &local_key,
+                        index
+                    );
+                }
                 index
             }
             (RenderAction::Update(_), Some(index)) | (RenderAction::Auto, Some(index)) => {
-                let mut guard = self.tree.renders[index].inner.borrow_mut();
-                let inner_node = &mut *guard;
-                let object = inner_node
-                    .object
-                    .as_any()
-                    .downcast_mut::<R>()
-                    .expect(&format!(
-                        "Wrong node type. Expected {}",
-                        std::any::type_name::<R>()
-                    ));
+                if self.element_needs_update(index) {
+                    let mut guard = self.tree.renders[index].inner.borrow_mut();
+                    let inner_node = &mut *guard;
+                    let object = inner_node
+                        .object
+                        .as_any()
+                        .downcast_mut::<R>()
+                        .expect(&format!(
+                            "Wrong node type. Expected {}",
+                            std::any::type_name::<R>()
+                        ));
 
-                let mut ctx = UpdateCtx {
-                    context_state: self.context_state,
-                    child_state: &mut inner_node.state,
-                    parent: self.parent_element.clone(),
-                };
-                action = object.update(&mut ctx, props);
-                tracing::trace!(
-                    "Update render object, key: {:?}, local_key: {}, index: {}",
-                    key,
-                    &local_key,
-                    index
-                );
+                    let mut ctx = UpdateCtx {
+                        context_state: self.context_state,
+                        child_state: &mut inner_node.state,
+                        parent: self.parent_element.clone(),
+                    };
+                    action = object.update(&mut ctx, props);
+                    tracing::trace!(
+                        "Update render object, key: {:?}, local_key: {}, index: {}",
+                        key,
+                        &local_key,
+                        index
+                    );
+                }
                 index
             }
             (RenderAction::Update(index), None) => {
@@ -219,30 +275,35 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
         }
         self.render_index = index + 1;
 
-        let node = &self.tree.renders[index].inner;
-        let parent_element = Rc::downgrade(node);
-        let mut current_element = node.borrow_mut();
-        current_element.local_key = local_key;
-        current_element.clear_needs_update();
+        if self.element_needs_update(index) {
+            let node = &self.tree.renders[index].inner;
+            let parent_element = Rc::downgrade(node);
+            let mut current_element = node.borrow_mut();
+            current_element.local_key = local_key;
+            current_element.clear_needs_update();
 
-        let changed = current_element.set_parent_data(self.parent_data.take());
-        if changed {
-            current_element.request_layout();
-        }
-
-        if let Some(content) = content {
-            let mut child_ui = Ui::new(
-                &mut current_element.children,
-                self.context_state,
-                Some(parent_element),
-            );
-            content(&mut child_ui);
-
-            if child_ui.cleanup_tree() {
+            let changed = current_element.set_parent_data(self.parent_data.take());
+            if changed {
                 current_element.request_layout();
             }
-            current_element.merge_child_states_up();
+
+            if let Some(content) = content {
+                let mut child_ui = Ui::new(
+                    &mut current_element.children,
+                    self.context_state,
+                    Some(parent_element),
+                    true,
+                );
+                content(&mut child_ui);
+
+                if child_ui.cleanup_tree() {
+                    current_element.request_layout();
+                }
+                current_element.merge_child_states_up();
+            }
         }
+
+        let _ = self.parent_data.take();
 
         action
     }
@@ -258,7 +319,7 @@ impl<'a, 'b, 'c, 'c2> Ui<'a, 'b, 'c, 'c2> {
         R: RenderObject<Props> + Any,
         N: FnOnce(&mut Ui),
     {
-        self.render_object_pro(key, props, RenderAction::Auto, None, Some(content))
+        self.render_object_advanced(key, props, RenderAction::Auto, None, Some(content))
     }
 }
 

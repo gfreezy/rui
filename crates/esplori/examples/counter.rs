@@ -8,7 +8,6 @@ use rui::{
 
 fn win(ui: &mut Ui) {
     let count = ui.state_node(|| 0usize);
-    println!("win");
 
     flex(
         ui,
@@ -23,7 +22,7 @@ fn win(ui: &mut Ui) {
     "#
         ),
         |ui| {
-            ui.memoize(comp, ui[count], |_| {});
+            ui.memoize(comp, (ui[count],));
 
             text(
                 ui,
@@ -51,13 +50,11 @@ fn win(ui: &mut Ui) {
     );
 }
 
-fn comp(ui: &mut Ui, count: usize, _content: impl FnOnce(&mut Ui)) {
-    println!("comp");
+fn comp(ui: &mut Ui, count: usize) {
     column(ui, live_s!(ui, ""), |ui| {
-        println!("comp column");
         text(
             ui,
-            &format!("{}", count),
+            &format!("outer: {}", count),
             live_s!(
                 ui,
                 r#"
@@ -84,7 +81,7 @@ fn comp(ui: &mut Ui, count: usize, _content: impl FnOnce(&mut Ui)) {
             |ui| {
                 text(
                     ui,
-                    &format!("{}", ui[count]),
+                    &format!("self: {}", ui[count]),
                     live_s!(
                         ui,
                         r#"
@@ -110,7 +107,8 @@ fn comp(ui: &mut Ui, count: usize, _content: impl FnOnce(&mut Ui)) {
 }
 
 fn main() {
-    let desc = WindowDesc::new("app".to_string(), move |ui| win(ui)).menu(|_| menu_bar());
+    let desc =
+        WindowDesc::new("app".to_string(), move |ui| ui.memoize(win, ())).menu(|_| menu_bar());
     let app = AppLauncher::with_windows(vec![desc]).log_to_console();
     app.launch().unwrap();
 }

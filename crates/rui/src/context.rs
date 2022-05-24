@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
     ops::{Deref, DerefMut},
-    rc::Weak,
+    rc::{Rc, Weak},
     time::Duration,
 };
 
@@ -37,6 +37,7 @@ pub(crate) struct ContextState<'a, 'b> {
     pub(crate) ext_handle: ExtEventSink,
     pub(crate) text: PietText,
     pub(crate) command_queue: &'a mut CommandQueue,
+    pub(crate) dirty_elements: Rc<RefCell<Vec<Weak<RefCell<InnerElement>>>>>,
     pub(crate) bump: &'b mut Bump,
 }
 
@@ -226,6 +227,10 @@ impl_context_method!(
 );
 
 impl ContextState<'_, '_> {
+    pub(crate) fn dirty_elements(&self) -> Rc<RefCell<Vec<Weak<RefCell<InnerElement>>>>> {
+        self.dirty_elements.clone()
+    }
+
     fn request_timer(&self, child_state: &mut ElementState, deadline: Duration) -> TimerToken {
         let timer_token = self.window.request_timer(deadline);
         child_state.add_timer(timer_token);
