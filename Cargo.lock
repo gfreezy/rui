@@ -326,6 +326,7 @@ dependencies = [
  "convert_case",
  "druid-shell",
  "fxhash",
+ "memoize_attr",
  "nom",
  "notify",
  "once_cell",
@@ -882,6 +883,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5aa361d4faea93603064a027415f07bd8e1d5c88c9fbf68bf56a285428fd79ce"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "memoize_attr"
+version = "0.0.0"
+dependencies = [
+ "quote",
+ "syn",
 ]
 
 [[package]]

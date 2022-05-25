@@ -1,5 +1,10 @@
 [workspace]
-members = ["crates/esplori", "crates/rui", "crates/style"]
+members = [
+    "crates/esplori",
+    "crates/rui",
+    "crates/style",
+    "crates/memoize_attr",
+]
 
 [patch.crates-io]
 piet-common = { git = "https://github.com/linebender/piet", rev = "436c5d9" }

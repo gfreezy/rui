@@ -179,7 +179,7 @@ fn win(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
                 });
             },
         );
-        ui.memoize(win2, ());
+        win2(ui);
     });
 
     snapshot.lock().unwrap().debug_state = ui.tree()[0].debug_state();
@@ -286,6 +286,7 @@ struct Snapshot {
     debug_state: DebugState,
 }
 
+#[memoize_attr::memoize]
 fn win2(ui: &mut Ui) {
     let count = ui.state_node(|| 0usize);
     flex(
@@ -300,7 +301,7 @@ fn win2(ui: &mut Ui) {
             "#
         ),
         |ui| {
-            ui.memoize(comp, (10,));
+            comp(ui, 10);
 
             text(
                 ui,
@@ -326,6 +327,7 @@ fn win2(ui: &mut Ui) {
     );
 }
 
+#[memoize_attr::memoize]
 fn comp(ui: &mut Ui, size: usize) {
     text(
         ui,

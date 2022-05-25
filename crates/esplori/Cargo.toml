@@ -21,3 +21,4 @@ thiserror = "1.0.30"
 fxhash = "0.2"
 style = { path = "../style" }
 rui = { path = "../rui" }
+memoize_attr = { path = "../memoize_attr" }
