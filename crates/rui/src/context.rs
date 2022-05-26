@@ -366,7 +366,7 @@ impl PaintCtx<'_, '_, '_, '_, '_, '_> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// # use druid::{Env, PaintCtx, RenderContext, theme};
     /// # struct T;
     /// # impl T {

@@ -61,7 +61,7 @@ pub struct Selector<T = ()>(SelectorSymbol, PhantomData<T>);
 /// The [`EventCtx::new_window`] method is an example of this.
 ///
 /// # Examples
-/// ```
+/// ```ignore
 /// use druid::{Command, Selector, Target};
 ///
 /// let selector = Selector::new("process_rows");
@@ -112,7 +112,7 @@ pub struct Notification {
 /// cloned, and you wish to send it to another widget.
 ///
 /// # Examples
-/// ```
+/// ```ignore
 /// use druid::{Command, Selector, SingleUse, Target};
 ///
 /// struct CantClone(u8);

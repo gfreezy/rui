@@ -75,7 +75,7 @@ fn inspect(ui: &mut Ui, snapshot: Arc<Mutex<Snapshot>>) {
                 content: move |ui, &(id, ref row)| {
                     button(
                         ui,
-                        &row,
+                        row,
                         move || {
                             selected.set(id);
                             expanded.update(|e| e.toggle(id));

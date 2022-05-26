@@ -15,14 +15,14 @@ use druid_shell::piet::{Color, PietText, RenderContext, TextAlignment};
 use druid_shell::TimerToken;
 use std::panic::Location;
 use std::time::Duration;
+use style::Style;
 
 const CURSOR_BLINK_DURATION: Duration = Duration::from_millis(500);
 
 pub struct TextBox {
     placeholder: String,
     editable: String,
-    alignment: TextAlignment,
-    text_size: f64,
+    style: Style,
     width: Option<f64>,
     on_changed: Box<dyn FnMut(String) + 'static>,
 }
@@ -38,25 +38,19 @@ impl TextBox {
         TextBox {
             placeholder: "".to_string(),
             editable: text,
-            alignment: TextAlignment::Start,
             on_changed: Box::new(|_| {}),
-            text_size: 14.,
+            style: Default::default(),
             width: None,
         }
     }
 
+    pub fn style(mut self, style: Style) -> Self {
+        self.style = style;
+        self
+    }
+
     pub fn placeholder(mut self, text: String) -> Self {
         self.placeholder = text;
-        self
-    }
-
-    pub fn alignment(mut self, alignment: TextAlignment) -> Self {
-        self.alignment = alignment;
-        self
-    }
-
-    pub fn text_size(mut self, size: f64) -> Self {
-        self.text_size = size;
         self
     }
 
@@ -65,6 +59,7 @@ impl TextBox {
         self
     }
 
+    #[track_caller]
     pub fn build(self, ui: &mut Ui) -> bool {
         let caller = crate::key::Key::current();
         ui.render_object(caller, self, |_| {})
@@ -120,7 +115,9 @@ impl RenderObject<TextBox> for TextBoxObject {
 
     fn create(props: TextBox) -> Self {
         let mut editor = Editor::from_text(&*props.editable);
-        editor.layout_mut().set_text_size(props.text_size);
+        editor
+            .layout_mut()
+            .set_text_size(props.style.font_size.value());
 
         TextBoxObject {
             placeholder: TextLayout::from_text(props.placeholder),
@@ -128,13 +125,13 @@ impl RenderObject<TextBox> for TextBoxObject {
             editor,
             input_handler: BasicTextInput::default(),
             activated: false,
-            text_size: props.text_size,
+            text_size: props.style.font_size.value(),
             width: props.width,
             hscroll_offset: 0.,
             suppress_adjust_hscroll: false,
             cursor_timer: TimerToken::INVALID,
             cursor_on: false,
-            alignment: TextAlignment::Start,
+            alignment: props.style.text_alignment,
             alignment_offset: 0.0,
             text_pos: Point::ZERO,
             was_focused_from_click: false,
@@ -149,8 +146,10 @@ impl RenderObject<TextBox> for TextBoxObject {
             ctx.request_layout();
         }
 
-        if self.text_size != props.text_size {
-            self.editor.layout_mut().set_text_size(props.text_size);
+        if self.text_size != props.style.font_size.value() {
+            self.editor
+                .layout_mut()
+                .set_text_size(props.style.font_size.value());
             ctx.request_layout();
         }
         if props.width != self.width {
@@ -161,8 +160,8 @@ impl RenderObject<TextBox> for TextBoxObject {
             self.placeholder.set_text(props.placeholder.to_owned());
             ctx.request_layout();
         }
-        if props.alignment != self.alignment {
-            self.alignment = props.alignment;
+        if self.alignment != props.style.text_alignment {
+            self.alignment = props.style.text_alignment;
             ctx.request_layout();
         }
         self.on_changed = props.on_changed;
@@ -176,7 +175,7 @@ impl RenderObject<TextBox> for TextBoxObject {
 impl RenderObjectInterface for TextBoxObject {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, _children: &mut Children) {
         self.suppress_adjust_hscroll = false;
-        let mut new_text = self.text.clone();
+        let mut original_text = self.text.clone();
         match event {
             Event::MouseDown(mouse) => {
                 // ctx.request_focus();
@@ -187,7 +186,7 @@ impl RenderObjectInterface for TextBoxObject {
                 if !mouse.focus {
                     self.was_focused_from_click = true;
                     self.reset_cursor_blink(ctx.request_timer(CURSOR_BLINK_DURATION));
-                    self.editor.click(&mouse, &mut new_text);
+                    self.editor.click(&mouse, &mut self.text);
                 }
 
                 ctx.request_paint();
@@ -196,7 +195,7 @@ impl RenderObjectInterface for TextBoxObject {
                 let mut mouse = mouse.clone();
                 mouse.pos += Vec2::new(self.hscroll_offset - self.alignment_offset, 0.0);
                 if ctx.is_active() {
-                    self.editor.drag(&mouse, &mut new_text);
+                    self.editor.drag(&mouse, &mut self.text);
                     ctx.request_paint();
                 }
             }
@@ -227,7 +226,7 @@ impl RenderObjectInterface for TextBoxObject {
             // }
             Event::Paste(ref item) => {
                 if let Some(string) = item.get_string() {
-                    self.editor.paste(string, &mut new_text);
+                    self.editor.paste(string, &mut self.text);
                 }
             }
             Event::KeyDown(key_event) => {
@@ -249,8 +248,7 @@ impl RenderObjectInterface for TextBoxObject {
                     k_e => {
                         if let Some(edit) = self.input_handler.handle_event(k_e) {
                             self.suppress_adjust_hscroll = matches!(edit, EditAction::SelectAll);
-                            self.editor.do_edit(edit, &mut new_text);
-                            ctx.request_update();
+                            self.editor.do_edit(edit, &mut self.text);
                             ctx.request_paint();
                         }
                     }
@@ -260,8 +258,8 @@ impl RenderObjectInterface for TextBoxObject {
             }
             _ => (),
         }
-        if &self.text != &new_text {
-            (self.on_changed)(new_text);
+        if &self.text != &original_text {
+            (self.on_changed)(self.text.clone());
         }
     }
 

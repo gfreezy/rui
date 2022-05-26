@@ -33,28 +33,6 @@ impl Padding {
     /// of [`kurbo::Insets`], a f64 for uniform padding, a 2-tuple for axis-uniform padding
     /// or 4-tuple with (left, top, right, bottom) values.
     ///
-    /// # Examples
-    ///
-    /// Uniform padding:
-    ///
-    /// ```
-    /// use coat::widgets::{Label, Padding};
-    /// use coat::kurbo::Insets;
-    ///
-    /// let _: Padding = Padding::new(10.0);
-    /// let _: Padding = Padding::new(Insets::uniform(10.0));
-    /// ```
-    ///
-    /// Uniform padding across each axis:
-    ///
-    /// ```
-    /// use coat::widgets::{Label, Padding};
-    /// use coat::kurbo::Insets;
-    ///
-    /// let _: Padding = Padding::new((10.0, 20.0));
-    /// let _: Padding = Padding::new(Insets::uniform_xy(10.0, 20.0));
-    /// ```
-    ///
     /// [`kurbo::Insets`]: https://docs.rs/kurbo/0.5.3/kurbo/struct.Insets.html
     pub fn new(insets: impl Into<Insets>) -> Padding {
         let insets = insets.into();
