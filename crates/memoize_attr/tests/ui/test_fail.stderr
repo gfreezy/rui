@@ -1,0 +1,5 @@
+error: `memoize` expects the first parameter to be `ui`
+  --> tests/ui/test_fail.rs:10:4
+   |
+10 | fn comp(_count: usize) {}
+   |    ^^^^
