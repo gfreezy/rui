@@ -23,11 +23,10 @@ fn win(ui: &mut Ui) {
     "#
         ),
         |ui| {
-            comp(ui, 10);
-
-            text(
+            textbox(
                 ui,
-                &format!("{}", ui[count]),
+                format!("{}", ui[count]),
+                |_| {},
                 live_s!(
                     ui,
                     r#"
@@ -41,7 +40,7 @@ fn win(ui: &mut Ui) {
 
             button(
                 ui,
-                "Increment",
+                "Count",
                 move || {
                     count.update(|c| *c += 1);
                 },
@@ -49,63 +48,6 @@ fn win(ui: &mut Ui) {
             );
         },
     );
-}
-
-#[memoize_attr::memoize]
-fn comp(ui: &mut Ui, count: usize) {
-    column(ui, live_s!(ui, ""), |ui| {
-        text(
-            ui,
-            &format!("outer: {}", count),
-            live_s!(
-                ui,
-                r#"
-    .a {
-        color: rgb(43, 130, 190);
-        font-size: 50.0;
-    }
-"#
-            ),
-        );
-        let count = ui.state_node(|| 0usize);
-        flex(
-            ui,
-            live_s!(
-                ui,
-                r#"
-    .counter {
-        axis: horizontal;
-        main-axis-alignment: center;
-        cross-axis-alignment: center;
-    }
-    "#
-            ),
-            |ui| {
-                text(
-                    ui,
-                    &format!("self: {}", ui[count]),
-                    live_s!(
-                        ui,
-                        r#"
-                .a {
-                    color: rgb(43, 130, 190);
-                    font-size: 50.0;
-                }
-            "#
-                    ),
-                );
-
-                button(
-                    ui,
-                    "Increment Subcomponent",
-                    move || {
-                        count.update(|c| *c += 1);
-                    },
-                    live_s!(ui, ""),
-                );
-            },
-        );
-    });
 }
 
 fn main() {
