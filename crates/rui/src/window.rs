@@ -1,7 +1,9 @@
 use std::{
     cell::RefCell,
+    collections::HashMap,
     panic::Location,
     rc::{Rc, Weak},
+    sync::atomic::{AtomicUsize, Ordering},
     time::Instant,
 };
 
@@ -9,7 +11,7 @@ use bumpalo::Bump;
 use druid_shell::{
     kurbo::{Point, Rect, Size, Vec2},
     piet::{Color, PaintBrush, Piet, RenderContext},
-    Region, WindowHandle,
+    MouseEvent, Region, WindowHandle,
 };
 
 use crate::{
@@ -30,6 +32,45 @@ use crate::{
     widgets::window_container::WindowContainer,
 };
 
+use self::hit_test::HitTestResult;
+
+mod hit_test {
+    use std::{
+        cell::RefCell,
+        rc::{Rc, Weak},
+    };
+
+    use crate::tree::InnerElement;
+
+    #[derive(Clone)]
+    pub(crate) struct HitTestEntry {
+        target: Weak<RefCell<InnerElement>>,
+    }
+
+    impl HitTestEntry {
+        pub(crate) fn target(&self) -> Option<Rc<RefCell<InnerElement>>> {
+            self.target.upgrade()
+        }
+    }
+
+    #[derive(Clone)]
+    pub(crate) struct HitTestResult {
+        path: Vec<HitTestEntry>,
+    }
+
+    impl HitTestResult {
+        pub(crate) fn new() -> Self {
+            HitTestResult { path: vec![] }
+        }
+
+        pub(crate) fn iter(&self) -> impl Iterator<Item = &HitTestEntry> {
+            self.path.iter()
+        }
+    }
+}
+
+type PointerIdentifier = usize;
+
 pub struct Window {
     id: WindowId,
     size: Size,
@@ -43,6 +84,7 @@ pub struct Window {
     ext_handle: ExtEventSink,
     dirty_elements: Rc<RefCell<Vec<Weak<RefCell<InnerElement>>>>>,
     bump: Bump,
+    hit_tests: HashMap<PointerIdentifier, hit_test::HitTestResult>,
 }
 
 impl Window {
@@ -70,6 +112,7 @@ impl Window {
             invalid: Region::EMPTY,
             ext_handle,
             dirty_elements,
+            hit_tests: HashMap::new(),
             bump: Bump::new(),
         }
     }
@@ -179,15 +222,57 @@ impl Window {
         invalid.union_with(&root_state.invalid);
     }
 
+    fn hit_test(&mut self, hit_test_result: &mut HitTestResult, event: Point) {}
+
+    fn handle_pointer_event(&mut self, event: &Event) {
+        static POINTER_IDENTIFIER: AtomicUsize = AtomicUsize::new(0);
+
+        let identifier = if matches!(event, Event::MouseDown(_)) {
+            POINTER_IDENTIFIER.fetch_add(1, Ordering::Relaxed) + 1
+        } else {
+            POINTER_IDENTIFIER.load(Ordering::Relaxed)
+        };
+
+        let hit_test_result = match event {
+            Event::MouseDown(e) | Event::Wheel(e) | Event::MouseMove(e) if e.buttons.is_empty() => {
+                assert!(!self.hit_tests.contains_key(&identifier));
+                let mut hit_test_result = HitTestResult::new();
+                self.hit_test(&mut hit_test_result, e.pos);
+                if matches!(event, Event::MouseDown(_)) {
+                    self.hit_tests.insert(identifier, hit_test_result.clone());
+                }
+                hit_test_result
+            }
+            Event::MouseUp(e) => self.hit_tests.remove(&identifier).unwrap(),
+            Event::MouseMove(e) if e.buttons.has_left() => {
+                self.hit_tests.get(&identifier).unwrap().clone()
+            }
+            _ => unreachable!(),
+        };
+        self.dispatch_event(event, hit_test_result);
+    }
+
+    fn dispatch_event(&mut self, event: &Event, hit_test_result: HitTestResult) {
+        for el in hit_test_result.iter().filter_map(|p| p.target()) {
+            // todo: xxx
+            // let el = el.borrow_mut().event(ctx, event);
+        }
+    }
+
     // #[instrument(skip(self))]
     pub(crate) fn event(&mut self, queue: &mut CommandQueue, event: Event) -> Handled {
         match &event {
             Event::WindowSize(size) => self.size = *size,
+            Event::WindowConnected => {
+                self.lifecycle(queue, &LifeCycle::Other);
+            }
+            event @ Event::MouseDown(_)
+            | event @ Event::MouseMove(_)
+            | event @ Event::MouseUp(_)
+            | event @ Event::Wheel(_) => {
+                self.handle_pointer_event(event);
+            }
             _ => (),
-        }
-
-        if let Event::WindowConnected = event {
-            self.lifecycle(queue, &LifeCycle::Other);
         }
 
         let Self {

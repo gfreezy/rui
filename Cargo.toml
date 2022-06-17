@@ -4,6 +4,8 @@ members = [
     "crates/rui",
     "crates/style",
     "crates/memoize_attr",
+    "crates/esplori",
+    "crates/zest",
 ]
 
 [patch.crates-io]

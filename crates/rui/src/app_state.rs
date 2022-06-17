@@ -3,9 +3,10 @@ use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 
 use std::rc::{Rc, Weak};
+use std::sync::atomic::AtomicUsize;
 use std::time::Instant;
 
-use druid_shell::kurbo::Size;
+use druid_shell::kurbo::{Point, Size};
 use druid_shell::piet::Piet;
 use druid_shell::{
     Application, IdleToken, KeyEvent, MouseEvent, Region, Scale, TextFieldToken, TimerToken,

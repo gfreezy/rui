@@ -1,0 +1,3 @@
+mod widget;
+
+fn main() {}

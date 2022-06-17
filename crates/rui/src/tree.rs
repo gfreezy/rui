@@ -213,6 +213,11 @@ pub struct Element {
     pub(crate) inner: Rc<RefCell<InnerElement>>,
 }
 
+#[derive(Clone)]
+pub struct WeakElement {
+    pub(crate) inner: Weak<RefCell<InnerElement>>,
+}
+
 pub(crate) struct InnerElement {
     pub(crate) name: &'static str,
     pub(crate) key: Key,

@@ -1,0 +1,13 @@
+[package]
+name = "zest"
+version = "0.0.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+druid-shell = { git = "https://github.com/linebender/druid", rev = "f63ab10" }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+reffers = "0.7"
+decorum = "0.3"
