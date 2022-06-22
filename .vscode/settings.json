@@ -4,20 +4,5 @@
         "**/Cargo.lock": true,
         "**/target": true
     },
-    "outline.showConstants": false,
-    "outline.showBooleans": false,
-    "outline.showArrays": false,
-    "outline.showEnumMembers": false,
-    "outline.showFields": false,
-    "outline.showNull": false,
-    "outline.showNumbers": false,
-    "outline.showProperties": false,
-    "outline.showStrings": false,
-    "outline.showTypeParameters": false,
-    "outline.showVariables": false,
-    "outline.showOperators": false,
-    "outline.showObjects": false,
-    "outline.showNamespaces": false,
-    "outline.showKeys": false,
     "explorer.sortOrder": "mixed"
 }
