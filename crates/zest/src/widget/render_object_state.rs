@@ -1,11 +1,17 @@
 use crate::widget::render_object::{try_ultimate_next_sibling, try_ultimate_prev_sibling};
 
-use super::render_object::{
-    Constraints, Matrix4, Offset, Owner, PaintContext, ParentData, PointerEvent, Rect,
-    RenderObject, WeakOwner, WeakRenderObject,
+use super::{
+    abstract_node::AbstractNode,
+    owner::{Owner, WeakOwner},
+    render_object::{
+        Constraints, Matrix4, Offset, PaintContext, ParentData, PointerEvent, Rect, RenderObject,
+        WeakRenderObject,
+    },
 };
 
+#[derive(Default)]
 pub(crate) struct RenderObjectState {
+    pub(crate) this: Option<WeakRenderObject>,
     pub(crate) first_child: Option<RenderObject>,
     pub(crate) last_child: Option<WeakRenderObject>,
     pub(crate) next_sibling: Option<RenderObject>,
@@ -23,6 +29,17 @@ pub(crate) struct RenderObjectState {
 }
 
 impl RenderObjectState {
+    pub fn new(self_render_object: &RenderObject) -> Self {
+        RenderObjectState {
+            this: Some(self_render_object.downgrade()),
+            ..Default::default()
+        }
+    }
+
+    pub fn this(&self) -> RenderObject {
+        self.this.as_ref().map(|this| this.upgrade()).unwrap()
+    }
+
     pub fn parent(&self) -> RenderObject {
         self.try_parent().unwrap()
     }
@@ -97,17 +114,17 @@ impl RenderObjectState {
         }
     }
 
-    pub fn attach(&mut self, ctx: &RenderObject, owner: Owner) {
+    pub fn attach(&mut self, owner: Owner) {
         self.set_owner(Some(owner.clone()));
 
         if self.needs_layout && self.try_relayout_boundary().is_some() {
             self.needs_layout = false;
-            self.mark_needs_layout(ctx);
+            self.mark_needs_layout();
         }
         // _needsCompositingBitsUpdate
         if self.needs_paint {
             self.needs_paint = false;
-            self.mark_needs_paint(ctx);
+            self.mark_needs_paint();
         }
 
         // attach children
@@ -118,7 +135,7 @@ impl RenderObjectState {
         }
     }
 
-    pub fn detach(&mut self, ctx: &RenderObject) {
+    pub fn detach(&mut self) {
         assert!(self.try_prev_sibling().is_none());
         assert!(self.try_next_sibling().is_none());
         self.set_owner(None);
@@ -134,10 +151,10 @@ impl RenderObjectState {
     /// Mark the given node as being a child of this node.
     ///
     /// Subclasses should call this function when they acquire a new child.
-    pub fn adopt_child(&mut self, ctx: &RenderObject, child: &RenderObject) {
+    pub fn adopt_child(&mut self, child: &RenderObject) {
         assert!(child.try_parent().is_none());
         child.set_parent(Some(child.clone()));
-        self.mark_needs_layout(ctx);
+        self.mark_needs_layout();
         // self.mark_needs_composition_bits_update();
 
         // attach the child to the owner
@@ -147,12 +164,12 @@ impl RenderObjectState {
     /// Disconnect the given node from this node.
     ///
     /// Subclasses should call this function when they lose a child.
-    pub fn drop_child(&mut self, ctx: &RenderObject, child: &RenderObject) {
-        assert_eq!(&child.parent(), ctx);
+    pub fn drop_child(&mut self, child: &RenderObject) {
+        assert_eq!(&child.parent(), &self.this());
         child.clean_relayout_boundary();
         child.set_parent(None);
         // detach the child from the owner
-        self.mark_needs_layout(ctx);
+        self.mark_needs_layout();
     }
 
     /// Adjust the [depth] of the given [child] to be greater than this node's own
@@ -171,31 +188,31 @@ impl RenderObjectState {
     ///
     /// If `after` is null, then this inserts the child at the start of the list,
     /// and the child becomes the new [firstChild].
-    pub fn insert(&mut self, ctx: &RenderObject, child: RenderObject, after: Option<RenderObject>) {
-        assert_ne!(&child, ctx);
-        assert_ne!(after.as_ref(), Some(ctx));
+    pub fn insert(&mut self, child: RenderObject, after: Option<RenderObject>) {
+        assert_ne!(&child, &self.this());
+        assert_ne!(after.as_ref(), Some(&self.this()));
         assert_ne!(Some(&child), after.as_ref());
         assert_ne!(Some(&child), self.try_first_child().as_ref());
         assert_ne!(Some(&child), self.try_last_child().as_ref());
-        self.adopt_child(ctx, &child);
-        self.insert_into_child_list(ctx, child, after);
+        self.adopt_child(&child);
+        self.insert_into_child_list(child, after);
     }
 
-    pub fn add(&mut self, ctx: &RenderObject, child: RenderObject) {
-        self.insert(ctx, child, self.try_last_child());
+    pub fn add(&mut self, child: RenderObject) {
+        self.insert(child, self.try_last_child());
     }
 
-    pub fn remove(&mut self, ctx: &RenderObject, child: &RenderObject) {
-        self.remove_from_child_list(ctx, child.clone());
-        self.drop_child(ctx, child);
+    pub fn remove(&mut self, child: &RenderObject) {
+        self.remove_from_child_list(child.clone());
+        self.drop_child(child);
     }
 
-    pub fn remove_all(&mut self, ctx: &RenderObject) {
+    pub fn remove_all(&mut self) {
         let mut child = self.try_first_child();
         while let Some(c) = child {
             c.set_prev_sibling(None);
             c.set_next_sibling(None);
-            self.drop_child(ctx, &c);
+            self.drop_child(&c);
             child = c.try_next_sibling();
         }
         self.set_first_child(None);
@@ -203,25 +220,20 @@ impl RenderObjectState {
         self.child_count = 0;
     }
 
-    pub fn move_(&mut self, ctx: &RenderObject, child: RenderObject, after: Option<RenderObject>) {
-        assert_ne!(&child, ctx);
-        assert_ne!(Some(ctx), after.as_ref());
+    pub fn move_(&mut self, child: RenderObject, after: Option<RenderObject>) {
+        assert_ne!(&child, &self.this());
+        assert_ne!(Some(&self.this()), after.as_ref());
         assert_ne!(Some(&child), after.as_ref());
-        assert_eq!(&child.parent(), ctx);
+        assert_eq!(&child.parent(), &self.this());
         if self.try_prev_sibling() == after {
             return;
         }
-        self.remove_from_child_list(ctx, child.clone());
-        self.insert_into_child_list(ctx, child, after);
-        self.mark_needs_layout(ctx);
+        self.remove_from_child_list(child.clone());
+        self.insert_into_child_list(child, after);
+        self.mark_needs_layout();
     }
 
-    fn insert_into_child_list(
-        &mut self,
-        ctx: &RenderObject,
-        child: RenderObject,
-        after: Option<RenderObject>,
-    ) {
+    fn insert_into_child_list(&mut self, child: RenderObject, after: Option<RenderObject>) {
         assert!(self.try_next_sibling().is_none());
         assert!(self.try_prev_sibling().is_none());
         self.child_count += 1;
@@ -239,8 +251,14 @@ impl RenderObjectState {
             Some(after) => {
                 assert!(self.try_first_child().is_some());
                 assert!(self.try_last_child().is_some());
-                assert_eq!(try_ultimate_prev_sibling(after.clone()), ctx.first_child());
-                assert_eq!(try_ultimate_next_sibling(after.clone()), ctx.last_child());
+                assert_eq!(
+                    try_ultimate_prev_sibling(after.clone()),
+                    self.this().first_child()
+                );
+                assert_eq!(
+                    try_ultimate_next_sibling(after.clone()),
+                    self.this().last_child()
+                );
                 match after.try_next_sibling() {
                     None => {
                         assert_eq!(after, self.last_child());
@@ -260,7 +278,7 @@ impl RenderObjectState {
         }
     }
 
-    fn remove_from_child_list(&mut self, _ctx: &RenderObject, child: RenderObject) {
+    fn remove_from_child_list(&mut self, child: RenderObject) {
         assert_eq!(try_ultimate_prev_sibling(child.clone()), self.first_child());
         assert_eq!(try_ultimate_next_sibling(child.clone()), self.last_child());
         assert!(self.child_count > 0);
@@ -289,7 +307,7 @@ impl RenderObjectState {
         child.decr_child_count();
     }
 
-    pub(crate) fn mark_needs_layout(&mut self, ctx: &RenderObject) {
+    pub(crate) fn mark_needs_layout(&mut self) {
         if self.needs_layout {
             return;
         }
@@ -305,12 +323,12 @@ impl RenderObjectState {
                 return;
             }
             Some(relayout_boundary) => {
-                if &relayout_boundary != ctx {
+                if relayout_boundary != self.this() {
                     self.mark_parent_needs_layout();
                 } else {
                     self.needs_layout = true;
                     if let Some(owner) = self.try_owner() {
-                        owner.add_node_need_layout(ctx.clone());
+                        owner.add_node_need_layout(self.this());
                         owner.request_visual_update();
                     }
                 }
@@ -318,8 +336,8 @@ impl RenderObjectState {
         }
     }
 
-    pub(crate) fn mark_needs_layout_for_sized_by_parent_change(&mut self, ctx: &RenderObject) {
-        self.mark_needs_layout(ctx);
+    pub(crate) fn mark_needs_layout_for_sized_by_parent_change(&mut self) {
+        self.mark_needs_layout();
         self.mark_parent_needs_layout();
     }
 
@@ -363,7 +381,7 @@ impl RenderObjectState {
         self.owner = owner.map(|o| o.downgrade());
     }
 
-    pub(crate) fn mark_needs_paint(&mut self, ctx: &RenderObject) {
+    pub(crate) fn mark_needs_paint(&mut self) {
         if self.needs_paint {
             return;
         }
@@ -371,7 +389,7 @@ impl RenderObjectState {
         let is_repaint_boundary = true;
         if is_repaint_boundary {
             if let Some(owner) = self.try_owner() {
-                owner.add_node_need_paint(ctx.clone());
+                owner.add_node_need_paint(self.this());
                 owner.request_visual_update();
             }
         } else if self.try_parent().is_some() {
@@ -392,15 +410,15 @@ impl RenderObjectState {
         }
     }
 
-    pub(crate) fn clean_relayout_boundary(&mut self, ctx: &RenderObject) {
-        if self.try_relayout_boundary().as_ref() != Some(ctx) {
+    pub(crate) fn clean_relayout_boundary(&mut self) {
+        if self.try_relayout_boundary().as_ref() != Some(&self.this()) {
             self.set_relayout_boundary(None);
             self.visit_children(|e| e.clean_relayout_boundary());
         }
     }
 
-    pub(crate) fn propagate_relayout_bondary(&mut self, ctx: &RenderObject) {
-        if self.try_relayout_boundary().as_ref() == Some(ctx) {
+    pub(crate) fn propagate_relayout_bondary(&mut self) {
+        if self.try_relayout_boundary().as_ref() == Some(&self.this()) {
             return;
         }
 
@@ -411,70 +429,12 @@ impl RenderObjectState {
         }
     }
 
-    fn layout_without_resize(&mut self, ctx: &RenderObject) {
-        assert_eq!(&self.relayout_boundary(), ctx);
+    fn layout_without_resize(&mut self) {
+        assert_eq!(&self.relayout_boundary(), &self.this());
         assert!(!self.doing_this_layout_with_callback);
         self.perform_layout();
         self.needs_layout = false;
-        self.mark_needs_paint(ctx);
-    }
-
-    /// Compute the layout for this render object.
-    ///
-    /// This method is the main entry point for parents to ask their children to
-    /// update their layout information. The parent passes a constraints object,
-    /// which informs the child as to which layouts are permissible. The child is
-    /// required to obey the given constraints.
-    ///
-    /// If the parent reads information computed during the child's layout, the
-    /// parent must pass true for `parentUsesSize`. In that case, the parent will
-    /// be marked as needing layout whenever the child is marked as needing layout
-    /// because the parent's layout information depends on the child's layout
-    /// information. If the parent uses the default value (false) for
-    /// `parentUsesSize`, the child can change its layout information (subject to
-    /// the given constraints) without informing the parent.
-    ///
-    /// Subclasses should not override [layout] directly. Instead, they should
-    /// override [performResize] and/or [performLayout]. The [layout] method
-    /// delegates the actual work to [performResize] and [performLayout].
-    ///
-    /// The parent's [performLayout] method should call the [layout] of all its
-    /// children unconditionally. It is the [layout] method's responsibility (as
-    /// implemented here) to return early if the child does not need to do any
-    /// work to update its layout information.
-    fn layout(&mut self, ctx: &RenderObject, constraints: Constraints, parent_use_size: bool) {
-        let is_relayout_boundary = !parent_use_size
-            || self.sized_by_parent()
-            || constraints.is_tight()
-            || self.try_parent().is_none();
-        let relayout_boundary = if is_relayout_boundary {
-            ctx.clone()
-        } else {
-            self.parent().relayout_boundary()
-        };
-        if !self.needs_layout
-            && constraints == self.constraints()
-            && Some(relayout_boundary.clone()) != self.try_relayout_boundary()
-        {
-            self.set_relayout_boundary(Some(relayout_boundary));
-            self.visit_children(|e| e.propagate_relayout_bondary());
-            return;
-        }
-
-        self.constraints = constraints;
-        if self.try_relayout_boundary().is_some() && self.relayout_boundary() != relayout_boundary {
-            self.visit_children(|e| e.clean_relayout_boundary());
-        }
-        self.set_relayout_boundary(Some(relayout_boundary));
-        assert!(!self.doing_this_layout_with_callback);
-
-        if self.sized_by_parent() {
-            self.perform_resize();
-        }
-
-        self.perform_layout();
-        self.needs_layout = false;
-        self.mark_needs_paint(ctx);
+        self.mark_needs_paint();
     }
 
     /// Whether the constraints are the only input to the sizing algorithm (in
@@ -595,17 +555,13 @@ impl RenderObjectState {
     /// be recorded on separate compositing layers.
     fn paint(&self, context: &mut PaintContext, offset: Offset) {}
 
-    pub(crate) fn get_transform_to(
-        &self,
-        ctx: &RenderObject,
-        ancestor: Option<RenderObject>,
-    ) -> Matrix4 {
+    pub(crate) fn get_transform_to(&self, ancestor: Option<RenderObject>) -> Matrix4 {
         let ancestor = match ancestor {
             Some(a) => a,
             None => self.owner().root_node(),
         };
-        let mut renderers = vec![ctx.clone()];
-        let mut renderer = ctx.clone();
+        let mut renderers = vec![self.this()];
+        let mut renderer = self.this();
         while renderer != ancestor {
             renderers.push(renderer.clone());
             if let Some(r) = renderer.try_parent() {
@@ -619,7 +575,7 @@ impl RenderObjectState {
         let mut transform = Matrix4::identity();
         let mut iter = renderers.iter().rev().peekable();
         while let (Some(renderer), Some(next)) = (iter.next(), iter.peek()) {
-            renderer.apply_paint_transform((*next).clone(), &mut transform);
+            renderer.apply_paint_transform(next, &mut transform);
         }
         transform
     }
