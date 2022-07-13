@@ -57,6 +57,7 @@ impl RenderObjectInterface for DebugObject {
         if !children.is_empty() {
             children[0].event(ctx, event);
         }
+
     }
 
     fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, children: &mut Children) {
