@@ -1,6 +1,6 @@
 use std::{
     any::Any,
-    cell::{RefCell},
+    cell::RefCell,
     fmt::Debug,
     ops::{Add, Mul, Sub},
     rc::{Rc, Weak},
@@ -216,7 +216,7 @@ impl Debug for RenderObject {
 }
 
 impl AbstractNode for RenderObject {
-    fn node<R>(&self, process: impl FnOnce(&mut RenderObjectState) -> R) -> R {
+    fn state<R>(&self, process: impl FnOnce(&mut RenderObjectState) -> R) -> R {
         match self {
             RenderObject::RenderBox(boxed) => boxed.state(process),
             RenderObject::RenderSliver(boxed) => boxed.state(process),
@@ -307,11 +307,11 @@ impl RenderObject {
     }
 
     pub(crate) fn owner(&self) -> PipelineOwner {
-        self.node(|s| s.owner())
+        self.state(|s| s.owner())
     }
 
     pub(crate) fn try_owner(&self) -> Option<PipelineOwner> {
-        self.node(|s| s.try_owner())
+        self.state(|s| s.try_owner())
     }
 
     pub fn mark_needs_paint(&self) {
@@ -469,6 +469,46 @@ impl RenderObject {
         }
     }
 
+    pub(crate) fn global_to_local(&self, point: Offset, ancestor: Option<RenderObject>) -> Offset {
+        let mut transform = self.get_transform_to(ancestor);
+        let det = transform.invert();
+        if det == 0.0 {
+            return Offset::ZERO;
+        }
+
+        let n = Vector3::new(0.0, 0.0, 1.0);
+        let _i = transform.perspective_transform(Vector3::new(0.0, 0.0, 0.0));
+        let d = transform.perspective_transform(Vector3::new(0.0, 0.0, 0.0));
+        let s = transform.perspective_transform(Vector3::new(point.dx, point.dy, 0.0));
+        let p = s - d * (n.dot(s) / n.dot(d));
+        Offset::new(p.x, p.y)
+    }
+
+    pub(crate) fn get_transform_to(&self, ancestor: Option<RenderObject>) -> Matrix4 {
+        let ancestor = match ancestor {
+            Some(a) => a,
+            None => self.owner().root_node(),
+        };
+        let mut renderers = vec![self.clone()];
+        let mut renderer = self.clone();
+        while renderer != ancestor {
+            renderers.push(renderer.clone());
+            if let Some(r) = renderer.try_parent() {
+                renderer = r.parent();
+            } else {
+                break;
+            }
+        }
+        renderers.push(ancestor);
+
+        let mut transform = Matrix4::identity();
+        let mut iter = renderers.iter().rev().peekable();
+        while let (Some(renderer), Some(next)) = (iter.next(), iter.peek()) {
+            renderer.apply_paint_transform(next, &mut transform);
+        }
+        transform
+    }
+
     pub(crate) fn layout_without_resize(&self) {
         match self {
             RenderObject::RenderBox(s) => s.layout_without_resize(),
@@ -535,7 +575,7 @@ impl WeakRenderObject {
         match self {
             WeakRenderObject::RenderBox(o) => o.is_alive(),
             WeakRenderObject::RenderSliver(o) => o.is_alive(),
-            WeakRenderObject::RenderView(o) => o.is_alive(),
+            WeakRenderObject::RenderView(_) => unreachable!(),
         }
     }
 }

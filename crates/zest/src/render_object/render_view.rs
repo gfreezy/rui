@@ -28,7 +28,7 @@ impl PartialEq for RenderView {
 }
 
 impl AbstractNode for RenderView {
-    fn node<R>(&self, process: impl FnOnce(&mut RenderObjectState) -> R) -> R {
+    fn state<R>(&self, process: impl FnOnce(&mut RenderObjectState) -> R) -> R {
         process(&mut self.inner.borrow_mut().state)
     }
 }
@@ -42,7 +42,6 @@ impl RenderView {
             })),
         };
         let object = RenderObject::RenderView(v);
-        object.set_this(object.clone());
         object.set_first_child(Some(child));
         object.mark_needs_layout();
         object
@@ -141,9 +140,5 @@ impl WeakRenderView {
             .upgrade()
             .map(|inner| RenderView { inner })
             .unwrap()
-    }
-
-    pub fn is_alive(&self) -> bool {
-        self.inner.upgrade().is_some()
     }
 }

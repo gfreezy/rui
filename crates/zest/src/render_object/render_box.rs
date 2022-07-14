@@ -1,12 +1,11 @@
 use std::{
     cell::RefCell,
-    collections::{HashMap},
+    collections::HashMap,
     hash::Hash,
     rc::{Rc, Weak},
 };
 
-use decorum::{R64};
-
+use decorum::R64;
 
 use crate::render_object::render_object::RenderObject;
 
@@ -47,39 +46,6 @@ impl From<druid_shell::kurbo::Size> for Size {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct BoxConstraints {
-    min_width: f64,
-    max_width: f64,
-    min_height: f64,
-    max_height: f64,
-}
-
-impl PartialEq for BoxConstraints {
-    fn eq(&self, other: &Self) -> bool {
-        self.min_width == other.min_width
-            && self.max_width == other.max_width
-            && self.min_height == other.min_height
-            && self.max_height == other.max_height
-    }
-}
-
-impl Eq for BoxConstraints {}
-
-impl Hash for BoxConstraints {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        R64::from(self.min_width).hash(state);
-        R64::from(self.max_width).hash(state);
-        R64::from(self.min_height).hash(state);
-        R64::from(self.max_height).hash(state);
-    }
-}
-
-impl From<BoxConstraints> for Constraints {
-    fn from(bc: BoxConstraints) -> Self {
-        Constraints::BoxConstraints(bc)
-    }
-}
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 enum InstrinsicDimension {
     MinWidth,
@@ -93,6 +59,7 @@ struct InstrinsicDimensionsCacheEntry {
     dimension: InstrinsicDimension,
     argument: R64,
 }
+
 #[derive(Clone)]
 pub struct RenderBox {
     inner: Rc<RefCell<InnerRenderBox>>,
@@ -174,9 +141,16 @@ pub trait RenderBoxWidget {
         }
         false
     }
+
+    fn attach(&mut self, this: &RenderObject) {}
+    fn detach(&mut self, this: &RenderObject) {}
 }
 
 impl RenderBox {
+    fn render_object(&self) -> RenderObject {
+        RenderObject::RenderBox(self.clone())
+    }
+
     pub(crate) fn new_render_object(widget: Box<dyn RenderBoxWidget>) -> RenderObject {
         let render_box = Self {
             inner: Rc::new(RefCell::new(InnerRenderBox {
@@ -184,9 +158,12 @@ impl RenderBox {
                 ..Default::default()
             })),
         };
-        let render_object = RenderObject::RenderBox(render_box);
-        render_object.set_this(render_object.clone());
-        render_object
+        render_box
+            .inner
+            .borrow_mut()
+            .state
+            .set_render_object(render_box.render_object());
+        render_box.render_object()
     }
 
     pub fn downgrade(&self) -> WeakRenderBox {
@@ -247,7 +224,7 @@ impl RenderBox {
     }
 
     pub(crate) fn layout_without_resize(&self) {
-        assert_eq!(&self.relayout_boundary(), &self.this());
+        assert_eq!(&self.relayout_boundary(), &self.render_object());
         assert!(!self.doing_this_layout_with_callback());
         self.perform_layout();
         self.state(|s| s.needs_layout = false);
@@ -296,7 +273,7 @@ struct InnerRenderBox {
 }
 
 impl AbstractNode for RenderBox {
-    fn node<R>(&self, process: impl FnOnce(&mut RenderObjectState) -> R) -> R {
+    fn state<R>(&self, process: impl FnOnce(&mut RenderObjectState) -> R) -> R {
         process(&mut self.inner.borrow_mut().state)
     }
 }
@@ -327,22 +304,6 @@ impl RenderBox {
         self.with_widget(|w, _this| w.sized_by_parent())
     }
 
-    fn compute_min_instrinsic_width(&self, height: f64) -> f64 {
-        self.with_widget(|w, this| w.compute_min_instrinsic_width(this, height))
-    }
-
-    fn compute_max_instrinsic_width(&self, height: f64) -> f64 {
-        self.with_widget(|w, this| w.compute_max_instrinsic_width(this, height))
-    }
-
-    fn compute_min_instrinsic_height(&self, width: f64) -> f64 {
-        self.with_widget(|w, this| w.compute_min_instrinsic_height(this, width))
-    }
-
-    fn compute_max_instrinsic_height(&self, width: f64) -> f64 {
-        self.with_widget(|w, this| w.compute_max_instrinsic_height(this, width))
-    }
-
     fn compute_dry_layout(&self, constraints: BoxConstraints) -> Size {
         self.with_widget(|w, this| w.compute_dry_layout(this, constraints))
     }
@@ -369,70 +330,43 @@ impl RenderBox {
 }
 
 impl RenderBox {
-    fn with_widget<T>(&self, f: impl FnOnce(&mut dyn RenderBoxWidget, &RenderObject) -> T) -> T {
-        let mut widget = self.inner.borrow_mut().object.take().unwrap();
-        let ret = f(&mut *widget, &self.this());
-        self.inner.borrow_mut().object.replace(widget);
-        ret
-    }
-
-    fn compute_intrinsic_dimensions(
-        &self,
-        dimension: InstrinsicDimension,
-        argument: f64,
-        computer: impl FnOnce(f64) -> f64,
-    ) -> f64 {
-        let should_cache = true;
-        if should_cache {
-            let key = InstrinsicDimensionsCacheEntry {
-                dimension,
-                argument: argument.into(),
-            };
-            let ref_mut = &mut self.inner.borrow_mut().cached_instrinsic_dimensions;
-            let ret = ref_mut.entry(key).or_insert_with(|| computer(argument));
-            *ret
-        } else {
-            computer(argument)
-        }
-    }
-
-    fn get_min_instrinsic_width(&self, height: f64) -> f64 {
+    pub(crate) fn get_min_instrinsic_width(&self, height: f64) -> f64 {
         self.compute_intrinsic_dimensions(InstrinsicDimension::MinWidth, height, |_width| {
-            self.compute_min_instrinsic_width(height)
+            self.with_widget(|w, this| w.compute_min_instrinsic_width(this, height))
         })
     }
 
-    fn get_max_instrinsic_width(&self, height: f64) -> f64 {
+    pub(crate) fn get_max_instrinsic_width(&self, height: f64) -> f64 {
         self.compute_intrinsic_dimensions(InstrinsicDimension::MaxWidth, height, |_width| {
-            self.compute_max_instrinsic_width(height)
+            self.with_widget(|w, this| w.compute_max_instrinsic_width(this, height))
         })
     }
 
-    fn get_min_instrinsic_height(&self, width: f64) -> f64 {
+    pub(crate) fn get_min_instrinsic_height(&self, width: f64) -> f64 {
         self.compute_intrinsic_dimensions(InstrinsicDimension::MinHeight, width, |width| {
-            self.compute_min_instrinsic_height(width)
+            self.with_widget(|w, this| w.compute_min_instrinsic_height(this, width))
         })
     }
 
-    fn get_max_instrinsic_height(&self, width: f64) -> f64 {
+    pub(crate) fn get_max_instrinsic_height(&self, width: f64) -> f64 {
         self.compute_intrinsic_dimensions(InstrinsicDimension::MaxHeight, width, |width| {
-            self.compute_max_instrinsic_height(width)
+            self.with_widget(|w, this| w.compute_max_instrinsic_height(this, width))
         })
     }
 
-    fn try_constraints(&self) -> Option<Constraints> {
-        self.state(|s| s.constraints.clone())
+    pub(crate) fn try_constraints(&self) -> Option<Constraints> {
+        self.state(|s| s.try_constraints())
     }
 
-    fn constraints(&self) -> Constraints {
+    pub(crate) fn constraints(&self) -> Constraints {
         self.try_constraints().unwrap()
     }
 
-    fn box_constraints(&self) -> BoxConstraints {
+    pub(crate) fn box_constraints(&self) -> BoxConstraints {
         self.constraints().box_constraints()
     }
 
-    fn get_dry_layout(&self, constraints: BoxConstraints) -> Size {
+    pub(crate) fn get_dry_layout(&self, constraints: BoxConstraints) -> Size {
         let should_cache = true;
         if should_cache {
             let ref_mut = &mut self.inner.borrow_mut().cached_dry_layout_sizes;
@@ -474,7 +408,7 @@ impl RenderBox {
             || constraints.is_tight()
             || self.try_parent().is_none();
         let relayout_boundary = if is_relayout_boundary {
-            self.this()
+            self.render_object()
         } else {
             self.parent().relayout_boundary()
         };
@@ -503,15 +437,11 @@ impl RenderBox {
         self.mark_needs_paint();
     }
 
-    pub fn has_size(&self) -> bool {
-        self.inner.borrow().size.is_some()
-    }
-
-    pub fn size(&self) -> Size {
+    pub(crate) fn size(&self) -> Size {
         self.inner.borrow().size.expect("no size available")
     }
 
-    pub fn offset(&self) -> Offset {
+    pub(crate) fn offset(&self) -> Offset {
         self.inner.borrow().offset
     }
 
@@ -528,45 +458,60 @@ impl RenderBox {
     pub(crate) fn hit_test(&self, result: &mut BoxHitTestResult, position: Offset) -> bool {
         if self.size().contains(position) {
             if self.hit_test_children(result, position) || self.hit_test_self(position) {
-                result.add(BoxHitTestEntry::new(self.this().downgrade(), position));
+                result.add(BoxHitTestEntry::new(
+                    self.render_object().downgrade(),
+                    position,
+                ));
             }
         }
         return false;
     }
 
     pub(crate) fn apply_paint_transform(&self, child: &RenderObject, transform: &Matrix4) {
-        assert_eq!(child.parent(), self.this());
+        assert_eq!(child.parent(), self.render_object());
 
         let offset = child.render_box().offset();
         transform.translate(offset.dx, offset.dy);
     }
 
-    pub(crate) fn global_to_local(&self, point: Offset, ancestor: Option<RenderObject>) -> Offset {
-        let mut transform = self.state(|s| s.get_transform_to(ancestor));
-        let det = transform.invert();
-        if det == 0.0 {
-            return Offset::ZERO;
-        }
-
-        let n = Vector3::new(0.0, 0.0, 1.0);
-        let _i = transform.perspective_transform(Vector3::new(0.0, 0.0, 0.0));
-        let d = transform.perspective_transform(Vector3::new(0.0, 0.0, 0.0));
-        let s = transform.perspective_transform(Vector3::new(point.dx, point.dy, 0.0));
-        let p = s - d * (n.dot(s) / n.dot(d));
-        Offset::new(p.x, p.y)
-    }
-
-    pub(crate) fn local_to_global(&self, _point: Offset, _ancestor: Option<RenderObject>) -> Offset {
-        todo!()
-    }
-
     pub(crate) fn paint_bounds(&self) -> Rect {
         Rect::from_size(self.size())
-        // Offset::ZERO & self.size()
     }
 
     pub(crate) fn handle_event(&self, _event: PointerEvent, _entry: BoxHitTestEntry) {
         todo!()
+    }
+
+    // private methods
+    fn with_widget<T>(&self, f: impl FnOnce(&mut dyn RenderBoxWidget, &RenderObject) -> T) -> T {
+        let mut widget = self.inner.borrow_mut().object.take().unwrap();
+        let ret = f(&mut *widget, &self.render_object());
+        self.inner.borrow_mut().object.replace(widget);
+        ret
+    }
+
+    fn compute_intrinsic_dimensions(
+        &self,
+        dimension: InstrinsicDimension,
+        argument: f64,
+        computer: impl FnOnce(f64) -> f64,
+    ) -> f64 {
+        let should_cache = true;
+        if should_cache {
+            let key = InstrinsicDimensionsCacheEntry {
+                dimension,
+                argument: argument.into(),
+            };
+            let ref_mut = &mut self.inner.borrow_mut().cached_instrinsic_dimensions;
+            let ret = ref_mut.entry(key).or_insert_with(|| computer(argument));
+            *ret
+        } else {
+            computer(argument)
+        }
+    }
+
+    fn has_size(&self) -> bool {
+        self.inner.borrow().size.is_some()
     }
 }
 
@@ -612,6 +557,41 @@ impl BoxHitTestEntry {
         }
     }
 }
+
+#[derive(Clone, Debug)]
+pub struct BoxConstraints {
+    min_width: f64,
+    max_width: f64,
+    min_height: f64,
+    max_height: f64,
+}
+
+impl PartialEq for BoxConstraints {
+    fn eq(&self, other: &Self) -> bool {
+        self.min_width == other.min_width
+            && self.max_width == other.max_width
+            && self.min_height == other.min_height
+            && self.max_height == other.max_height
+    }
+}
+
+impl Eq for BoxConstraints {}
+
+impl Hash for BoxConstraints {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        R64::from(self.min_width).hash(state);
+        R64::from(self.max_width).hash(state);
+        R64::from(self.min_height).hash(state);
+        R64::from(self.max_height).hash(state);
+    }
+}
+
+impl From<BoxConstraints> for Constraints {
+    fn from(bc: BoxConstraints) -> Self {
+        Constraints::BoxConstraints(bc)
+    }
+}
+
 impl BoxConstraints {
     pub fn has_tight_width(&self) -> bool {
         self.min_width >= self.max_width
