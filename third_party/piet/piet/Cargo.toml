@@ -1,0 +1,42 @@
+[package]
+name = "piet"
+version = "0.5.0"
+authors = ["Raph Levien <raph.levien@gmail.com>"]
+description = "An abstraction for 2D graphics."
+license = "MIT/Apache-2.0"
+repository = "https://github.com/linebender/piet"
+readme = "../README.md"
+edition = "2018"
+keywords = ["graphics", "2d"]
+categories = ["rendering::graphics-api"]
+include = ["src/**/*", "Cargo.toml", "snapshots/resources/*"]
+
+[dependencies]
+image = { version = "0.24.0", optional = true, default-features = false }
+kurbo = "0.8.2"
+pico-args = { version = "0.4.0", optional = true }
+png = { version = "0.17", optional = true }
+os_info = { version = "3.0.0", optional = true, default-features = false }
+unic-bidi = "0.9"
+
+[features]
+samples = ["pico-args", "png", "os_info"]
+
+# passing on all the image features. AVIF is not supported because it does not
+# support decoding, and thats al we use `Image` for.
+image_png = ["image/png", "image"]
+jpeg = ["image/jpeg", "image"]
+jpeg_rayon = ["image/jpeg_rayon", "image"]
+gif = ["image/gif", "image"]
+bmp = ["image/bmp", "image"]
+ico = ["image/ico", "image"]
+tiff = ["image/tiff", "image"]
+webp = ["image/webp", "image"]
+pnm = ["image/pnm", "image"]
+dds = ["image/dds", "image"]
+tga = ["image/tga", "image"]
+farbfeld = ["image/farbfeld", "image"]
+dxt = ["image/dxt", "image"]
+hdr = ["image/hdr", "image"]
+
+serde = ["kurbo/serde"]

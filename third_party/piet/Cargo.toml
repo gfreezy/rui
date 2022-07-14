@@ -1,0 +1,20 @@
+[workspace]
+
+members = [
+    "piet",
+    "piet-cairo",
+    "piet-common",
+    "piet-coregraphics",
+    "piet-direct2d",
+    "piet-web",
+    "piet-web/examples/basic",
+    "piet-svg"
+]
+
+default-members = [
+    "piet",
+    "piet-common",
+    "piet-web",
+    "piet-web/examples/basic",
+    "piet-svg"
+]
