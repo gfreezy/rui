@@ -68,8 +68,8 @@ pub(crate) trait AbstractNode {
 
     fn set_last_child_if_none(&self, element: Option<RenderObject>) {
         self.state(|s| {
-            if s.last_child.is_none() {
-                s.last_child = element.map(|v| v.downgrade());
+            if s.try_last_child().is_none() {
+                s.set_last_child(element);
             }
         })
     }
@@ -130,32 +130,30 @@ pub(crate) trait AbstractNode {
     }
 
     fn depth(&self) -> usize {
-        self.state(|s| s.depth)
+        self.state(|s| s.depth())
     }
 
     fn incr_depth(&self) {
         self.state(|s| {
-            s.depth += 1;
+            s.incr_depth();
         })
     }
 
     fn child_count(&self) -> usize {
-        self.state(|s| s.child_count)
+        self.state(|s| s.child_count())
     }
 
     fn clear_child_count(&self) {
-        self.state(|s| s.child_count = 0)
+        self.state(|s| s.clear_child_count())
     }
 
     fn incr_child_count(&self) {
-        self.state(|s| {
-            s.child_count += 1;
-        })
+        self.state(|s| s.incr_child_count())
     }
 
     fn decr_child_count(&self) {
         self.state(|s| {
-            s.child_count -= 1;
+            s.decr_child_count();
         })
     }
 

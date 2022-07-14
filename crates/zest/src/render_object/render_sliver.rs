@@ -4,6 +4,7 @@ use std::{
 };
 
 use super::{
+    abstract_node::AbstractNode,
     render_object::{Matrix4, Offset, PaintContext, RenderObject},
     render_object_state::RenderObjectState,
 };
@@ -19,6 +20,12 @@ impl PartialEq for RenderSliver {
     }
 }
 
+impl AbstractNode for RenderSliver {
+    fn state<R>(&self, process: impl FnOnce(&mut RenderObjectState) -> R) -> R {
+        process(&mut self.inner.borrow_mut().state)
+    }
+}
+
 impl RenderSliver {
     pub fn downgrade(&self) -> WeakRenderSliver {
         WeakRenderSliver {
@@ -26,39 +33,15 @@ impl RenderSliver {
         }
     }
 
-    pub(crate) fn state<R>(&self, process: impl FnOnce(&mut RenderObjectState) -> R) -> R {
-        process(&mut self.inner.borrow_mut().state)
-    }
-
     pub(crate) fn apply_paint_transform(&self, _child: &RenderObject, _transform: &Matrix4) {
         todo!()
     }
 
-    pub(crate) fn mark_needs_paint(&self) {
-        self.state(|s| s.mark_needs_paint())
+    pub(crate) fn is_repaint_bondary(&self) -> bool {
+        true
     }
-
-    pub(crate) fn clean_relayout_boundary(&self) {
-        self.state(|s| s.clean_relayout_boundary())
-    }
-
-    pub(crate) fn propagate_relayout_bondary(&self) {
-        self.state(|s| s.propagate_relayout_bondary())
-    }
-
-    pub(crate) fn relayout_boundary(&self) -> RenderObject {
-        self.state(|s| s.relayout_boundary())
-    }
-
     pub(crate) fn mark_needs_layout(&self) {
-        self.state(|s| s.mark_needs_layout())
-    }
-
-    pub(crate) fn invoke_layout_callback(
-        &self,
-        callback: impl FnOnce(&super::render_object::Constraints),
-    ) {
-        self.state(|s| s.invoke_layout_callback(callback))
+        self.state(|s| s.mark_needs_layout());
     }
 
     pub(crate) fn layout(
@@ -69,29 +52,11 @@ impl RenderSliver {
         todo!()
     }
 
+    pub(crate) fn paint(&self, _context: &mut PaintContext, offset: Offset) {
+        todo!()
+    }
+
     pub(crate) fn sized_by_parent(&self) -> bool {
-        todo!()
-    }
-
-    pub(crate) fn needs_layout(&self) -> bool {
-        self.state(|s| s.needs_layout)
-    }
-
-    pub(crate) fn needs_paint(&self) -> bool {
-        self.state(|s| s.needs_paint)
-    }
-
-    pub(crate) fn is_repaint_bondary(&self) -> bool {
-        todo!()
-    }
-    pub(crate) fn paint(&self, _context: &mut PaintContext, _offset: Offset) {
-        todo!()
-    }
-    pub(crate) fn paint_with_context(
-        &self,
-        _context: &mut super::render_object::PaintContext,
-        _offset: super::render_object::Offset,
-    ) {
         todo!()
     }
 }

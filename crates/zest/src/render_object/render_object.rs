@@ -266,13 +266,30 @@ impl RenderObject {
         }
     }
 
-    // fn parent_data(&self) -> ParentData {
-    //     self.state(|s| s.parent_data())
-    // }
+    pub(crate) fn schedule_initial_layout(&self) {
+        match self {
+            RenderObject::RenderView(boxed) => boxed.set_relayout_boundary(Some(self.clone())),
+            _ => unreachable!(),
+        }
+        self.owner().add_node_need_layout(self.clone());
+    }
 
-    // fn try_parent_data(&self) -> Option<ParentData> {
-    //     self.state(|s| s.try_parent_data())
-    // }
+    //-- begin delegate methods --//
+    pub(crate) fn parent_data(&self) -> ParentData {
+        match self {
+            RenderObject::RenderBox(s) => s.parent_data(),
+            RenderObject::RenderSliver(s) => todo!(),
+            RenderObject::RenderView(_boxed) => todo!(),
+        }
+    }
+
+    pub(crate) fn try_parent_data(&self) -> Option<ParentData> {
+        match self {
+            RenderObject::RenderBox(s) => s.try_parent_data(),
+            RenderObject::RenderSliver(s) => todo!(),
+            RenderObject::RenderView(_boxed) => todo!(),
+        }
+    }
 
     pub(crate) fn mark_needs_layout(&self) {
         match self {
@@ -307,11 +324,19 @@ impl RenderObject {
     }
 
     pub(crate) fn owner(&self) -> PipelineOwner {
-        self.state(|s| s.owner())
+        match self {
+            RenderObject::RenderBox(s) => s.owner(),
+            RenderObject::RenderSliver(s) => todo!(),
+            RenderObject::RenderView(_boxed) => todo!(),
+        }
     }
 
     pub(crate) fn try_owner(&self) -> Option<PipelineOwner> {
-        self.state(|s| s.try_owner())
+        match self {
+            RenderObject::RenderBox(s) => s.try_owner(),
+            RenderObject::RenderSliver(s) => todo!(),
+            RenderObject::RenderView(_boxed) => todo!(),
+        }
     }
 
     pub fn mark_needs_paint(&self) {
@@ -336,14 +361,6 @@ impl RenderObject {
             RenderObject::RenderSliver(s) => s.propagate_relayout_bondary(),
             RenderObject::RenderView(_boxed) => todo!(),
         }
-    }
-
-    pub(crate) fn schedule_initial_layout(&self) {
-        match self {
-            RenderObject::RenderView(boxed) => boxed.set_relayout_boundary(self.clone()),
-            _ => unreachable!(),
-        }
-        self.owner().add_node_need_layout(self.clone());
     }
 
     // fn layout_without_resize(&self) {

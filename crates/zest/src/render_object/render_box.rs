@@ -11,8 +11,10 @@ use crate::render_object::render_object::RenderObject;
 
 use super::{
     abstract_node::AbstractNode,
+    pipeline_owner::PipelineOwner,
     render_object::{
-        Constraints, Matrix4, Offset, PaintContext, PointerEvent, Rect, Vector3, WeakRenderObject,
+        Constraints, Matrix4, Offset, PaintContext, ParentData, PointerEvent, Rect, Vector3,
+        WeakRenderObject,
     },
     render_object_state::RenderObjectState,
 };
@@ -171,77 +173,6 @@ impl RenderBox {
             inner: Rc::downgrade(&self.inner),
         }
     }
-
-    pub(crate) fn state<R>(&self, process: impl FnOnce(&mut RenderObjectState) -> R) -> R {
-        process(&mut self.inner.borrow_mut().state)
-    }
-
-    pub(crate) fn mark_needs_paint(&self) {
-        self.state(|s| s.mark_needs_paint())
-    }
-
-    pub(crate) fn clean_relayout_boundary(&self) {
-        self.state(|s| s.clean_relayout_boundary())
-    }
-
-    pub(crate) fn propagate_relayout_bondary(&self) {
-        self.state(|s| s.propagate_relayout_bondary())
-    }
-
-    pub(crate) fn relayout_boundary(&self) -> RenderObject {
-        self.state(|s| s.relayout_boundary())
-    }
-
-    pub(crate) fn invoke_layout_callback(&self, callback: impl FnOnce(&Constraints)) {
-        self.state(|s| s.invoke_layout_callback(callback))
-    }
-
-    pub(crate) fn needs_layout(&self) -> bool {
-        self.state(|s| s.needs_layout)
-    }
-
-    pub(crate) fn needs_paint(&self) -> bool {
-        self.state(|s| s.needs_paint)
-    }
-
-    pub(crate) fn is_repaint_bondary(&self) -> bool {
-        self.with_widget(|w, _| w.is_repaint_boundary())
-    }
-
-    pub(crate) fn paint_with_context(&self, context: &mut PaintContext, offset: Offset) {
-        self.state(|s| s.needs_paint = false);
-        self.paint(context, offset);
-        assert!(!self.needs_layout());
-        assert!(!self.needs_paint());
-    }
-
-    pub(crate) fn try_relayout_boundary(&self) -> Option<RenderObject> {
-        self.state(|s| s.try_relayout_boundary())
-    }
-
-    pub(crate) fn doing_this_layout_with_callback(&self) -> bool {
-        self.state(|s| s.doing_this_layout_with_callback)
-    }
-
-    pub(crate) fn layout_without_resize(&self) {
-        assert_eq!(&self.relayout_boundary(), &self.render_object());
-        assert!(!self.doing_this_layout_with_callback());
-        self.perform_layout();
-        self.state(|s| s.needs_layout = false);
-        self.mark_needs_paint();
-    }
-
-    pub(crate) fn layer(&self) -> Option<super::layer::Layer> {
-        self.state(|s| s.layer.clone())
-    }
-
-    pub(crate) fn set_layer(&self, child_layer: super::layer::Layer) {
-        self.state(|s| s.layer = Some(child_layer));
-    }
-
-    pub(crate) fn set_size(&self, size: Size) {
-        self.inner.borrow_mut().size = Some(size);
-    }
 }
 
 #[derive(Clone)]
@@ -267,7 +198,6 @@ struct InnerRenderBox {
     object: Option<Box<dyn RenderBoxWidget + 'static>>,
     size: Option<Size>,
     offset: Offset,
-    constraints: Option<BoxConstraints>,
     cached_instrinsic_dimensions: HashMap<InstrinsicDimensionsCacheEntry, f64>,
     cached_dry_layout_sizes: HashMap<BoxConstraints, Size>,
 }
@@ -354,14 +284,6 @@ impl RenderBox {
         })
     }
 
-    pub(crate) fn try_constraints(&self) -> Option<Constraints> {
-        self.state(|s| s.try_constraints())
-    }
-
-    pub(crate) fn constraints(&self) -> Constraints {
-        self.try_constraints().unwrap()
-    }
-
     pub(crate) fn box_constraints(&self) -> BoxConstraints {
         self.constraints().box_constraints()
     }
@@ -421,20 +343,32 @@ impl RenderBox {
             return;
         }
 
-        self.state(|s| s.constraints = constraints.into());
+        self.state(|s| s.set_constraints(constraints.into()));
         if self.try_relayout_boundary().is_some() && self.relayout_boundary() != relayout_boundary {
             self.visit_children(|e| e.clean_relayout_boundary());
         }
         self.state(|s| s.set_relayout_boundary(Some(relayout_boundary)));
-        assert!(!self.state(|s| s.doing_this_layout_with_callback));
+        assert!(!self.state(|s| s.doing_this_layout_with_callback()));
 
         if self.sized_by_parent() {
             self.perform_resize();
         }
 
         self.perform_layout();
-        self.state(|s| s.needs_layout = false);
+        self.state(|s| s.clear_needs_layout());
         self.mark_needs_paint();
+    }
+
+    pub(crate) fn layout_without_resize(&self) {
+        assert_eq!(&self.relayout_boundary(), &self.render_object());
+        assert!(!self.doing_this_layout_with_callback());
+        self.perform_layout();
+        self.state(|s| s.clear_needs_layout());
+        self.mark_needs_paint();
+    }
+
+    pub(crate) fn set_size(&self, size: Size) {
+        self.inner.borrow_mut().size = Some(size);
     }
 
     pub(crate) fn size(&self) -> Size {
@@ -455,6 +389,7 @@ impl RenderBox {
             inner.state.mark_needs_layout();
         }
     }
+
     pub(crate) fn hit_test(&self, result: &mut BoxHitTestResult, position: Offset) -> bool {
         if self.size().contains(position) {
             if self.hit_test_children(result, position) || self.hit_test_self(position) {
@@ -508,6 +443,10 @@ impl RenderBox {
         } else {
             computer(argument)
         }
+    }
+
+    pub(crate) fn is_repaint_bondary(&self) -> bool {
+        self.with_widget(|w, _| w.is_repaint_boundary())
     }
 
     fn has_size(&self) -> bool {

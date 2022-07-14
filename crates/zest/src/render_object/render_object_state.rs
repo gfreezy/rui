@@ -11,22 +11,22 @@ use super::{
 };
 
 pub(crate) struct RenderObjectState {
-    pub(crate) this: Option<WeakRenderObject>,
-    pub(crate) first_child: Option<RenderObject>,
-    pub(crate) last_child: Option<WeakRenderObject>,
-    pub(crate) next_sibling: Option<RenderObject>,
-    pub(crate) prev_sibling: Option<WeakRenderObject>,
-    pub(crate) child_count: usize,
-    pub(crate) depth: usize,
-    pub(crate) parent: Option<WeakRenderObject>,
-    pub(crate) owner: Option<WeakOwner>,
-    pub(crate) parent_data: Option<ParentData>,
-    pub(crate) needs_layout: bool,
-    pub(crate) needs_paint: bool,
-    pub(crate) relayout_boundary: Option<WeakRenderObject>,
-    pub(crate) doing_this_layout_with_callback: bool,
-    pub(crate) constraints: Option<Constraints>,
-    pub(crate) layer: Option<Layer>,
+    this: Option<WeakRenderObject>,
+    first_child: Option<RenderObject>,
+    last_child: Option<WeakRenderObject>,
+    next_sibling: Option<RenderObject>,
+    prev_sibling: Option<WeakRenderObject>,
+    child_count: usize,
+    depth: usize,
+    parent: Option<WeakRenderObject>,
+    owner: Option<WeakOwner>,
+    parent_data: Option<ParentData>,
+    needs_layout: bool,
+    needs_paint: bool,
+    relayout_boundary: Option<WeakRenderObject>,
+    doing_this_layout_with_callback: bool,
+    constraints: Option<Constraints>,
+    layer: Option<Layer>,
 }
 
 impl Default for RenderObjectState {
@@ -402,6 +402,9 @@ impl RenderObjectState {
         }
     }
 
+    pub(crate) fn clear_needs_layout(&mut self) {
+        self.needs_layout = false;
+    }
     pub(crate) fn mark_parent_needs_layout(&mut self) {
         self.needs_layout = true;
         assert!(self.try_parent().is_some());
@@ -420,6 +423,18 @@ impl RenderObjectState {
 
     pub(crate) fn set_owner(&mut self, owner: Option<PipelineOwner>) {
         self.owner = owner.map(|o| o.downgrade());
+    }
+
+    pub(crate) fn needs_layout(&self) -> bool {
+        self.needs_layout
+    }
+
+    pub(crate) fn needs_paint(&self) -> bool {
+        self.needs_paint
+    }
+
+    pub(crate) fn clear_needs_paint(&mut self) {
+        self.needs_paint = false;
     }
 
     pub(crate) fn mark_needs_paint(&mut self) {
@@ -446,7 +461,7 @@ impl RenderObjectState {
         self.constraints.clone()
     }
 
-    fn constraints(&self) -> Constraints {
+    pub(crate) fn constraints(&self) -> Constraints {
         self.try_constraints().unwrap()
     }
 
@@ -456,5 +471,45 @@ impl RenderObjectState {
         self.owner()
             .enable_mutations_to_dirty_subtrees(|| callback(&self.constraints()));
         self.doing_this_layout_with_callback = false;
+    }
+
+    pub(crate) fn doing_this_layout_with_callback(&self) -> bool {
+        self.doing_this_layout_with_callback
+    }
+
+    pub(crate) fn try_layer(&self) -> Option<Layer> {
+        self.layer.clone()
+    }
+
+    pub(crate) fn set_layer(&mut self, layer: Option<Layer>) {
+        self.layer = layer;
+    }
+
+    pub(crate) fn depth(&self) -> usize {
+        self.depth
+    }
+
+    pub(crate) fn child_count(&self) -> usize {
+        self.child_count
+    }
+
+    pub(crate) fn incr_depth(&mut self) {
+        self.depth += 1;
+    }
+
+    pub(crate) fn clear_child_count(&mut self) {
+        self.child_count = 0;
+    }
+
+    pub(crate) fn incr_child_count(&mut self) {
+        self.child_count += 1;
+    }
+
+    pub(crate) fn decr_child_count(&mut self) {
+        self.child_count -= 1;
+    }
+
+    pub(crate) fn set_constraints(&mut self, c: Constraints) {
+        self.constraints = Some(c);
     }
 }
