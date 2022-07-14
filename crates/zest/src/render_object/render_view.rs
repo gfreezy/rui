@@ -87,6 +87,18 @@ impl RenderView {
     pub(crate) fn paint(&self, context: &mut PaintContext, offset: Offset) {
         context.paint_child(&self.first_child(), offset);
     }
+
+    pub(crate) fn is_repaint_bondary(&self) -> bool {
+        true
+    }
+
+    pub(crate) fn handle_event(
+        &self,
+        event: super::render_object::PointerEvent,
+        entry: super::render_object::HitTestEntry,
+    ) {
+        todo!()
+    }
 }
 
 struct InnerRenderView {

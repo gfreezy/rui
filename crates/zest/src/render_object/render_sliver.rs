@@ -59,6 +59,14 @@ impl RenderSliver {
     pub(crate) fn sized_by_parent(&self) -> bool {
         todo!()
     }
+
+    pub(crate) fn handle_event(
+        &self,
+        event: super::render_object::PointerEvent,
+        entry: super::render_object::HitTestEntry,
+    ) {
+        todo!()
+    }
 }
 
 struct InnerRenderSliver {

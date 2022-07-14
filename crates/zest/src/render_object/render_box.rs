@@ -143,9 +143,6 @@ pub trait RenderBoxWidget {
         }
         false
     }
-
-    fn attach(&mut self, this: &RenderObject) {}
-    fn detach(&mut self, this: &RenderObject) {}
 }
 
 impl RenderBox {

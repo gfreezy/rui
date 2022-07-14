@@ -274,6 +274,63 @@ impl RenderObject {
         self.owner().add_node_need_layout(self.clone());
     }
 
+    /// Bootstrap the rendering pipeline by scheduling the very first paint.
+    ///
+    /// Requires that this render object is attached, is the root of the render
+    /// tree, and has a composited layer.
+    ///
+    /// See [RenderView] for an example of how this function is used.
+    fn schedule_initial_paint(&self) {
+        self.owner().add_node_need_paint(self.clone());
+    }
+
+    pub(crate) fn prepare_initial_frame(&self) {
+        self.schedule_initial_layout();
+        self.schedule_initial_paint();
+    }
+
+    pub(crate) fn global_to_local(&self, point: Offset, ancestor: Option<RenderObject>) -> Offset {
+        let mut transform = self.get_transform_to(ancestor);
+        let det = transform.invert();
+        if det == 0.0 {
+            return Offset::ZERO;
+        }
+
+        let n = Vector3::new(0.0, 0.0, 1.0);
+        let _i = transform.perspective_transform(Vector3::new(0.0, 0.0, 0.0));
+        let d = transform.perspective_transform(Vector3::new(0.0, 0.0, 0.0));
+        let s = transform.perspective_transform(Vector3::new(point.dx, point.dy, 0.0));
+        let p = s - d * (n.dot(s) / n.dot(d));
+        Offset::new(p.x, p.y)
+    }
+
+    pub(crate) fn get_transform_to(&self, ancestor: Option<RenderObject>) -> Matrix4 {
+        let ancestor = match ancestor {
+            Some(a) => a,
+            None => self.owner().root_node(),
+        };
+        let mut renderers = vec![self.clone()];
+        let mut renderer = self.clone();
+        while renderer != ancestor {
+            renderers.push(renderer.clone());
+            if let Some(r) = renderer.try_parent() {
+                renderer = r.parent();
+            } else {
+                break;
+            }
+        }
+        renderers.push(ancestor);
+
+        let mut transform = Matrix4::identity();
+        let mut iter = renderers.iter().rev().peekable();
+        while let (Some(renderer), Some(next)) = (iter.next(), iter.peek()) {
+            renderer.apply_paint_transform(next, &mut transform);
+        }
+        transform
+    }
+}
+
+impl RenderObject {
     //-- begin delegate methods --//
     pub(crate) fn parent_data(&self) -> ParentData {
         match self {
@@ -445,7 +502,7 @@ impl RenderObject {
         match self {
             RenderObject::RenderBox(s) => s.is_repaint_bondary(),
             RenderObject::RenderSliver(s) => s.is_repaint_bondary(),
-            RenderObject::RenderView(_) => true,
+            RenderObject::RenderView(s) => s.is_repaint_bondary(),
         }
     }
 
@@ -457,18 +514,14 @@ impl RenderObject {
         }
     }
 
-    /// Bootstrap the rendering pipeline by scheduling the very first paint.
-    ///
-    /// Requires that this render object is attached, is the root of the render
-    /// tree, and has a composited layer.
-    ///
-    /// See [RenderView] for an example of how this function is used.
-    fn schedule_initial_paint(&self) {
-        self.owner().add_node_need_paint(self.clone());
-    }
-
     /// Override this method to handle pointer events that hit this render object.
-    pub fn handle_event(&self, _event: PointerEvent, _entry: HitTestEntry) {}
+    pub fn handle_event(&self, event: PointerEvent, entry: HitTestEntry) {
+        match self {
+            RenderObject::RenderBox(s) => todo!(), //s.handle_event(event, entry),
+            RenderObject::RenderSliver(s) => s.handle_event(event, entry),
+            RenderObject::RenderView(s) => s.handle_event(event, entry),
+        }
+    }
 
     pub(crate) fn paint_with_context(&self, context: &mut PaintContext, offset: Offset) {
         match self {
@@ -484,46 +537,6 @@ impl RenderObject {
             RenderObject::RenderSliver(s) => s.apply_paint_transform(child, transform),
             RenderObject::RenderView(_boxed) => todo!(),
         }
-    }
-
-    pub(crate) fn global_to_local(&self, point: Offset, ancestor: Option<RenderObject>) -> Offset {
-        let mut transform = self.get_transform_to(ancestor);
-        let det = transform.invert();
-        if det == 0.0 {
-            return Offset::ZERO;
-        }
-
-        let n = Vector3::new(0.0, 0.0, 1.0);
-        let _i = transform.perspective_transform(Vector3::new(0.0, 0.0, 0.0));
-        let d = transform.perspective_transform(Vector3::new(0.0, 0.0, 0.0));
-        let s = transform.perspective_transform(Vector3::new(point.dx, point.dy, 0.0));
-        let p = s - d * (n.dot(s) / n.dot(d));
-        Offset::new(p.x, p.y)
-    }
-
-    pub(crate) fn get_transform_to(&self, ancestor: Option<RenderObject>) -> Matrix4 {
-        let ancestor = match ancestor {
-            Some(a) => a,
-            None => self.owner().root_node(),
-        };
-        let mut renderers = vec![self.clone()];
-        let mut renderer = self.clone();
-        while renderer != ancestor {
-            renderers.push(renderer.clone());
-            if let Some(r) = renderer.try_parent() {
-                renderer = r.parent();
-            } else {
-                break;
-            }
-        }
-        renderers.push(ancestor);
-
-        let mut transform = Matrix4::identity();
-        let mut iter = renderers.iter().rev().peekable();
-        while let (Some(renderer), Some(next)) = (iter.next(), iter.peek()) {
-            renderer.apply_paint_transform(next, &mut transform);
-        }
-        transform
     }
 
     pub(crate) fn layout_without_resize(&self) {
@@ -556,11 +569,6 @@ impl RenderObject {
             RenderObject::RenderSliver(_s) => todo!(),
             RenderObject::RenderView(s) => s.set_layer(child_layer),
         }
-    }
-
-    pub(crate) fn prepare_initial_frame(&self) {
-        self.schedule_initial_layout();
-        self.schedule_initial_paint();
     }
 
     pub(crate) fn set_size(&self, size: Size) {
