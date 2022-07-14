@@ -20,6 +20,7 @@ pub use piet_coregraphics::*;
 
 /// The `RenderContext` for the CoreGraphics backend, which is selected.
 pub type Piet<'a> = CoreGraphicsContext<'a>;
+pub type PietLayer = Layer;
 
 /// The associated brush type for this backend.
 ///

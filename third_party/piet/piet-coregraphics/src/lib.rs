@@ -13,11 +13,14 @@ use core_graphics::base::{
     kCGImageAlphaLast, kCGImageAlphaPremultipliedLast, kCGRenderingIntentDefault, CGFloat,
 };
 use core_graphics::color_space::CGColorSpace;
-use core_graphics::context::{CGContextRef, CGInterpolationQuality, CGLineCap, CGLineJoin};
+use core_graphics::context::{
+    CGContext, CGContextRef, CGInterpolationQuality, CGLineCap, CGLineJoin,
+};
 use core_graphics::data_provider::CGDataProvider;
 use core_graphics::geometry::{CGAffineTransform, CGPoint, CGRect, CGSize};
 use core_graphics::gradient::CGGradientDrawingOptions;
 use core_graphics::image::CGImage;
+use core_graphics::layer::CGLayer;
 use foreign_types::ForeignTypeRef;
 
 use piet::kurbo::{Affine, PathEl, Point, QuadBez, Rect, Shape, Size};
@@ -80,6 +83,10 @@ impl<'a> CoreGraphicsContext<'a> {
         Self::new_impl(ctx, None, text)
     }
 
+    pub fn new_from_layer(layer: &mut Layer) -> CoreGraphicsContext {
+        Self::new_y_down(&mut layer.cg_context, Some(layer.text.clone()))
+    }
+
     fn new_impl(
         ctx: &mut CGContextRef,
         height: Option<f64>,
@@ -96,6 +103,41 @@ impl<'a> CoreGraphicsContext<'a> {
             ctx,
             text,
             transform_stack: Vec::new(),
+        }
+    }
+
+    pub fn create_layer(&mut self, size: Size) -> Layer {
+        Layer::new(self, size)
+    }
+
+    fn create_cglayer(&self, size: Size) -> CGLayer {
+        CGLayer::create_layer_with_context(self.ctx, to_cgsize(size))
+    }
+
+    pub fn draw_layer_in_rect(&mut self, layer: &Layer, rect: Rect) {
+        self.ctx
+            .draw_layer_in_rect(&layer.cg_layer, to_cgrect(rect));
+    }
+
+    pub fn draw_layer_at_point(&mut self, layer: &Layer, point: Point) {
+        self.ctx
+            .draw_layer_at_point(&layer.cg_layer, to_cgpoint(point));
+    }
+}
+
+pub struct Layer {
+    cg_layer: CGLayer, // layer owner, dropped when Layer is dropped
+    cg_context: CGContext,
+    text: CoreGraphicsText,
+}
+
+impl Layer {
+    pub(crate) fn new(ctx: &mut CoreGraphicsContext, size: Size) -> Self {
+        let layer = ctx.create_cglayer(size);
+        Layer {
+            cg_context: layer.context(),
+            cg_layer: layer,
+            text: ctx.text.clone(),
         }
     }
 }
