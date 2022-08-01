@@ -384,7 +384,7 @@ impl RenderObject {
         match self {
             RenderObject::RenderBox(s) => s.owner(),
             RenderObject::RenderSliver(s) => todo!(),
-            RenderObject::RenderView(_boxed) => todo!(),
+            RenderObject::RenderView(s) => s.owner(),
         }
     }
 
@@ -392,7 +392,7 @@ impl RenderObject {
         match self {
             RenderObject::RenderBox(s) => s.try_owner(),
             RenderObject::RenderSliver(s) => todo!(),
-            RenderObject::RenderView(_boxed) => todo!(),
+            RenderObject::RenderView(s) => s.try_owner(),
         }
     }
 

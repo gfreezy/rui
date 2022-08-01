@@ -405,6 +405,7 @@ impl RenderObjectState {
     pub(crate) fn clear_needs_layout(&mut self) {
         self.needs_layout = false;
     }
+
     pub(crate) fn mark_parent_needs_layout(&mut self) {
         self.needs_layout = true;
         assert!(self.try_parent().is_some());

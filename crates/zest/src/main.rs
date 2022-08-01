@@ -1,4 +1,5 @@
 mod render_object;
+mod rendering;
 mod widget;
 
 use druid_shell::{

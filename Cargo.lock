@@ -1903,6 +1903,7 @@ dependencies = [
  "druid-shell",
  "enum_dispatch",
  "reffers",
+ "style",
  "tracing",
  "tracing-subscriber",
 ]

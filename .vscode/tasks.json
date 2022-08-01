@@ -4,6 +4,10 @@
 		{
 			"type": "cargo",
 			"command": "run",
+			"args": [
+				"--bin",
+				"zest"
+			],
 			"problemMatcher": [
 				"$rustc"
 			],

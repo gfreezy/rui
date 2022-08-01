@@ -146,7 +146,7 @@ pub trait RenderBoxWidget {
 }
 
 impl RenderBox {
-    fn render_object(&self) -> RenderObject {
+    fn to_render_object(&self) -> RenderObject {
         RenderObject::RenderBox(self.clone())
     }
 
@@ -161,8 +161,8 @@ impl RenderBox {
             .inner
             .borrow_mut()
             .state
-            .set_render_object(render_box.render_object());
-        render_box.render_object()
+            .set_render_object(render_box.to_render_object());
+        render_box.to_render_object()
     }
 
     pub fn downgrade(&self) -> WeakRenderBox {
@@ -327,7 +327,7 @@ impl RenderBox {
             || constraints.is_tight()
             || self.try_parent().is_none();
         let relayout_boundary = if is_relayout_boundary {
-            self.render_object()
+            self.to_render_object()
         } else {
             self.parent().relayout_boundary()
         };
@@ -357,7 +357,7 @@ impl RenderBox {
     }
 
     pub(crate) fn layout_without_resize(&self) {
-        assert_eq!(&self.relayout_boundary(), &self.render_object());
+        assert_eq!(&self.relayout_boundary(), &self.to_render_object());
         assert!(!self.doing_this_layout_with_callback());
         self.perform_layout();
         self.state(|s| s.clear_needs_layout());
@@ -391,7 +391,7 @@ impl RenderBox {
         if self.size().contains(position) {
             if self.hit_test_children(result, position) || self.hit_test_self(position) {
                 result.add(BoxHitTestEntry::new(
-                    self.render_object().downgrade(),
+                    self.to_render_object().downgrade(),
                     position,
                 ));
             }
@@ -400,7 +400,7 @@ impl RenderBox {
     }
 
     pub(crate) fn apply_paint_transform(&self, child: &RenderObject, transform: &Matrix4) {
-        assert_eq!(child.parent(), self.render_object());
+        assert_eq!(child.parent(), self.to_render_object());
 
         let offset = child.render_box().offset();
         transform.translate(offset.dx, offset.dy);
@@ -417,7 +417,7 @@ impl RenderBox {
     // private methods
     fn with_widget<T>(&self, f: impl FnOnce(&mut dyn RenderBoxWidget, &RenderObject) -> T) -> T {
         let mut widget = self.inner.borrow_mut().object.take().unwrap();
-        let ret = f(&mut *widget, &self.render_object());
+        let ret = f(&mut *widget, &self.to_render_object());
         self.inner.borrow_mut().object.replace(widget);
         ret
     }
