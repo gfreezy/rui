@@ -3,12 +3,9 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use super::{
-    render_object::{
-        AbstractNodeExt, HitTestEntry, Matrix4, Offset, PaintContext, PointerEvent, RenderObject,
-        WeakRenderObject,
-    },
-    render_object_state::RenderObjectState,
+use super::render_object::{
+    AbstractNodeExt, HitTestEntry, Matrix4, Offset, PaintContext, PointerEvent, RenderObject,
+    WeakRenderObject,
 };
 use crate::render_object::render_object::{try_ultimate_next_sibling, try_ultimate_prev_sibling};
 
@@ -98,15 +95,11 @@ impl AbstractNodeExt for RenderSliver {
         todo!()
     }
 
-    fn paint_bounds(&self) -> Rect {
+    fn paint_with_context(&self, context: &mut PaintContext, offset: Offset) {
         todo!()
     }
 
     fn handle_event(&self, _event: PointerEvent, _entry: HitTestEntry) {
-        todo!()
-    }
-
-    fn paint_with_context(&self, context: &mut PaintContext, offset: Offset) {
         todo!()
     }
 
@@ -115,6 +108,14 @@ impl AbstractNodeExt for RenderSliver {
     }
 
     fn layout_without_resize(&self) {
+        todo!()
+    }
+
+    fn paint_bounds(&self) -> Rect {
+        todo!()
+    }
+
+    fn layout(&self, constraints: Constraints, parent_use_size: bool) {
         todo!()
     }
 }

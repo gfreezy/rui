@@ -9,6 +9,7 @@ use super::{
         WeakRenderObject,
     },
     render_sliver::{InnerRenderSliver, RenderSliver},
+    render_view::{InnerRenderView, RenderView},
 };
 
 use super::render_box::RenderBox;
@@ -35,7 +36,7 @@ struct RenderObjectState {
 }
 
 impl_trait_method! {
-    AbstractNode => RenderBox, RenderSliver {
+    AbstractNode => RenderBox, RenderSliver, RenderView {
         delegate::delegate! {
             to self.inner.borrow() {
                 fn parent(&self) -> RenderObject;
@@ -137,7 +138,7 @@ impl_trait_method! {
 
                 fn propagate_relayout_bondary(&self) ;
 
-                fn _mark_needs_layout(&self) ;
+                fn mark_needs_layout(&self) ;
 
                 fn clear_needs_layout(&self) ;
 
@@ -168,7 +169,7 @@ impl_trait_method! {
 }
 
 impl_method! {
-     InnerRenderBox, InnerRenderSliver {
+     InnerRenderBox, InnerRenderSliver, InnerRenderView {
         pub(crate) fn parent(&self) -> RenderObject {
             self.try_parent().unwrap()
         }
@@ -250,7 +251,7 @@ impl_method! {
 
             if self.needs_layout && self.try_relayout_boundary().is_some() {
                 self.needs_layout = false;
-                self._mark_needs_layout();
+                self.mark_needs_layout();
             }
             // _needsCompositingBitsUpdate
             if self.needs_paint && self.layer.is_some() {
@@ -286,7 +287,7 @@ impl_method! {
         pub(crate) fn adopt_child(&mut self, child: &RenderObject) {
             assert!(child.try_parent().is_none());
             child.set_parent(Some(child.clone()));
-            self._mark_needs_layout();
+            self.mark_needs_layout();
             // self.mark_needs_composition_bits_update();
 
             // attach the child to the owner
@@ -301,7 +302,7 @@ impl_method! {
             // child.clean_relayout_boundary();
             child.set_parent(None);
             // detach the child from the owner
-            self._mark_needs_layout();
+            self.mark_needs_layout();
         }
 
         /// Adjust the [depth] of the given [child] to be greater than this node's own
@@ -362,7 +363,7 @@ impl_method! {
             }
             self.remove_from_child_list(child.clone());
             self.insert_into_child_list(child, after);
-            self._mark_needs_layout();
+            self.mark_needs_layout();
         }
 
         fn insert_into_child_list(&mut self, child: RenderObject, after: Option<RenderObject>) {
@@ -481,7 +482,7 @@ impl_method! {
             // }
         }
 
-        pub(crate) fn _mark_needs_layout(&mut self) {
+        pub(crate) fn mark_needs_layout(&mut self) {
             // if self.needs_layout {
             //     return;
             // }

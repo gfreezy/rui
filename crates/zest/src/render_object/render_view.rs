@@ -10,14 +10,20 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use super::render_object::{
+    AbstractNodeExt, HitTestEntry, Matrix4, Offset, PaintContext, PointerEvent, WeakRenderObject,
+};
+use crate::render_object::render_object::{try_ultimate_next_sibling, try_ultimate_prev_sibling};
+
 use super::{
-    render_object::{Offset, PaintContext},
-    render_object_state::RenderObjectState,
+    layer::Layer,
+    pipeline_owner::{PipelineOwner, WeakOwner},
+    render_object::{AbstractNode, Constraints, ParentData},
 };
 
 #[derive(Clone)]
 pub struct RenderView {
-    inner: Rc<RefCell<InnerRenderView>>,
+    pub(crate) inner: Rc<RefCell<InnerRenderView>>,
 }
 
 impl PartialEq for RenderView {
@@ -31,7 +37,7 @@ impl RenderView {
         let v = Self {
             inner: Rc::new(RefCell::new(InnerRenderView {
                 size,
-                state: Default::default(),
+                ..Default::default()
             })),
         };
         let object = RenderObject::RenderView(v);
@@ -46,14 +52,10 @@ impl RenderView {
         }
     }
 
-    pub(crate) fn mark_needs_layout(&self) {
-        self.state(|s| s.mark_needs_layout())
-    }
-
     pub(crate) fn composite_frame(&self, piet: &mut Piet) {
         let child = self.first_child();
         assert!(child.is_repaint_bondary());
-        let layer = child.layer().unwrap();
+        let layer = child.layer();
         layer.draw_at_point(piet, child.render_box().offset());
     }
 
@@ -67,36 +69,37 @@ impl RenderView {
             .layout(BoxConstraints::tight(size).into(), true);
     }
 
-    pub(crate) fn layout_without_resize(&self) {
-        self.perform_layout();
-        self.state(|s| s.clear_needs_layout());
-        self.mark_needs_paint();
-    }
-
-    pub(crate) fn paint_bounds(&self) -> Rect {
-        Rect::from_size(self.inner.borrow().size)
-    }
-
     pub(crate) fn paint(&self, context: &mut PaintContext, offset: Offset) {
         context.paint_child(&self.first_child(), offset);
     }
-
-    pub(crate) fn is_repaint_bondary(&self) -> bool {
-        true
-    }
-
-    pub(crate) fn handle_event(
-        &self,
-        event: super::render_object::PointerEvent,
-        entry: super::render_object::HitTestEntry,
-    ) {
-        todo!()
-    }
 }
 
-struct InnerRenderView {
-    state: RenderObjectState,
+#[mixin::insert(RenderObjectState)]
+pub(crate) struct InnerRenderView {
     size: Size,
+}
+
+impl Default for InnerRenderView {
+    fn default() -> Self {
+        Self {
+            size: Size::ZERO,
+            first_child: Default::default(),
+            last_child: Default::default(),
+            next_sibling: Default::default(),
+            prev_sibling: Default::default(),
+            child_count: Default::default(),
+            depth: Default::default(),
+            parent: Default::default(),
+            owner: Default::default(),
+            parent_data: Default::default(),
+            needs_layout: Default::default(),
+            needs_paint: Default::default(),
+            relayout_boundary: Default::default(),
+            doing_this_layout_with_callback: Default::default(),
+            constraints: Default::default(),
+            layer: Default::default(),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -110,5 +113,37 @@ impl WeakRenderView {
             .upgrade()
             .map(|inner| RenderView { inner })
             .unwrap()
+    }
+}
+
+impl AbstractNodeExt for RenderView {
+    fn is_repaint_bondary(&self) -> bool {
+        true
+    }
+
+    fn paint_with_context(&self, context: &mut PaintContext, offset: Offset) {
+        todo!()
+    }
+
+    fn handle_event(&self, event: PointerEvent, entry: HitTestEntry) {
+        todo!()
+    }
+
+    fn invoke_layout_callback(&self, callback: impl FnOnce(&Constraints)) {
+        todo!()
+    }
+
+    fn layout_without_resize(&self) {
+        self.perform_layout();
+        self.clear_needs_layout();
+        self.mark_needs_paint();
+    }
+
+    fn paint_bounds(&self) -> Rect {
+        Rect::from_size(self.inner.borrow().size)
+    }
+
+    fn layout(&self, constraints: Constraints, parent_use_size: bool) {
+        todo!()
     }
 }

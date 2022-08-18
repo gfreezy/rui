@@ -16,7 +16,6 @@ use super::{
         AbstractNode, AbstractNodeExt, Constraints, HitTestEntry, Matrix4, Offset, PaintContext,
         ParentData, PointerEvent, Rect, Vector3, WeakRenderObject,
     },
-    render_object_state::RenderObjectState,
 };
 
 #[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
@@ -314,64 +313,6 @@ impl RenderBox {
         }
     }
 
-    /// Compute the layout for this render object.
-    ///
-    /// This method is the main entry point for parents to ask their children to
-    /// update their layout information. The parent passes a constraints object,
-    /// which informs the child as to which layouts are permissible. The child is
-    /// required to obey the given constraints.
-    ///
-    /// If the parent reads information computed during the child's layout, the
-    /// parent must pass true for `parentUsesSize`. In that case, the parent will
-    /// be marked as needing layout whenever the child is marked as needing layout
-    /// because the parent's layout information depends on the child's layout
-    /// information. If the parent uses the default value (false) for
-    /// `parentUsesSize`, the child can change its layout information (subject to
-    /// the given constraints) without informing the parent.
-    ///
-    /// Subclasses should not override [layout] directly. Instead, they should
-    /// override [performResize] and/or [performLayout]. The [layout] method
-    /// delegates the actual work to [performResize] and [performLayout].
-    ///
-    /// The parent's [performLayout] method should call the [layout] of all its
-    /// children unconditionally. It is the [layout] method's responsibility (as
-    /// implemented here) to return early if the child does not need to do any
-    /// work to update its layout information.
-    pub(crate) fn layout(&self, constraints: Constraints, parent_use_size: bool) {
-        let is_relayout_boundary = !parent_use_size
-            || self.sized_by_parent()
-            || constraints.is_tight()
-            || self.try_parent().is_none();
-        let relayout_boundary = if is_relayout_boundary {
-            self.to_render_object()
-        } else {
-            self.parent().relayout_boundary()
-        };
-        if !self.needs_layout()
-            && Some(&constraints) == self.try_constraints().as_ref()
-            && Some(relayout_boundary.clone()) != self.try_relayout_boundary()
-        {
-            self.set_relayout_boundary(Some(relayout_boundary));
-            self.visit_children(|e| e.propagate_relayout_bondary());
-            return;
-        }
-
-        self.set_constraints(constraints.into());
-        if self.try_relayout_boundary().is_some() && self.relayout_boundary() != relayout_boundary {
-            self.visit_children(|e| e.clean_relayout_boundary());
-        }
-        self.set_relayout_boundary(Some(relayout_boundary));
-        assert!(!self.doing_this_layout_with_callback());
-
-        if self.sized_by_parent() {
-            self.perform_resize();
-        }
-
-        self.perform_layout();
-        self.clear_needs_layout();
-        self.mark_needs_paint();
-    }
-
     pub(crate) fn set_size(&self, size: Size) {
         self.inner.borrow_mut().size = Some(size);
     }
@@ -391,7 +332,7 @@ impl RenderBox {
         if inner.try_parent().is_some() {
             inner.mark_parent_needs_layout();
         } else {
-            inner._mark_needs_layout();
+            inner.mark_needs_layout();
         }
     }
 
@@ -471,6 +412,41 @@ impl AbstractNodeExt for RenderBox {
     fn layout_without_resize(&self) {
         assert_eq!(&self.relayout_boundary(), &self.to_render_object());
         assert!(!self.doing_this_layout_with_callback());
+        self.perform_layout();
+        self.clear_needs_layout();
+        self.mark_needs_paint();
+    }
+
+    fn layout(&self, constraints: Constraints, parent_use_size: bool) {
+        let is_relayout_boundary = !parent_use_size
+            || self.sized_by_parent()
+            || constraints.is_tight()
+            || self.try_parent().is_none();
+        let relayout_boundary = if is_relayout_boundary {
+            self.to_render_object()
+        } else {
+            self.parent().relayout_boundary()
+        };
+        if !self.needs_layout()
+            && Some(&constraints) == self.try_constraints().as_ref()
+            && Some(relayout_boundary.clone()) != self.try_relayout_boundary()
+        {
+            self.set_relayout_boundary(Some(relayout_boundary));
+            self.visit_children(|e| e.propagate_relayout_bondary());
+            return;
+        }
+
+        self.set_constraints(constraints.into());
+        if self.try_relayout_boundary().is_some() && self.relayout_boundary() != relayout_boundary {
+            self.visit_children(|e| e.clean_relayout_boundary());
+        }
+        self.set_relayout_boundary(Some(relayout_boundary));
+        assert!(!self.doing_this_layout_with_callback());
+
+        if self.sized_by_parent() {
+            self.perform_resize();
+        }
+
         self.perform_layout();
         self.clear_needs_layout();
         self.mark_needs_paint();

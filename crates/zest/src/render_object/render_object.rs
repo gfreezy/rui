@@ -15,7 +15,8 @@ use super::{
     layer::Layer,
     pipeline_owner::PipelineOwner,
     render_box::{BoxConstraints, RenderBox, RenderBoxWidget, Size, WeakRenderBox},
-    render_sliver::RenderSliver,
+    render_sliver::{RenderSliver, WeakRenderSliver},
+    render_view::{RenderView, WeakRenderView},
 };
 
 pub(crate) fn try_ultimate_prev_sibling(mut element: RenderObject) -> RenderObject {
@@ -311,7 +312,7 @@ pub(crate) trait AbstractNode {
 
     fn propagate_relayout_bondary(&self);
 
-    fn _mark_needs_layout(&self);
+    fn mark_needs_layout(&self);
 
     fn clear_needs_layout(&self);
 
@@ -345,6 +346,7 @@ pub(crate) trait AbstractNodeExt {
     fn handle_event(&self, event: PointerEvent, entry: HitTestEntry);
     fn invoke_layout_callback(&self, callback: impl FnOnce(&Constraints));
     fn layout_without_resize(&self);
+    fn layout(&self, constraints: Constraints, parent_use_size: bool);
     fn paint_bounds(&self) -> Rect;
 }
 
@@ -353,7 +355,7 @@ pub(crate) trait AbstractNodeExt {
 pub enum RenderObject {
     RenderBox(RenderBox),
     RenderSliver(RenderSliver),
-    // RenderView(RenderView),
+    RenderView(RenderView),
 }
 
 impl Debug for RenderObject {
@@ -367,58 +369,62 @@ impl RenderObject {
         RenderBox::new_render_object(widget)
     }
 
-    // pub(crate) fn new_render_view(child: RenderObject, size: Size) -> RenderObject {
-    //     RenderView::new_render_object(child, size)
-    // }
+    pub(crate) fn new_render_view(child: RenderObject, size: Size) -> RenderObject {
+        RenderView::new_render_object(child, size)
+    }
 
     pub fn downgrade(&self) -> WeakRenderObject {
         match self {
             RenderObject::RenderBox(boxed) => WeakRenderObject::RenderBox(boxed.downgrade()),
+            RenderObject::RenderSliver(boxed) => WeakRenderObject::RenderSliver(boxed.downgrade()),
+            RenderObject::RenderView(boxed) => WeakRenderObject::RenderView(boxed.downgrade()),
         }
     }
 
     pub(crate) fn render_box(&self) -> RenderBox {
         match self {
             RenderObject::RenderBox(boxed) => boxed.clone(),
+            _ => unreachable!(),
         }
     }
 
-    // pub(crate) fn render_sliver(&self) -> RenderSliver {
-    //     match self {
-    //         RenderObject::RenderBox(_) => unreachable!(),
-    //     }
-    // }
+    pub(crate) fn render_sliver(&self) -> RenderSliver {
+        match self {
+            RenderObject::RenderBox(_) => unreachable!(),
+            _ => unreachable!(),
+        }
+    }
 
-    // pub(crate) fn render_view(&self) -> RenderView {
-    //     match self {
-    //         RenderObject::RenderBox(_boxed) => unreachable!(),
-    //         RenderObject::RenderSliver(_) => unreachable!(),
-    //         RenderObject::RenderView(boxed) => boxed.clone(),
-    //     }
-    // }
+    pub(crate) fn render_view(&self) -> RenderView {
+        match self {
+            RenderObject::RenderBox(_boxed) => unreachable!(),
+            RenderObject::RenderSliver(_) => unreachable!(),
+            RenderObject::RenderView(boxed) => boxed.clone(),
+        }
+    }
 
-    // pub(crate) fn schedule_initial_layout(&self) {
-    //     match self {
-    //         RenderObject::RenderView(boxed) => boxed.set_relayout_boundary(Some(self.clone())),
-    //         _ => unreachable!(),
-    //     }
-    //     self.owner().add_node_need_layout(self.clone());
-    // }
+    pub(crate) fn schedule_initial_layout(&self) {
+        match self {
+            RenderObject::RenderView(boxed) => boxed.set_relayout_boundary(Some(self.clone())),
+            _ => unreachable!(),
+        }
+        self.owner().add_node_need_layout(self.clone());
+    }
 
-    // /// Bootstrap the rendering pipeline by scheduling the very first paint.
-    // ///
-    // /// Requires that this render object is attached, is the root of the render
-    // /// tree, and has a composited layer.
-    // ///
-    // /// See [RenderView] for an example of how this function is used.
-    // fn schedule_initial_paint(&self) {
-    //     self.owner().add_node_need_paint(self.clone());
-    // }
+    /// Bootstrap the rendering pipeline by scheduling the very first paint.
+    ///
+    /// Requires that this render object is attached, is the root of the render
+    /// tree, and has a composited layer.
+    ///
+    /// See [RenderView] for an example of how this function is used.
+    fn schedule_initial_paint(&self) {
+        self.owner().add_node_need_paint(self.clone());
+    }
 
-    // pub(crate) fn prepare_initial_frame(&self) {
-    //     self.schedule_initial_layout();
-    //     self.schedule_initial_paint();
-    // }
+    pub(crate) fn prepare_initial_frame(&self) {
+        self.schedule_initial_layout();
+        self.schedule_initial_paint();
+    }
 
     // pub(crate) fn global_to_local(&self, point: Offset, ancestor: Option<RenderObject>) -> Offset {
     //     let mut transform = self.get_transform_to(ancestor);
@@ -464,22 +470,24 @@ impl RenderObject {
 #[derive(Clone)]
 pub enum WeakRenderObject {
     RenderBox(WeakRenderBox),
-    // RenderSliver(WeakRenderSliver),
-    // RenderView(WeakRenderView),
+    RenderSliver(WeakRenderSliver),
+    RenderView(WeakRenderView),
 }
 
 impl WeakRenderObject {
     pub fn upgrade(&self) -> RenderObject {
         match self {
             WeakRenderObject::RenderBox(o) => RenderObject::RenderBox(o.upgrade()),
-            // WeakRenderObject::RenderSliver(o) => RenderObject::RenderSliver(o.upgrade()),
-            // WeakRenderObject::RenderView(o) => RenderObject::RenderView(o.upgrade()),
+            WeakRenderObject::RenderSliver(o) => RenderObject::RenderSliver(o.upgrade()),
+            WeakRenderObject::RenderView(o) => RenderObject::RenderView(o.upgrade()),
         }
     }
 
     pub fn is_alive(&self) -> bool {
         match self {
             WeakRenderObject::RenderBox(o) => o.is_alive(),
+            WeakRenderObject::RenderSliver(o) => o.is_alive(),
+            WeakRenderObject::RenderView(o) => true,
         }
     }
 }
