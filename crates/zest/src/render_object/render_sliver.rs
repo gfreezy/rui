@@ -4,25 +4,28 @@ use std::{
 };
 
 use super::{
-    abstract_node::AbstractNode,
-    render_object::{Matrix4, Offset, PaintContext, RenderObject},
+    render_object::{
+        AbstractNodeExt, HitTestEntry, Matrix4, Offset, PaintContext, PointerEvent, RenderObject,
+        WeakRenderObject,
+    },
     render_object_state::RenderObjectState,
+};
+use crate::render_object::render_object::{try_ultimate_next_sibling, try_ultimate_prev_sibling};
+
+use super::{
+    layer::Layer,
+    pipeline_owner::{PipelineOwner, WeakOwner},
+    render_object::{AbstractNode, Constraints, ParentData, Rect},
 };
 
 #[derive(Clone)]
 pub struct RenderSliver {
-    inner: Rc<RefCell<InnerRenderSliver>>,
+    pub(crate) inner: Rc<RefCell<InnerRenderSliver>>,
 }
 
 impl PartialEq for RenderSliver {
     fn eq(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.inner, &other.inner)
-    }
-}
-
-impl AbstractNode for RenderSliver {
-    fn state<R>(&self, process: impl FnOnce(&mut RenderObjectState) -> R) -> R {
-        process(&mut self.inner.borrow_mut().state)
     }
 }
 
@@ -41,7 +44,7 @@ impl RenderSliver {
         true
     }
     pub(crate) fn mark_needs_layout(&self) {
-        self.state(|s| s.mark_needs_layout());
+        self.mark_needs_layout();
     }
 
     pub(crate) fn layout(
@@ -69,13 +72,12 @@ impl RenderSliver {
     }
 }
 
-struct InnerRenderSliver {
-    state: RenderObjectState,
-}
+#[mixin::insert(RenderObjectState)]
+pub(crate) struct InnerRenderSliver {}
 
 #[derive(Clone)]
 pub struct WeakRenderSliver {
-    inner: Weak<RefCell<InnerRenderSliver>>,
+    pub(crate) inner: Weak<RefCell<InnerRenderSliver>>,
 }
 
 impl WeakRenderSliver {
@@ -88,5 +90,31 @@ impl WeakRenderSliver {
 
     pub fn is_alive(&self) -> bool {
         self.inner.upgrade().is_some()
+    }
+}
+
+impl AbstractNodeExt for RenderSliver {
+    fn is_repaint_bondary(&self) -> bool {
+        todo!()
+    }
+
+    fn paint_bounds(&self) -> Rect {
+        todo!()
+    }
+
+    fn handle_event(&self, _event: PointerEvent, _entry: HitTestEntry) {
+        todo!()
+    }
+
+    fn paint_with_context(&self, context: &mut PaintContext, offset: Offset) {
+        todo!()
+    }
+
+    fn invoke_layout_callback(&self, callback: impl FnOnce(&Constraints)) {
+        todo!()
+    }
+
+    fn layout_without_resize(&self) {
+        todo!()
     }
 }

@@ -6,10 +6,9 @@ use std::{
 
 use druid_shell::piet::{Piet, PietText};
 
-use super::{
-    abstract_node::AbstractNode,
-    render_object::{PaintContext, RenderObject, WeakRenderObject},
-};
+use crate::render_object::render_object::{AbstractNode, AbstractNodeExt};
+
+use super::render_object::{PaintContext, RenderObject, WeakRenderObject};
 
 #[derive(Clone)]
 pub(crate) struct PipelineOwner {
@@ -78,10 +77,10 @@ impl PipelineOwner {
 
     pub fn set_render_view(&self, node: &RenderObject) {
         if let Some(o) = &*self.inner.root.borrow() {
-            o.upgrade().detach();
+            // o.upgrade().detach();
         }
         *self.inner.root.borrow_mut() = Some(node.downgrade());
-        node.attach(self.clone());
+        // node.attach(self.clone());
     }
 
     pub fn downgrade(&self) -> WeakOwner {

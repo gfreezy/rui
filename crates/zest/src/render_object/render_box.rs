@@ -10,11 +10,11 @@ use decorum::R64;
 use crate::render_object::render_object::RenderObject;
 
 use super::{
-    abstract_node::AbstractNode,
-    pipeline_owner::PipelineOwner,
+    layer::Layer,
+    pipeline_owner::{PipelineOwner, WeakOwner},
     render_object::{
-        Constraints, Matrix4, Offset, PaintContext, ParentData, PointerEvent, Rect, Vector3,
-        WeakRenderObject,
+        AbstractNode, AbstractNodeExt, Constraints, HitTestEntry, Matrix4, Offset, PaintContext,
+        ParentData, PointerEvent, Rect, Vector3, WeakRenderObject,
     },
     render_object_state::RenderObjectState,
 };
@@ -64,7 +64,7 @@ struct InstrinsicDimensionsCacheEntry {
 
 #[derive(Clone)]
 pub struct RenderBox {
-    inner: Rc<RefCell<InnerRenderBox>>,
+    pub(crate) inner: Rc<RefCell<InnerRenderBox>>,
 }
 
 impl PartialEq for RenderBox {
@@ -157,11 +157,7 @@ impl RenderBox {
                 ..Default::default()
             })),
         };
-        render_box
-            .inner
-            .borrow_mut()
-            .state
-            .set_render_object(render_box.to_render_object());
+
         render_box.to_render_object()
     }
 
@@ -184,24 +180,45 @@ impl WeakRenderBox {
             .map(|inner| RenderBox { inner })
             .unwrap()
     }
+
     pub fn is_alive(&self) -> bool {
         self.inner.upgrade().is_some()
     }
 }
 
-#[derive(Default)]
-struct InnerRenderBox {
-    state: RenderObjectState,
-    object: Option<Box<dyn RenderBoxWidget + 'static>>,
-    size: Option<Size>,
-    offset: Offset,
+#[mixin::insert(RenderObjectState)]
+pub(crate) struct InnerRenderBox {
+    pub(crate) object: Option<Box<dyn RenderBoxWidget + 'static>>,
+    pub(crate) size: Option<Size>,
+    pub(crate) offset: Offset,
     cached_instrinsic_dimensions: HashMap<InstrinsicDimensionsCacheEntry, f64>,
     cached_dry_layout_sizes: HashMap<BoxConstraints, Size>,
 }
 
-impl AbstractNode for RenderBox {
-    fn state<R>(&self, process: impl FnOnce(&mut RenderObjectState) -> R) -> R {
-        process(&mut self.inner.borrow_mut().state)
+impl Default for InnerRenderBox {
+    fn default() -> Self {
+        Self {
+            first_child: Default::default(),
+            last_child: Default::default(),
+            next_sibling: Default::default(),
+            prev_sibling: Default::default(),
+            child_count: Default::default(),
+            depth: Default::default(),
+            parent: Default::default(),
+            owner: Default::default(),
+            parent_data: Default::default(),
+            needs_layout: true,
+            needs_paint: true,
+            relayout_boundary: Default::default(),
+            doing_this_layout_with_callback: Default::default(),
+            constraints: Default::default(),
+            layer: Default::default(),
+            object: Default::default(),
+            size: Default::default(),
+            offset: Default::default(),
+            cached_instrinsic_dimensions: Default::default(),
+            cached_dry_layout_sizes: Default::default(),
+        }
     }
 }
 
@@ -280,7 +297,6 @@ impl RenderBox {
             self.with_widget(|w, this| w.compute_max_instrinsic_height(this, width))
         })
     }
-
     pub(crate) fn box_constraints(&self) -> BoxConstraints {
         self.constraints().box_constraints()
     }
@@ -335,32 +351,24 @@ impl RenderBox {
             && Some(&constraints) == self.try_constraints().as_ref()
             && Some(relayout_boundary.clone()) != self.try_relayout_boundary()
         {
-            self.state(|s| s.set_relayout_boundary(Some(relayout_boundary)));
+            self.set_relayout_boundary(Some(relayout_boundary));
             self.visit_children(|e| e.propagate_relayout_bondary());
             return;
         }
 
-        self.state(|s| s.set_constraints(constraints.into()));
+        self.set_constraints(constraints.into());
         if self.try_relayout_boundary().is_some() && self.relayout_boundary() != relayout_boundary {
             self.visit_children(|e| e.clean_relayout_boundary());
         }
-        self.state(|s| s.set_relayout_boundary(Some(relayout_boundary)));
-        assert!(!self.state(|s| s.doing_this_layout_with_callback()));
+        self.set_relayout_boundary(Some(relayout_boundary));
+        assert!(!self.doing_this_layout_with_callback());
 
         if self.sized_by_parent() {
             self.perform_resize();
         }
 
         self.perform_layout();
-        self.state(|s| s.clear_needs_layout());
-        self.mark_needs_paint();
-    }
-
-    pub(crate) fn layout_without_resize(&self) {
-        assert_eq!(&self.relayout_boundary(), &self.to_render_object());
-        assert!(!self.doing_this_layout_with_callback());
-        self.perform_layout();
-        self.state(|s| s.clear_needs_layout());
+        self.clear_needs_layout();
         self.mark_needs_paint();
     }
 
@@ -380,10 +388,10 @@ impl RenderBox {
         let mut inner = self.inner.borrow_mut();
         inner.cached_instrinsic_dimensions.clear();
         inner.cached_dry_layout_sizes.clear();
-        if inner.state.try_parent().is_some() {
-            inner.state.mark_parent_needs_layout();
+        if inner.try_parent().is_some() {
+            inner.mark_parent_needs_layout();
         } else {
-            inner.state.mark_needs_layout();
+            inner._mark_needs_layout();
         }
     }
 
@@ -404,14 +412,6 @@ impl RenderBox {
 
         let offset = child.render_box().offset();
         transform.translate(offset.dx, offset.dy);
-    }
-
-    pub(crate) fn paint_bounds(&self) -> Rect {
-        Rect::from_size(self.size())
-    }
-
-    pub(crate) fn handle_event(&self, _event: PointerEvent, _entry: BoxHitTestEntry) {
-        todo!()
     }
 
     // private methods
@@ -442,12 +442,38 @@ impl RenderBox {
         }
     }
 
-    pub(crate) fn is_repaint_bondary(&self) -> bool {
+    fn has_size(&self) -> bool {
+        self.inner.borrow().size.is_some()
+    }
+}
+
+impl AbstractNodeExt for RenderBox {
+    fn is_repaint_bondary(&self) -> bool {
         self.with_widget(|w, _| w.is_repaint_boundary())
     }
 
-    fn has_size(&self) -> bool {
-        self.inner.borrow().size.is_some()
+    fn paint_bounds(&self) -> Rect {
+        Rect::from_size(self.size())
+    }
+
+    fn handle_event(&self, _event: PointerEvent, _entry: HitTestEntry) {
+        todo!()
+    }
+
+    fn paint_with_context(&self, context: &mut PaintContext, offset: Offset) {
+        todo!()
+    }
+
+    fn invoke_layout_callback(&self, callback: impl FnOnce(&Constraints)) {
+        todo!()
+    }
+
+    fn layout_without_resize(&self) {
+        assert_eq!(&self.relayout_boundary(), &self.to_render_object());
+        assert!(!self.doing_this_layout_with_callback());
+        self.perform_layout();
+        self.clear_needs_layout();
+        self.mark_needs_paint();
     }
 }
 

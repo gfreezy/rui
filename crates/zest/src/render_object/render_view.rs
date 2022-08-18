@@ -1,7 +1,6 @@
 use druid_shell::piet::Piet;
 
 use super::{
-    abstract_node::AbstractNode,
     render_box::{BoxConstraints, Size},
     render_object::{Rect, RenderObject},
 };
@@ -24,12 +23,6 @@ pub struct RenderView {
 impl PartialEq for RenderView {
     fn eq(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.inner, &other.inner)
-    }
-}
-
-impl AbstractNode for RenderView {
-    fn state<R>(&self, process: impl FnOnce(&mut RenderObjectState) -> R) -> R {
-        process(&mut self.inner.borrow_mut().state)
     }
 }
 

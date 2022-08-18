@@ -2,10 +2,7 @@ use druid_shell::piet::{
     PietText, PietTextLayout, Text, TextAttribute, TextLayout, TextLayoutBuilder,
 };
 
-use crate::render_object::{
-    abstract_node::AbstractNode,
-    render_box::{RenderBoxWidget, Size},
-};
+use crate::render_object::render_box::{RenderBoxWidget, Size};
 
 pub struct RenderText {
     text: String,
