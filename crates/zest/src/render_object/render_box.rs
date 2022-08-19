@@ -446,6 +446,13 @@ impl AbstractNodeExt for RenderBox {
         self.clear_needs_layout();
         self.mark_needs_paint();
     }
+
+    fn apply_paint_transform(&self, child: &RenderObject, transform: &Matrix4) {
+        assert_eq!(child.parent(), self.to_render_object());
+
+        let offset = child.render_box().offset();
+        transform.translate(offset.dx, offset.dy);
+    }
 }
 
 pub struct BoxHitTestResult {

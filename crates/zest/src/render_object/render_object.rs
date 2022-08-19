@@ -360,6 +360,8 @@ pub(crate) trait AbstractNodeExt {
     fn layout_without_resize(&self);
     fn layout(&self, constraints: Constraints, parent_use_size: bool);
     fn paint_bounds(&self) -> Rect;
+
+    fn apply_paint_transform(&self, child: &RenderObject, transform: &Matrix4);
 }
 
 #[enum_dispatch::enum_dispatch(AbstractNode, AbstractNodeExt)]
@@ -435,45 +437,45 @@ impl RenderObject {
         self.schedule_initial_paint();
     }
 
-    // pub(crate) fn global_to_local(&self, point: Offset, ancestor: Option<RenderObject>) -> Offset {
-    //     let mut transform = self.get_transform_to(ancestor);
-    //     let det = transform.invert();
-    //     if det == 0.0 {
-    //         return Offset::ZERO;
-    //     }
+    pub(crate) fn global_to_local(&self, point: Offset, ancestor: Option<RenderObject>) -> Offset {
+        let mut transform = self.get_transform_to(ancestor);
+        let det = transform.invert();
+        if det == 0.0 {
+            return Offset::ZERO;
+        }
 
-    //     let n = Vector3::new(0.0, 0.0, 1.0);
-    //     let _i = transform.perspective_transform(Vector3::new(0.0, 0.0, 0.0));
-    //     let d = transform.perspective_transform(Vector3::new(0.0, 0.0, 0.0));
-    //     let s = transform.perspective_transform(Vector3::new(point.dx, point.dy, 0.0));
-    //     let p = s - d * (n.dot(s) / n.dot(d));
-    //     Offset::new(p.x, p.y)
-    // }
+        let n = Vector3::new(0.0, 0.0, 1.0);
+        let _i = transform.perspective_transform(Vector3::new(0.0, 0.0, 0.0));
+        let d = transform.perspective_transform(Vector3::new(0.0, 0.0, 0.0));
+        let s = transform.perspective_transform(Vector3::new(point.dx, point.dy, 0.0));
+        let p = s - d * (n.dot(s) / n.dot(d));
+        Offset::new(p.x, p.y)
+    }
 
-    // pub(crate) fn get_transform_to(&self, ancestor: Option<RenderObject>) -> Matrix4 {
-    //     let ancestor = match ancestor {
-    //         Some(a) => a,
-    //         None => self.owner().root_node(),
-    //     };
-    //     let mut renderers = vec![self.clone()];
-    //     let mut renderer = self.clone();
-    //     while renderer != ancestor {
-    //         renderers.push(renderer.clone());
-    //         if let Some(r) = renderer.try_parent() {
-    //             renderer = r.parent();
-    //         } else {
-    //             break;
-    //         }
-    //     }
-    //     renderers.push(ancestor);
+    pub(crate) fn get_transform_to(&self, ancestor: Option<RenderObject>) -> Matrix4 {
+        let ancestor = match ancestor {
+            Some(a) => a,
+            None => self.owner().root_node(),
+        };
+        let mut renderers = vec![self.clone()];
+        let mut renderer = self.clone();
+        while renderer != ancestor {
+            renderers.push(renderer.clone());
+            if let Some(r) = renderer.try_parent() {
+                renderer = r.parent();
+            } else {
+                break;
+            }
+        }
+        renderers.push(ancestor);
 
-    //     let mut transform = Matrix4::identity();
-    //     let mut iter = renderers.iter().rev().peekable();
-    //     while let (Some(renderer), Some(next)) = (iter.next(), iter.peek()) {
-    //         renderer.apply_paint_transform(next, &mut transform);
-    //     }
-    //     transform
-    // }
+        let mut transform = Matrix4::identity();
+        let mut iter = renderers.iter().rev().peekable();
+        while let (Some(renderer), Some(next)) = (iter.next(), iter.peek()) {
+            renderer.apply_paint_transform(next, &mut transform);
+        }
+        transform
+    }
 }
 
 #[derive(Clone)]

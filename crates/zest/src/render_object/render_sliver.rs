@@ -110,4 +110,8 @@ impl AbstractNodeExt for RenderSliver {
     fn layout(&self, constraints: Constraints, parent_use_size: bool) {
         todo!()
     }
+
+    fn apply_paint_transform(&self, child: &RenderObject, transform: &Matrix4) {
+        todo!()
+    }
 }
