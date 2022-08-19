@@ -14,7 +14,9 @@ use druid_shell::{
 use super::{
     layer::Layer,
     pipeline_owner::PipelineOwner,
-    render_box::{BoxConstraints, RenderBox, RenderBoxWidget, Size, WeakRenderBox},
+    render_box::{
+        BoxConstraints, BoxHitTestEntry, RenderBox, RenderBoxWidget, Size, WeakRenderBox,
+    },
     render_sliver::{RenderSliver, WeakRenderSliver},
     render_view::{RenderView, WeakRenderView},
 };
@@ -141,7 +143,17 @@ impl Rect {
 }
 pub struct PointerEvent {}
 
-pub struct HitTestEntry {}
+pub enum HitTestEntry {
+    BoxHitTestEntry(BoxHitTestEntry),
+}
+
+impl HitTestEntry {
+    pub fn to_box_hit_test_entry(self) -> BoxHitTestEntry {
+        match self {
+            HitTestEntry::BoxHitTestEntry(entry) => entry,
+        }
+    }
+}
 
 pub struct PaintContext {
     paint_bounds: Rect,
@@ -344,7 +356,6 @@ pub(crate) trait AbstractNodeExt {
     fn is_repaint_bondary(&self) -> bool;
     fn paint_with_context(&self, context: &mut PaintContext, offset: Offset);
     fn handle_event(&self, event: PointerEvent, entry: HitTestEntry);
-    fn invoke_layout_callback(&self, callback: impl FnOnce(&Constraints));
     fn layout_without_resize(&self);
     fn layout(&self, constraints: Constraints, parent_use_size: bool);
     fn paint_bounds(&self) -> Rect;
@@ -404,10 +415,7 @@ impl RenderObject {
     }
 
     pub(crate) fn schedule_initial_layout(&self) {
-        match self {
-            RenderObject::RenderView(boxed) => boxed.set_relayout_boundary(Some(self.clone())),
-            _ => unreachable!(),
-        }
+        self.set_relayout_boundary(Some(self.clone()));
         self.owner().add_node_need_layout(self.clone());
     }
 

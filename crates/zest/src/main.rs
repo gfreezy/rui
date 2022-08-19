@@ -1,3 +1,5 @@
+#[macro_use]
+mod macros;
 mod render_object;
 mod rendering;
 mod widget;
@@ -39,7 +41,7 @@ impl MainState {
     fn draw_frame(&mut self, piet: &mut Piet) {
         self.pipeline_owner().flush_layout();
         self.pipeline_owner().flush_paint(piet);
-        // self.root_view().render_view().composite_frame(piet);
+        self.root_view().render_view().composite_frame(piet);
     }
 }
 
@@ -53,7 +55,7 @@ impl WinHandler for MainState {
         pipeline_owner.set_render_view(&root_view);
         self.pipeline_owner = Some(pipeline_owner);
         self.root_view = Some(root_view);
-        // self.root_view().prepare_initial_frame();
+        self.root_view().prepare_initial_frame();
     }
 
     fn prepare_paint(&mut self) {

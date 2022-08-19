@@ -82,7 +82,7 @@ pub trait RenderBoxWidget {
         }
     }
 
-    fn handle_event(&self, _event: PointerEvent, _entry: BoxHitTestEntry) {}
+    fn handle_event(&self, event: PointerEvent, entry: BoxHitTestEntry) {}
 
     fn is_repaint_boundary(&self) -> bool {
         false
@@ -157,7 +157,9 @@ impl RenderBox {
             })),
         };
 
-        render_box.to_render_object()
+        let render_object = render_box.to_render_object();
+        render_box.set_render_object(&render_object);
+        render_object
     }
 
     pub fn downgrade(&self) -> WeakRenderBox {
@@ -187,9 +189,9 @@ impl WeakRenderBox {
 
 #[mixin::insert(RenderObjectState)]
 pub(crate) struct InnerRenderBox {
-    pub(crate) object: Option<Box<dyn RenderBoxWidget + 'static>>,
-    pub(crate) size: Option<Size>,
-    pub(crate) offset: Offset,
+    object: Option<Box<dyn RenderBoxWidget + 'static>>,
+    size: Option<Size>,
+    offset: Offset,
     cached_instrinsic_dimensions: HashMap<InstrinsicDimensionsCacheEntry, f64>,
     cached_dry_layout_sizes: HashMap<BoxConstraints, Size>,
 }
@@ -203,6 +205,7 @@ impl Default for InnerRenderBox {
             prev_sibling: Default::default(),
             child_count: Default::default(),
             depth: Default::default(),
+            self_render_object: Default::default(),
             parent: Default::default(),
             owner: Default::default(),
             parent_data: Default::default(),
@@ -397,16 +400,12 @@ impl AbstractNodeExt for RenderBox {
         Rect::from_size(self.size())
     }
 
-    fn handle_event(&self, _event: PointerEvent, _entry: HitTestEntry) {
-        todo!()
+    fn handle_event(&self, event: PointerEvent, entry: HitTestEntry) {
+        self.with_widget(|w, _| w.handle_event(event, entry.to_box_hit_test_entry()))
     }
 
     fn paint_with_context(&self, context: &mut PaintContext, offset: Offset) {
-        todo!()
-    }
-
-    fn invoke_layout_callback(&self, callback: impl FnOnce(&Constraints)) {
-        todo!()
+        context.paint_child(&self.render_object(), offset)
     }
 
     fn layout_without_resize(&self) {

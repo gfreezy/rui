@@ -13,8 +13,6 @@ use super::{
 };
 
 use super::render_box::RenderBox;
-// use super::render_sliver::RenderSliver;
-// use super::render_view::RenderView;
 
 #[mixin::declare]
 struct RenderObjectState {
@@ -25,6 +23,7 @@ struct RenderObjectState {
     pub(crate) child_count: usize,
     pub(crate) depth: usize,
     pub(crate) parent: Option<WeakRenderObject>,
+    pub(crate) self_render_object: Option<WeakRenderObject>,
     pub(crate) owner: Option<WeakOwner>,
     pub(crate) parent_data: Option<ParentData>,
     pub(crate) needs_layout: bool,
@@ -34,10 +33,24 @@ struct RenderObjectState {
     pub(crate) constraints: Option<Constraints>,
     pub(crate) layer: Option<Layer>,
 }
+impl_method! {
+    RenderBox, RenderSliver, RenderView {
+        delegate::delegate! {
+            to self.inner.borrow() {
+                pub(crate) fn render_object(&self) -> RenderObject;
+            }
+
+            to self.inner.borrow_mut() {
+                pub(crate) fn set_render_object(&self, render_object: &RenderObject);
+            }
+        }
+    }
+}
 
 impl_trait_method! {
     AbstractNode => RenderBox, RenderSliver, RenderView {
         delegate::delegate! {
+            // region: delegate to immutable inner
             to self.inner.borrow() {
                 fn parent(&self) -> RenderObject;
 
@@ -90,7 +103,9 @@ impl_trait_method! {
                 fn layer(&self) -> Layer ;
 
             }
+            // endregion: delete to immutable inner
 
+            // region: delegate to mutable inner
             to self.inner.borrow_mut() {
                 fn set_parent(&self, element: Option<RenderObject>);
 
@@ -164,6 +179,8 @@ impl_trait_method! {
 
                 fn set_constraints(&self, c: Constraints);
             }
+            // endregion: delegate to mutable inner
+
         }
     }
 }
@@ -244,6 +261,14 @@ impl_method! {
             }
         }
 
+        pub(crate) fn render_object(&self) -> RenderObject {
+            self.self_render_object.as_ref().unwrap().upgrade()
+        }
+
+        pub(crate) fn set_render_object(&mut self, obj: &RenderObject) {
+            self.self_render_object = Some(obj.downgrade());
+        }
+
         // attach/detach
         pub(crate) fn attach(&mut self, owner: PipelineOwner) {
             tracing::debug!("attach owner");
@@ -298,8 +323,8 @@ impl_method! {
         ///
         /// Subclasses should call this function when they lose a child.
         pub(crate) fn drop_child(&mut self, child: &RenderObject) {
-            // assert_eq!(&child.parent(), &self.render_object());
-            // child.clean_relayout_boundary();
+            assert_eq!(&child.parent(), &self.render_object());
+            child.clean_relayout_boundary();
             child.set_parent(None);
             // detach the child from the owner
             self.mark_needs_layout();
@@ -322,8 +347,8 @@ impl_method! {
         /// If `after` is null, then this inserts the child at the start of the list,
         /// and the child becomes the new [firstChild].
         pub(crate) fn insert(&mut self, child: RenderObject, after: Option<RenderObject>) {
-            // assert_ne!(&child, &self.render_object());
-            // assert_ne!(after.as_ref(), Some(&self.render_object()));
+            assert_ne!(&child, &self.render_object());
+            assert_ne!(after.as_ref(), Some(&self.render_object()));
             assert_ne!(Some(&child), after.as_ref());
             assert_ne!(Some(&child), self.try_first_child().as_ref());
             assert_ne!(Some(&child), self.try_last_child().as_ref());
@@ -354,10 +379,10 @@ impl_method! {
         }
 
         pub(crate) fn move_(&mut self, child: RenderObject, after: Option<RenderObject>) {
-            // assert_ne!(&child, &self.render_object());
-            // assert_ne!(Some(&self.render_object()), after.as_ref());
+            assert_ne!(&child, &self.render_object());
+            assert_ne!(Some(&self.render_object()), after.as_ref());
             assert_ne!(Some(&child), after.as_ref());
-            // assert_eq!(&child.parent(), &self.render_object());
+            assert_eq!(&child.parent(), &self.render_object());
             if self.try_prev_sibling() == after {
                 return;
             }
@@ -464,51 +489,51 @@ impl_method! {
         }
 
         pub(crate) fn clean_relayout_boundary(&mut self) {
-            // if self.try_relayout_boundary().as_ref() != Some(&self.render_object()) {
-                // self.set_relayout_boundary(None);
-                // self.visit_children(|e| e.clean_relayout_boundary());
-            // }
+            if self.try_relayout_boundary().as_ref() != Some(&self.render_object()) {
+                self.set_relayout_boundary(None);
+                self.visit_children(|e| e.clean_relayout_boundary());
+            }
         }
 
         pub(crate) fn propagate_relayout_bondary(&mut self) {
-            // if self.try_relayout_boundary().as_ref() == Some(&self.render_object()) {
-            //     return;
-            // }
+            if self.try_relayout_boundary().as_ref() == Some(&self.render_object()) {
+                return;
+            }
 
-            // let parent_relayout_boundary = self.parent().relayout_boundary();
-            // if Some(&parent_relayout_boundary) != self.try_relayout_boundary().as_ref() {
-            //     self.set_relayout_boundary(Some(parent_relayout_boundary));
-            //     self.visit_children(|e| e.propagate_relayout_bondary());
-            // }
+            let parent_relayout_boundary = self.parent().relayout_boundary();
+            if Some(&parent_relayout_boundary) != self.try_relayout_boundary().as_ref() {
+                self.set_relayout_boundary(Some(parent_relayout_boundary));
+                self.visit_children(|e| e.propagate_relayout_bondary());
+            }
         }
 
         pub(crate) fn mark_needs_layout(&mut self) {
-            // if self.needs_layout {
-            //     return;
-            // }
-            // match self.try_relayout_boundary() {
-            //     None => {
-            //         self.needs_layout = true;
-            //         if self.try_parent().is_some() {
-            //             // _relayoutBoundary is cleaned by an ancestor in RenderObject.layout.
-            //             // Conservatively mark everything dirty until it reaches the closest
-            //             // known relayout boundary.
-            //             self.mark_parent_needs_layout();
-            //         }
-            //         return;
-            //     }
-            //     Some(relayout_boundary) => {
-            //         if relayout_boundary != self.render_object() {
-            //             self.mark_parent_needs_layout();
-            //         } else {
-            //             self.needs_layout = true;
-            //             if let Some(owner) = self.try_owner() {
-            //                 owner.add_node_need_layout(self.render_object());
-            //                 owner.request_visual_update();
-            //             }
-            //         }
-            //     }
-            // }
+            if self.needs_layout {
+                return;
+            }
+            match self.try_relayout_boundary() {
+                None => {
+                    self.needs_layout = true;
+                    if self.try_parent().is_some() {
+                        // _relayoutBoundary is cleaned by an ancestor in RenderObject.layout.
+                        // Conservatively mark everything dirty until it reaches the closest
+                        // known relayout boundary.
+                        self.mark_parent_needs_layout();
+                    }
+                    return;
+                }
+                Some(relayout_boundary) => {
+                    if relayout_boundary != self.render_object() {
+                        self.mark_parent_needs_layout();
+                    } else {
+                        self.needs_layout = true;
+                        if let Some(owner) = self.try_owner() {
+                            owner.add_node_need_layout(self.render_object());
+                            owner.request_visual_update();
+                        }
+                    }
+                }
+            }
         }
 
         pub(crate) fn clear_needs_layout(&mut self) {
@@ -519,7 +544,7 @@ impl_method! {
             self.needs_layout = true;
             assert!(self.try_parent().is_some());
             let parent = self.parent();
-            // parent._mark_needs_layout();
+            parent.mark_needs_layout();
             assert_eq!(parent, self.parent())
         }
 
@@ -548,23 +573,23 @@ impl_method! {
         }
 
         pub(crate) fn mark_needs_paint(&mut self) {
-            // if self.needs_paint {
-            //     return;
-            // }
-            // self.needs_paint = true;
-            // let is_repaint_boundary = true;
-            // if is_repaint_boundary {
-            //     if let Some(owner) = self.try_owner() {
-            //         owner.add_node_need_paint(self.render_object());
-            //         owner.request_visual_update();
-            //     }
-            // } else if self.try_parent().is_some() {
-            //     self.parent().mark_needs_paint();
-            // } else {
-            //     if let Some(owner) = self.try_owner() {
-            //         owner.request_visual_update();
-            //     }
-            // }
+            if self.needs_paint {
+                return;
+            }
+            self.needs_paint = true;
+            let is_repaint_boundary = true;
+            if is_repaint_boundary {
+                if let Some(owner) = self.try_owner() {
+                    owner.add_node_need_paint(self.render_object());
+                    owner.request_visual_update();
+                }
+            } else if self.try_parent().is_some() {
+                self.parent().mark_needs_paint();
+            } else {
+                if let Some(owner) = self.try_owner() {
+                    owner.request_visual_update();
+                }
+            }
         }
 
         pub(crate) fn try_constraints(&self) -> Option<Constraints> {

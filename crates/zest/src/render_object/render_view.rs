@@ -40,7 +40,9 @@ impl RenderView {
                 ..Default::default()
             })),
         };
-        let object = RenderObject::RenderView(v);
+
+        let object = RenderObject::RenderView(v.clone());
+        v.set_render_object(&object);
         object.set_first_child(Some(child));
         object.mark_needs_layout();
         object
@@ -87,6 +89,7 @@ impl Default for InnerRenderView {
             last_child: Default::default(),
             next_sibling: Default::default(),
             prev_sibling: Default::default(),
+            self_render_object: Default::default(),
             child_count: Default::default(),
             depth: Default::default(),
             parent: Default::default(),
@@ -126,10 +129,6 @@ impl AbstractNodeExt for RenderView {
     }
 
     fn handle_event(&self, event: PointerEvent, entry: HitTestEntry) {
-        todo!()
-    }
-
-    fn invoke_layout_callback(&self, callback: impl FnOnce(&Constraints)) {
         todo!()
     }
 

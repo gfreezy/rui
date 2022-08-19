@@ -103,10 +103,6 @@ impl AbstractNodeExt for RenderSliver {
         todo!()
     }
 
-    fn invoke_layout_callback(&self, callback: impl FnOnce(&Constraints)) {
-        todo!()
-    }
-
     fn layout_without_resize(&self) {
         todo!()
     }
