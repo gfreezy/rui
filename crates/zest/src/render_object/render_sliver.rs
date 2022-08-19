@@ -95,10 +95,6 @@ impl AbstractNodeExt for RenderSliver {
         todo!()
     }
 
-    fn paint_with_context(&self, context: &mut PaintContext, offset: Offset) {
-        todo!()
-    }
-
     fn handle_event(&self, _event: PointerEvent, _entry: HitTestEntry) {
         todo!()
     }

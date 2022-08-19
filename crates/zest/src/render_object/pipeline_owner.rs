@@ -77,10 +77,10 @@ impl PipelineOwner {
 
     pub fn set_render_view(&self, node: &RenderObject) {
         if let Some(o) = &*self.inner.root.borrow() {
-            // o.upgrade().detach();
+            o.upgrade().detach();
         }
         *self.inner.root.borrow_mut() = Some(node.downgrade());
-        // node.attach(self.clone());
+        node.attach(self.clone());
     }
 
     pub fn downgrade(&self) -> WeakOwner {

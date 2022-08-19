@@ -124,10 +124,6 @@ impl AbstractNodeExt for RenderView {
         true
     }
 
-    fn paint_with_context(&self, context: &mut PaintContext, offset: Offset) {
-        todo!()
-    }
-
     fn handle_event(&self, event: PointerEvent, entry: HitTestEntry) {
         todo!()
     }

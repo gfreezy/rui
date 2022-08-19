@@ -115,7 +115,7 @@ impl RenderBoxWidget for RenderText {
     fn perform_layout(&mut self, this: &crate::render_object::render_object::RenderObject) {
         self.rebuild_if_needed(&mut this.owner().text());
         let size: Size = self.layout().size().into();
-        // this.set_size(size)
+        this.render_box().set_size(size)
     }
 
     fn hit_test_self(

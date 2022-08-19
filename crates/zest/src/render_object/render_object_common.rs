@@ -33,6 +33,7 @@ struct RenderObjectState {
     pub(crate) constraints: Option<Constraints>,
     pub(crate) layer: Option<Layer>,
 }
+
 impl_method! {
     RenderBox, RenderSliver, RenderView {
         delegate::delegate! {
@@ -49,6 +50,13 @@ impl_method! {
 
 impl_trait_method! {
     AbstractNode => RenderBox, RenderSliver, RenderView {
+        fn paint_with_context(&self, context: &mut PaintContext, offset: Offset) {
+            self.clear_needs_paint();
+            self.paint(context, offset);
+            assert!(!self.needs_layout());
+            assert!(!self.needs_paint());
+        }
+
         delegate::delegate! {
             // region: delegate to immutable inner
             to self.inner.borrow() {

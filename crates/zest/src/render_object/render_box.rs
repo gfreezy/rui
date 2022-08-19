@@ -404,10 +404,6 @@ impl AbstractNodeExt for RenderBox {
         self.with_widget(|w, _| w.handle_event(event, entry.to_box_hit_test_entry()))
     }
 
-    fn paint_with_context(&self, context: &mut PaintContext, offset: Offset) {
-        context.paint_child(&self.render_object(), offset)
-    }
-
     fn layout_without_resize(&self) {
         assert_eq!(&self.relayout_boundary(), &self.to_render_object());
         assert!(!self.doing_this_layout_with_callback());

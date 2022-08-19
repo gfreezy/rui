@@ -349,12 +349,13 @@ pub(crate) trait AbstractNode {
     fn decr_child_count(&self);
 
     fn set_constraints(&self, c: Constraints);
+
+    fn paint_with_context(&self, context: &mut PaintContext, offset: Offset);
 }
 
 #[enum_dispatch::enum_dispatch]
 pub(crate) trait AbstractNodeExt {
     fn is_repaint_bondary(&self) -> bool;
-    fn paint_with_context(&self, context: &mut PaintContext, offset: Offset);
     fn handle_event(&self, event: PointerEvent, entry: HitTestEntry);
     fn layout_without_resize(&self);
     fn layout(&self, constraints: Constraints, parent_use_size: bool);
