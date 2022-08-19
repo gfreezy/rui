@@ -1,5 +1,3 @@
-#![feature(proc_macro_hygiene)]
-
 #[test]
 fn test_base_case() {
     #[mixin::declare]
