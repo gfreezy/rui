@@ -6,8 +6,6 @@ use std::{
 
 use druid_shell::piet::{Piet, PietText};
 
-use crate::render_object::render_object::{AbstractNode, AbstractNodeExt};
-
 use super::render_object::{PaintContext, RenderObject, WeakRenderObject};
 
 #[derive(Clone)]

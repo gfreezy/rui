@@ -278,8 +278,6 @@ dependencies = [
 [[package]]
 name = "delegate"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d70a2d4995466955a415223acf3c9c934b9ff2339631cdf4ffc893da4bacd717"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -336,18 +334,6 @@ name = "either"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f107b87b6afc2a64fd13cac55fe06d6c8859f12d4b14cbcdd2c67d0976781be"
-
-[[package]]
-name = "enum_dispatch"
-version = "0.3.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0eb359f1476bf611266ac1f5355bc14aeca37b299d0ebccc038ee7058891c9cb"
-dependencies = [
- "once_cell",
- "proc-macro2",
- "quote",
- "syn",
-]
 
 [[package]]
 name = "esplori"
@@ -1561,13 +1547,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_mixin"
-version = "0.0.0"
-dependencies = [
- "mixin",
-]
-
-[[package]]
 name = "thiserror"
 version = "1.0.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1981,7 +1960,6 @@ dependencies = [
  "decorum",
  "delegate",
  "druid-shell",
- "enum_dispatch",
  "mixin",
  "reffers",
  "style",

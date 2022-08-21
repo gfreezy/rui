@@ -180,6 +180,8 @@ use quote::{quote, ToTokens};
 use std::collections::HashMap;
 use syn::parse::ParseStream;
 use syn::spanned::Spanned;
+use syn::visit::visit_expr_match;
+use syn::visit_mut::{visit_arm_mut, visit_expr_array_mut, VisitMut};
 use syn::{Attribute, Error, ExprMethodCall, Meta};
 
 mod kw {
@@ -678,11 +680,26 @@ fn has_inline_attribute(attrs: &[&syn::Attribute]) -> bool {
     })
 }
 
+struct MatchVisitor {
+    name: Ident,
+    args: Vec<syn::Expr>,
+}
+
+impl VisitMut for MatchVisitor {
+    fn visit_arm_mut(&mut self, arm: &mut syn::Arm) {
+        let body = arm.body.clone();
+        let name = &self.name;
+        let args = &self.args;
+        arm.body = syn::parse2(quote::quote! { #body.#name(#(#args),*) }).unwrap();
+    }
+}
+
 #[proc_macro]
 pub fn delegate(tokens: TokenStream) -> TokenStream {
     let block: DelegationBlock = syn::parse_macro_input!(tokens);
     let sections = block.segments.iter().map(|delegator| {
         let delegator_attribute = &delegator.delegator;
+
         let functions = delegator.methods.iter().map(|method| {
             let input = &method.method;
             let signature = &input.sig;
@@ -710,7 +727,17 @@ pub fn delegate(tokens: TokenStream) -> TokenStream {
             };
             let visibility = &method.visibility;
 
-            let body = quote::quote! { #delegator_attribute.#name(#(#args),*) };
+            let body = if let syn::Expr::Match(expr_match) = delegator_attribute {
+                let mut expr_match = expr_match.clone();
+                MatchVisitor {
+                    name: name.clone(),
+                    args: args.clone(),
+                }
+                .visit_expr_match_mut(&mut expr_match);
+                expr_match.into_token_stream()
+            } else {
+                quote::quote! { #delegator_attribute.#name(#(#args),*) }
+            };
             let body = if attributes.generate_await {
                 quote::quote! { #body.await }
             } else {

@@ -5,14 +5,14 @@ use super::{
     pipeline_owner::{PipelineOwner, WeakOwner},
     render_box::InnerRenderBox,
     render_object::{
-        AbstractNode, Constraints, Matrix4, Offset, PaintContext, ParentData, Rect, RenderObject,
+        Constraints, ParentData, RenderObject,
         WeakRenderObject,
     },
-    render_sliver::{InnerRenderSliver, RenderSliver},
-    render_view::{InnerRenderView, RenderView},
+    render_sliver::{InnerRenderSliver},
+    render_view::{InnerRenderView},
 };
 
-use super::render_box::RenderBox;
+
 
 #[mixin::declare]
 struct RenderObjectState {
@@ -32,165 +32,6 @@ struct RenderObjectState {
     pub(crate) doing_this_layout_with_callback: bool,
     pub(crate) constraints: Option<Constraints>,
     pub(crate) layer: Option<Layer>,
-}
-
-impl_method! {
-    RenderBox, RenderSliver, RenderView {
-        delegate::delegate! {
-            to self.inner.borrow() {
-                pub(crate) fn render_object(&self) -> RenderObject;
-            }
-
-            to self.inner.borrow_mut() {
-                pub(crate) fn set_render_object(&self, render_object: &RenderObject);
-            }
-        }
-    }
-}
-
-impl_trait_method! {
-    AbstractNode => RenderBox, RenderSliver, RenderView {
-        fn paint_with_context(&self, context: &mut PaintContext, offset: Offset) {
-            self.clear_needs_paint();
-            self.paint(context, offset);
-            assert!(!self.needs_layout());
-            assert!(!self.needs_paint());
-        }
-
-        delegate::delegate! {
-            // region: delegate to immutable inner
-            to self.inner.borrow() {
-                fn parent(&self) -> RenderObject;
-
-                fn try_parent(&self) -> Option<RenderObject>;
-
-                fn first_child(&self) -> RenderObject;
-
-                fn try_first_child(&self) -> Option<RenderObject>;
-
-                fn last_child(&self) -> RenderObject;
-
-                fn try_last_child(&self) -> Option<RenderObject>;
-
-                fn next_sibling(&self) -> RenderObject;
-
-                fn prev_sibling(&self) -> RenderObject;
-
-                fn try_next_sibling(&self) -> Option<RenderObject>;
-
-                fn try_prev_sibling(&self) -> Option<RenderObject>;
-
-                fn redepth_child(&self, child: &RenderObject);
-
-                fn child_count(&self) -> usize;
-
-                fn depth(&self) -> usize;
-
-                fn redepth_children(&self);
-
-                fn relayout_boundary(&self) -> RenderObject;
-
-                fn try_relayout_boundary(&self) -> Option<RenderObject> ;
-
-                fn owner(&self) -> PipelineOwner ;
-
-                fn try_owner(&self) -> Option<PipelineOwner> ;
-
-                fn needs_layout(&self) -> bool ;
-
-                fn needs_paint(&self) -> bool ;
-
-                fn try_constraints(&self) -> Option<Constraints> ;
-
-                fn constraints(&self) -> Constraints ;
-
-                fn doing_this_layout_with_callback(&self) -> bool ;
-
-                fn try_layer(&self) -> Option<Layer> ;
-
-                fn layer(&self) -> Layer ;
-
-            }
-            // endregion: delete to immutable inner
-
-            // region: delegate to mutable inner
-            to self.inner.borrow_mut() {
-                fn set_parent(&self, element: Option<RenderObject>);
-
-                fn set_next_sibling(&self, element: Option<RenderObject>);
-
-                fn set_prev_sibling(&self, element: Option<RenderObject>);
-
-                fn set_first_child(&self, element: Option<RenderObject>);
-
-                fn set_last_child(&self, element: Option<RenderObject>);
-
-                fn set_last_child_if_none(&self, element: Option<RenderObject>);
-
-                fn attach(&self, owner: PipelineOwner);
-
-                fn detach(&self);
-
-                /// Mark the given node as being a child of this node.
-                ///
-                /// Subclasses should call this function when they acquire a new child.
-                fn adopt_child(&self, child: &RenderObject);
-
-                /// Disconnect the given node from this node.
-                ///
-                /// Subclasses should call this function when they lose a child.
-                fn drop_child(&self, child: &RenderObject);
-
-                /// Insert child into this render object's child list after the given child.
-                ///
-                /// If `after` is null, then this inserts the child at the start of the list,
-                /// and the child becomes the new [firstChild].
-                fn insert(&self, child: RenderObject, after: Option<RenderObject>);
-
-                fn add(&self, child: RenderObject);
-
-                fn remove(&self, child: &RenderObject);
-
-                fn remove_all(&self);
-
-                fn move_(&self, child: RenderObject, after: Option<RenderObject>);
-
-                fn set_relayout_boundary(&self, relayout_boundary: Option<RenderObject>) ;
-
-                fn clean_relayout_boundary(&self) ;
-
-                fn propagate_relayout_bondary(&self) ;
-
-                fn mark_needs_layout(&self) ;
-
-                fn clear_needs_layout(&self) ;
-
-                fn mark_parent_needs_layout(&self) ;
-
-                fn set_owner(&self, owner: Option<PipelineOwner>) ;
-
-                fn clear_needs_paint(&self) ;
-
-                fn mark_needs_paint(&self) ;
-
-                fn invoke_layout_callback(&self, callback: impl FnOnce(&Constraints)) ;
-
-                fn set_layer(&self, layer: Option<Layer>) ;
-
-                fn incr_depth(&self) ;
-
-                fn clear_child_count(&self) ;
-
-                fn incr_child_count(&self) ;
-
-                fn decr_child_count(&self) ;
-
-                fn set_constraints(&self, c: Constraints);
-            }
-            // endregion: delegate to mutable inner
-
-        }
-    }
 }
 
 impl_method! {
@@ -475,7 +316,7 @@ impl_method! {
             }
         }
 
-        fn visit_children(&self, mut visitor: impl FnMut(RenderObject)) {
+        pub(crate) fn visit_children(&self, mut visitor: impl FnMut(RenderObject)) {
             // attach children
             let mut child = self.try_first_child();
             while let Some(c) = child {

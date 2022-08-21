@@ -11,7 +11,6 @@ tracing-subscriber = "0.3.11"
 reffers = "0.7.0"
 decorum = "0.3.1"
 core-graphics = "0.22"
-enum_dispatch = "0.3.8"
 style = { path = "../style" }
 mixin = { path = "../../third_party/mixin" }
 delegate = "0.7"
