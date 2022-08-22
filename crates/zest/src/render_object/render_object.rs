@@ -499,13 +499,13 @@ impl WeakRenderObject {
         }
     }
 
-    pub fn is_alive(&self) -> bool {
-        match self {
-            WeakRenderObject::RenderBox(o) => o.is_alive(),
-            WeakRenderObject::RenderSliver(o) => o.is_alive(),
-            WeakRenderObject::RenderView(_o) => true,
-        }
-    }
+    delegate::delegate!(to match self {
+        WeakRenderObject::RenderBox(o) => o,
+        WeakRenderObject::RenderSliver(o) => o,
+        WeakRenderObject::RenderView(o) => o,
+    } {
+        pub fn is_alive(&self) -> bool;
+    });
 }
 
 impl PaintContext {

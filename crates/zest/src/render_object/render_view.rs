@@ -14,7 +14,6 @@ use super::render_object::{
     HitTestEntry, Matrix4, Offset, PaintContext, PointerEvent, WeakRenderObject,
 };
 
-
 use super::{
     layer::Layer,
     pipeline_owner::{PipelineOwner, WeakOwner},
@@ -116,6 +115,10 @@ impl WeakRenderView {
             .upgrade()
             .map(|inner| RenderView { inner })
             .unwrap()
+    }
+
+    pub fn is_alive(&self) -> bool {
+        true
     }
 }
 
