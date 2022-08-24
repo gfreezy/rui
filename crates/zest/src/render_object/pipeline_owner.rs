@@ -104,14 +104,15 @@ impl PipelineOwner {
             let b = b.upgrade();
             a.depth().cmp(&b.depth())
         });
-        eprintln!("flush_layout: {:?}", nodes.len());
         for node in &*nodes {
             let node = node.upgrade();
+            tracing::debug!("flush_layout node: {:?}", node);
             if dbg!(node.needs_layout()) && dbg!(node.try_owner()) == Some(self.clone()) {
                 eprintln!("layout node");
                 node.layout_without_resize();
             }
         }
+        nodes.clear();
     }
 
     pub(crate) fn flush_paint(&self, piet: &mut Piet) {
@@ -122,18 +123,18 @@ impl PipelineOwner {
             let b = b.upgrade();
             a.depth().cmp(&b.depth())
         });
-        eprintln!("flush_paint: {:?}", nodes.len());
         for node in &*nodes {
             let node = node.upgrade();
-            eprintln!("paint node outer");
+            tracing::debug!("paint node: {:?}", node);
 
-            if dbg!(node.needs_paint()) && node.try_owner() == Some(self.clone()) {
+            if node.needs_paint() && node.try_owner() == Some(self.clone()) {
                 // check whether layer is attached
                 eprintln!("paint node");
 
                 PaintContext::repaint_composited_child(&node, piet);
             }
         }
+        nodes.clear();
     }
 
     pub(crate) fn text(&self) -> druid_shell::piet::CoreGraphicsText {

@@ -1,7 +1,8 @@
 use druid_shell::piet::Piet;
+use std::fmt::Debug;
 
 use super::{
-    render_box::{BoxConstraints, Size},
+    render_box::{BoxConstraints, HitTestResult, Size},
     render_object::{Rect, RenderObject},
 };
 
@@ -31,6 +32,12 @@ impl PartialEq for RenderView {
     }
 }
 
+impl Debug for RenderView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RenderView").finish()
+    }
+}
+
 impl RenderView {
     pub(crate) fn new_render_object(child: RenderObject, size: Size) -> RenderObject {
         let v = Self {
@@ -40,11 +47,11 @@ impl RenderView {
             })),
         };
 
-        let object = RenderObject::RenderView(v.clone());
-        v.set_render_object(&object);
-        object.set_first_child(Some(child));
-        object.mark_needs_layout();
-        object
+        let root_view = RenderObject::RenderView(v.clone());
+        v.set_render_object(&root_view);
+        root_view.add(child);
+        root_view.mark_needs_layout();
+        root_view
     }
 
     pub fn downgrade(&self) -> WeakRenderView {
@@ -127,9 +134,7 @@ impl RenderView {
         true
     }
 
-    pub(crate) fn handle_event(&self, _event: PointerEvent, _entry: HitTestEntry) {
-        todo!()
-    }
+    pub(crate) fn handle_event(&self, event: PointerEvent, entry: HitTestEntry) {}
 
     pub(crate) fn layout_without_resize(&self) {
         self.perform_layout();
@@ -141,12 +146,27 @@ impl RenderView {
         Rect::from_size(self.inner.borrow().size)
     }
 
-    pub(crate) fn layout(&self, _constraints: Constraints, _parent_use_size: bool) {
-        todo!()
+    pub(crate) fn layout(&self, constraints: Constraints, _parent_use_size: bool) {
+        self.set_constraints(constraints);
+        self.perform_layout();
+        self.clear_needs_layout();
+        self.mark_needs_paint();
     }
 
     pub(crate) fn apply_paint_transform(&self, _child: &RenderObject, _transform: &Matrix4) {
         todo!()
+    }
+
+    pub(crate) fn hit_test(&self, result: &mut HitTestResult, position: Offset) -> bool {
+        tracing::debug!("hit_test in render view");
+        if let Some(child) = self.try_first_child() {
+            child.hit_test(result, position);
+        }
+        result.add(HitTestEntry::new_box_hit_test_entry(
+            self.render_object().downgrade(),
+            position,
+        ));
+        true
     }
 }
 
@@ -212,7 +232,8 @@ impl_method! {
 
                 pub(crate) fn layer(&self) -> Layer ;
                 pub(crate)fn render_object(&self) -> RenderObject;
-
+                pub(crate) fn to_string_short(&self) -> String;
+                pub(crate) fn to_string_deep(&self) -> String;
             }
             // endregion: delete to immutable inner
 

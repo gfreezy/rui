@@ -1,10 +1,14 @@
 use std::{
     cell::RefCell,
+    fmt::Debug,
     rc::{Rc, Weak},
 };
 
-use super::render_object::{
-    HitTestEntry, Matrix4, Offset, PaintContext, PointerEvent, RenderObject, WeakRenderObject,
+use super::{
+    render_box::HitTestResult,
+    render_object::{
+        HitTestEntry, Matrix4, Offset, PaintContext, PointerEvent, RenderObject, WeakRenderObject,
+    },
 };
 
 use super::{
@@ -16,6 +20,14 @@ use super::{
 #[derive(Clone)]
 pub struct RenderSliver {
     pub(crate) inner: Rc<RefCell<InnerRenderSliver>>,
+}
+
+impl Debug for RenderSliver {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RenderSliver")
+            .field("name", &self.name())
+            .finish()
+    }
 }
 
 impl PartialEq for RenderSliver {
@@ -69,6 +81,10 @@ impl WeakRenderSliver {
 }
 
 impl RenderSliver {
+    pub fn name(&self) -> String {
+        "RenderSliver".to_string()
+    }
+
     pub(crate) fn handle_event(&self, _event: PointerEvent, _entry: HitTestEntry) {
         todo!()
     }
@@ -86,6 +102,10 @@ impl RenderSliver {
     }
 
     pub(crate) fn apply_paint_transform(&self, _child: &RenderObject, _transform: &Matrix4) {
+        todo!()
+    }
+
+    pub(crate) fn hit_test(&self, result: &mut HitTestResult, position: Offset) -> bool {
         todo!()
     }
 }
@@ -131,7 +151,9 @@ impl_method! {
                 pub(crate) fn redepth_children(&self);
 
                 pub(crate) fn relayout_boundary(&self) -> RenderObject;
-pub(crate) fn visit_children(&self, visitor: impl FnMut(RenderObject));
+
+                pub(crate) fn visit_children(&self, visitor: impl FnMut(RenderObject));
+
                 pub(crate) fn try_relayout_boundary(&self) -> Option<RenderObject> ;
 
                 pub(crate) fn owner(&self) -> PipelineOwner ;
@@ -153,6 +175,8 @@ pub(crate) fn visit_children(&self, visitor: impl FnMut(RenderObject));
                 pub(crate) fn layer(&self) -> Layer ;
                 pub(crate)fn render_object(&self) -> RenderObject;
 
+                pub(crate) fn to_string_short(&self) -> String;
+                pub(crate) fn to_string_deep(&self) -> String;
             }
             // endregion: delete to immutable inner
 

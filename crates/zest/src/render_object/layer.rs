@@ -15,6 +15,7 @@ pub(crate) struct Layer {
 struct InnerLayer {
     layer: PietLayer,
     offset: Offset,
+    size: Size,
     children: Vec<Layer>,
 }
 
@@ -27,11 +28,13 @@ impl Layer {
         Layer {
             inner: Rc::new(RefCell::new(InnerLayer {
                 layer,
+                size,
                 offset: Offset::ZERO,
                 children: vec![],
             })),
         }
     }
+
     pub fn add_child(&self, layer: Layer) {
         self.inner.borrow_mut().children.push(layer);
     }
@@ -40,10 +43,22 @@ impl Layer {
         self.inner.borrow_mut().children.clear();
     }
 
+    pub fn size(&self) -> Size {
+        self.inner.borrow().size
+    }
+
+    pub fn offset(&self) -> Offset {
+        self.inner.borrow().offset
+    }
+
     pub fn with_piet<T>(&self, f: impl FnOnce(&mut Piet) -> T) -> T {
         let mut borrow = self.inner.borrow_mut();
         let mut piet = Piet::new_from_layer(&mut borrow.layer);
         f(&mut piet)
+    }
+
+    pub fn clear(&self) {
+        self.inner.borrow().layer.clear();
     }
 
     pub fn draw_in_rect(&self, piet: &mut Piet, rect: Rect) {

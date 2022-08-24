@@ -1,6 +1,7 @@
 use std::{
     any::Any,
     cell::RefCell,
+    collections::btree_map::Entry,
     fmt::Debug,
     ops::{Add, Mul, Sub},
     rc::{Rc, Weak},
@@ -9,13 +10,15 @@ use std::{
 use druid_shell::{
     kurbo::{Circle, Point},
     piet::{Color, Piet, PietTextLayout, RenderContext},
+    MouseEvent,
 };
 
 use super::{
     layer::Layer,
     pipeline_owner::PipelineOwner,
     render_box::{
-        BoxConstraints, BoxHitTestEntry, RenderBox, RenderBoxWidget, Size, WeakRenderBox,
+        BoxConstraints, BoxHitTestEntry, HitTestResult, RenderBox, RenderBoxWidget, Size,
+        WeakRenderBox,
     },
     render_sliver::{RenderSliver, WeakRenderSliver},
     render_view::{RenderView, WeakRenderView},
@@ -140,17 +143,54 @@ impl Rect {
     pub(crate) fn height(&self) -> f64 {
         self.y1 - self.y0
     }
-}
-pub struct PointerEvent {}
 
+    pub(crate) fn size(&self) -> Size {
+        Size {
+            width: self.width(),
+            height: self.height(),
+        }
+    }
+}
+pub type PointerEvent = MouseEvent;
+
+#[derive(Clone)]
 pub enum HitTestEntry {
     BoxHitTestEntry(BoxHitTestEntry),
+    SliverHitTestEntry(SliverHitTestEntry),
+}
+
+#[derive(Clone)]
+pub struct SliverHitTestEntry {
+    render_object: WeakRenderObject,
+}
+
+impl SliverHitTestEntry {
+    pub fn target(&self) -> RenderObject {
+        self.render_object.upgrade()
+    }
 }
 
 impl HitTestEntry {
     pub fn to_box_hit_test_entry(self) -> BoxHitTestEntry {
         match self {
             HitTestEntry::BoxHitTestEntry(entry) => entry,
+            HitTestEntry::SliverHitTestEntry(entry) => todo!(),
+        }
+    }
+
+    pub(crate) fn new_box_hit_test_entry(
+        render_object: WeakRenderObject,
+        position: Offset,
+    ) -> Self {
+        HitTestEntry::BoxHitTestEntry(BoxHitTestEntry::new(render_object, position))
+    }
+
+    delegate::delegate! {
+        to match self {
+            HitTestEntry::BoxHitTestEntry(e) => e,
+            HitTestEntry::SliverHitTestEntry(e) => e,
+        } {
+            pub fn target(&self) -> RenderObject;
         }
     }
 }
@@ -177,6 +217,12 @@ impl Offset {
 impl From<Offset> for Point {
     fn from(offset: Offset) -> Self {
         Point::new(offset.dx, offset.dy)
+    }
+}
+
+impl From<Point> for Offset {
+    fn from(p: Point) -> Self {
+        Offset::new(p.x, p.y)
     }
 }
 
@@ -355,17 +401,7 @@ impl RenderObject {
 
             pub(crate) fn paint_with_context(&self, context: &mut PaintContext, offset: Offset);
             pub(crate) fn visit_children(&self, visitor: impl FnMut(RenderObject));
-        }
-    }
-}
 
-impl RenderObject {
-    delegate::delegate! {
-        to match self {
-            RenderObject::RenderBox(b) => b,
-            RenderObject::RenderSliver(sliver) => sliver,
-            RenderObject::RenderView(view) => view,
-        } {
             pub(crate) fn is_repaint_bondary(&self) -> bool;
             pub(crate) fn handle_event(&self, event: PointerEvent, entry: HitTestEntry);
             pub(crate) fn layout_without_resize(&self);
@@ -373,13 +409,32 @@ impl RenderObject {
             pub(crate) fn paint_bounds(&self) -> Rect;
 
             pub(crate) fn apply_paint_transform(&self, child: &RenderObject, transform: &Matrix4);
+
+            pub(crate) fn to_string_short(&self) -> String;
+            pub(crate) fn to_string_deep(&self) -> String;
+
+        }
+    }
+
+    pub(crate) fn hit_test(&self, result: &mut HitTestResult, position: Offset) -> bool {
+        tracing::debug!("hit_test in {:?}", self);
+        match self {
+            RenderObject::RenderBox(o) => o.hit_test(result, position),
+            RenderObject::RenderSliver(o) => o.hit_test(result, position),
+            RenderObject::RenderView(o) => o.hit_test(result, position),
         }
     }
 }
 
 impl Debug for RenderObject {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Element").finish()
+    delegate::delegate! {
+            to match self {
+                RenderObject::RenderBox(box_) => box_,
+                RenderObject::RenderSliver(sliver) => sliver,
+                RenderObject::RenderView(view) => view,
+            } {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
+        }
     }
 }
 
@@ -536,27 +591,28 @@ impl PaintContext {
     pub(crate) fn repaint_composited_child(child: &RenderObject, piet: &mut Piet) {
         assert!(child.needs_paint());
         assert!(child.is_repaint_bondary());
+        let child_bounds = child.paint_bounds();
         let child_layer = match child.try_layer() {
-            None => {
-                let bounds = child.paint_bounds();
+            Some(layer) if layer.size() == child_bounds.size() => {
+                layer.clear_children();
+                layer.clear();
+                layer
+            }
+            _ => {
+                let bounds = &child_bounds;
                 let size = Size {
                     width: bounds.width(),
                     height: bounds.height(),
                 };
 
-                let child_layer = Layer::new(piet, size);
+                let child_layer = Layer::new(piet, dbg!(size));
                 child.set_layer(Some(child_layer.clone()));
                 child_layer
             }
-            Some(layer) => {
-                layer.clear_children();
-                layer
-            }
         };
 
-        let rect = child.paint_bounds();
         eprintln!("repaint_composited_child");
-        let mut paint_context = PaintContext::new(child_layer, rect);
+        let mut paint_context = PaintContext::new(child_layer, child_bounds);
         child.paint_with_context(&mut paint_context, Offset::ZERO);
     }
 

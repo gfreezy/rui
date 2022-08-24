@@ -4,15 +4,10 @@ use super::{
     layer::Layer,
     pipeline_owner::{PipelineOwner, WeakOwner},
     render_box::InnerRenderBox,
-    render_object::{
-        Constraints, ParentData, RenderObject,
-        WeakRenderObject,
-    },
-    render_sliver::{InnerRenderSliver},
-    render_view::{InnerRenderView},
+    render_object::{Constraints, ParentData, RenderObject, WeakRenderObject},
+    render_sliver::InnerRenderSliver,
+    render_view::InnerRenderView,
 };
-
-
 
 #[mixin::declare]
 struct RenderObjectState {
@@ -36,6 +31,14 @@ struct RenderObjectState {
 
 impl_method! {
      InnerRenderBox, InnerRenderSliver, InnerRenderView {
+        pub(crate) fn to_string_short(&self) -> String {
+            todo!()
+        }
+
+        pub(crate) fn to_string_deep(&self) -> String {
+            todo!()
+        }
+
         pub(crate) fn parent(&self) -> RenderObject {
             self.try_parent().unwrap()
         }
@@ -160,7 +163,7 @@ impl_method! {
         /// Subclasses should call this function when they acquire a new child.
         pub(crate) fn adopt_child(&mut self, child: &RenderObject) {
             assert!(child.try_parent().is_none());
-            child.set_parent(Some(child.clone()));
+            child.set_parent(Some(self.render_object()));
             self.mark_needs_layout();
             // self.mark_needs_composition_bits_update();
 

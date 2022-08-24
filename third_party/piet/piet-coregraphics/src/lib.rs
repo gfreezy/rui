@@ -114,6 +114,9 @@ impl<'a> CoreGraphicsContext<'a> {
         CGLayer::create_layer_with_context(self.ctx, to_cgsize(size))
     }
 
+    pub fn clear_in_rect(&mut self, rect: Rect) {
+        self.ctx.clear_rect(to_cgrect(rect));
+    }
     pub fn draw_layer_in_rect(&mut self, layer: &Layer, rect: Rect) {
         self.ctx
             .draw_layer_in_rect(&layer.cg_layer, to_cgrect(rect));
@@ -128,6 +131,7 @@ impl<'a> CoreGraphicsContext<'a> {
 pub struct Layer {
     cg_layer: CGLayer, // layer owner, dropped when Layer is dropped
     cg_context: CGContext,
+    size: Size,
     text: CoreGraphicsText,
 }
 
@@ -135,10 +139,16 @@ impl Layer {
     pub(crate) fn new(ctx: &mut CoreGraphicsContext, size: Size) -> Self {
         let layer = ctx.create_cglayer(size);
         Layer {
+            size,
             cg_context: layer.context(),
             cg_layer: layer,
             text: ctx.text.clone(),
         }
+    }
+
+    pub fn clear(&self) {
+        self.cg_context
+            .clear_rect(to_cgrect(Rect::from_origin_size(Point::ZERO, self.size)));
     }
 }
 

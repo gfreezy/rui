@@ -1,6 +1,7 @@
+use debug_cell::RefCell;
 use std::{
-    cell::RefCell,
     collections::HashMap,
+    fmt::Debug,
     hash::Hash,
     rc::{Rc, Weak},
 };
@@ -13,7 +14,8 @@ use super::{
     layer::Layer,
     pipeline_owner::{PipelineOwner, WeakOwner},
     render_object::{
-        Constraints, HitTestEntry, Matrix4, Offset, PaintContext, ParentData, PointerEvent, Rect, WeakRenderObject,
+        Constraints, HitTestEntry, Matrix4, Offset, PaintContext, ParentData, PointerEvent, Rect,
+        WeakRenderObject,
     },
 };
 
@@ -65,13 +67,29 @@ pub struct RenderBox {
     pub(crate) inner: Rc<RefCell<InnerRenderBox>>,
 }
 
+impl Debug for RenderBox {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RenderBox")
+            .field("name", &self.name())
+            .finish()
+    }
+}
+
 impl PartialEq for RenderBox {
     fn eq(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.inner, &other.inner)
     }
 }
 
+pub trait RenderBoxProps: RenderBoxWidget {
+    type Props: Default;
+    fn create(props: Self::Props) -> Self;
+    fn update(&mut self, this: &RenderObject, props: Self::Props);
+}
+
 pub trait RenderBoxWidget {
+    fn name(&self) -> &'static str;
+
     fn paint(&mut self, this: &RenderObject, paint_context: &mut PaintContext, offset: Offset) {
         let mut child = this.try_first_child();
         while let Some(c) = child {
@@ -81,7 +99,7 @@ pub trait RenderBoxWidget {
         }
     }
 
-    fn handle_event(&self, _event: PointerEvent, _entry: BoxHitTestEntry) {}
+    fn handle_event(&mut self, this: &RenderObject, event: PointerEvent, entry: BoxHitTestEntry) {}
 
     fn is_repaint_boundary(&self) -> bool {
         false
@@ -124,7 +142,7 @@ pub trait RenderBoxWidget {
     fn hit_test_children(
         &mut self,
         this: &RenderObject,
-        result: &mut BoxHitTestResult,
+        result: &mut HitTestResult,
         position: Offset,
     ) -> bool {
         let mut child = this.try_last_child();
@@ -224,6 +242,10 @@ impl Default for InnerRenderBox {
 }
 
 impl RenderBox {
+    pub(crate) fn name(&self) -> &'static str {
+        self.with_widget(|w, _| w.name())
+    }
+
     /// Paint this render object into the given context at the given offset.
     ///
     /// Subclasses should override this method to provide a visual appearance
@@ -265,11 +287,7 @@ impl RenderBox {
         self.with_widget(|w, this| w.hit_test_self(this, position))
     }
 
-    pub(crate) fn hit_test_children(
-        &self,
-        result: &mut BoxHitTestResult,
-        position: Offset,
-    ) -> bool {
+    pub(crate) fn hit_test_children(&self, result: &mut HitTestResult, position: Offset) -> bool {
         self.with_widget(|w, this| w.hit_test_children(this, result, position))
     }
 }
@@ -338,10 +356,10 @@ impl RenderBox {
         }
     }
 
-    pub(crate) fn hit_test(&self, result: &mut BoxHitTestResult, position: Offset) -> bool {
+    pub(crate) fn hit_test(&self, result: &mut HitTestResult, position: Offset) -> bool {
         if self.size().contains(position) {
             if self.hit_test_children(result, position) || self.hit_test_self(position) {
-                result.add(BoxHitTestEntry::new(
+                result.add(HitTestEntry::new_box_hit_test_entry(
                     self.to_render_object().downgrade(),
                     position,
                 ));
@@ -393,7 +411,9 @@ impl RenderBox {
     }
 
     pub(crate) fn handle_event(&self, event: PointerEvent, entry: HitTestEntry) {
-        self.with_widget(|w, _| w.handle_event(event, entry.to_box_hit_test_entry()))
+        self.with_widget(|w, _| {
+            w.handle_event(&self.render_object(), event, entry.to_box_hit_test_entry())
+        })
     }
 
     pub(crate) fn layout_without_resize(&self) {
@@ -447,22 +467,22 @@ impl RenderBox {
     }
 }
 
-pub struct BoxHitTestResult {
-    entries: Vec<BoxHitTestEntry>,
+pub struct HitTestResult {
+    entries: Vec<HitTestEntry>,
 }
 
-impl BoxHitTestResult {
-    fn new() -> Self {
+impl HitTestResult {
+    pub fn new() -> Self {
         Self {
             entries: Vec::new(),
         }
     }
 
-    fn add(&mut self, entry: BoxHitTestEntry) {
+    pub fn add(&mut self, entry: HitTestEntry) {
         self.entries.push(entry);
     }
 
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
@@ -470,23 +490,32 @@ impl BoxHitTestResult {
         &self,
         _offset: Offset,
         _position: Offset,
-        _hit_test: impl FnOnce(&mut BoxHitTestResult, Offset) -> bool,
+        _hit_test: impl FnOnce(&mut HitTestResult, Offset) -> bool,
     ) -> bool {
         todo!()
     }
+
+    pub fn entries(&self) -> impl Iterator<Item = &HitTestEntry> {
+        self.entries.iter()
+    }
 }
 
+#[derive(Clone)]
 pub struct BoxHitTestEntry {
     render_object: WeakRenderObject,
     position: Offset,
 }
 
 impl BoxHitTestEntry {
-    fn new(render_object: WeakRenderObject, position: Offset) -> Self {
+    pub(crate) fn new(render_object: WeakRenderObject, position: Offset) -> Self {
         Self {
             render_object,
             position,
         }
+    }
+
+    pub fn target(&self) -> RenderObject {
+        self.render_object.upgrade()
     }
 }
 
@@ -610,6 +639,8 @@ impl_method! {
                 pub(crate) fn layer(&self) -> Layer ;
                 pub(crate)fn render_object(&self) -> RenderObject;
 
+                pub(crate) fn to_string_short(&self) -> String;
+                pub(crate) fn to_string_deep(&self) -> String;
             }
             // endregion: delete to immutable inner
 

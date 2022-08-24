@@ -2,7 +2,17 @@ use druid_shell::piet::{
     PietText, PietTextLayout, Text, TextAttribute, TextLayout, TextLayoutBuilder,
 };
 
-use crate::render_object::render_box::{RenderBoxWidget, Size};
+use crate::render_object::{
+    render_box::{RenderBoxProps, RenderBoxWidget, Size},
+    render_object::RenderObject,
+};
+
+#[derive(Default)]
+pub struct RenderTextProps {
+    text: String,
+    font_size: f64,
+    max_width: Option<f64>,
+}
 
 pub struct RenderText {
     text: String,
@@ -45,6 +55,29 @@ impl RenderText {
     }
 }
 
+impl RenderBoxProps for RenderText {
+    type Props = RenderTextProps;
+
+    fn create(props: Self::Props) -> Self {
+        RenderText {
+            text: props.text,
+            font_size: props.font_size,
+            max_width: props.max_width,
+            layout: None,
+        }
+    }
+
+    fn update(&mut self, this: &RenderObject, props: Self::Props) {
+        *self = RenderText {
+            text: props.text,
+            font_size: props.font_size,
+            max_width: props.max_width,
+            layout: None,
+        };
+        this.mark_needs_layout();
+    }
+}
+
 impl RenderBoxWidget for RenderText {
     fn paint(
         self: &mut RenderText,
@@ -56,10 +89,19 @@ impl RenderBoxWidget for RenderText {
     }
 
     fn handle_event(
-        &self,
-        _event: crate::render_object::render_object::PointerEvent,
-        _entry: crate::render_object::render_box::BoxHitTestEntry,
+        &mut self,
+        this: &crate::render_object::render_object::RenderObject,
+        event: crate::render_object::render_object::PointerEvent,
+        entry: crate::render_object::render_box::BoxHitTestEntry,
     ) {
+        tracing::debug!("text handle event");
+        self.font_size += 1.;
+        self.layout = None;
+        this.mark_needs_layout();
+    }
+
+    fn is_repaint_boundary(&self) -> bool {
+        true
     }
 
     fn sized_by_parent(&self) -> bool {
@@ -112,6 +154,7 @@ impl RenderBoxWidget for RenderText {
     fn perform_layout(&mut self, this: &crate::render_object::render_object::RenderObject) {
         self.rebuild_if_needed(&mut this.owner().text());
         let size: Size = self.layout().size().into();
+        tracing::debug!("text perform layout: {:?}", size);
         this.render_box().set_size(size)
     }
 
@@ -120,31 +163,19 @@ impl RenderBoxWidget for RenderText {
         _this: &crate::render_object::render_object::RenderObject,
         _position: crate::render_object::render_object::Offset,
     ) -> bool {
-        false
+        true
     }
 
     fn hit_test_children(
         self: &mut RenderText,
         this: &crate::render_object::render_object::RenderObject,
-        result: &mut crate::render_object::render_box::BoxHitTestResult,
+        result: &mut crate::render_object::render_box::HitTestResult,
         position: crate::render_object::render_object::Offset,
     ) -> bool {
-        let mut child = this.try_last_child();
-        while let Some(c) = child {
-            let offset = c.render_box().offset();
-            let is_hit = result.add_with_paint_offset(offset, position, |result, transformed| {
-                assert_eq!(transformed, position - offset);
-                c.render_box().hit_test(result, transformed)
-            });
-            if is_hit {
-                return true;
-            }
-            child = c.try_prev_sibling();
-        }
         false
     }
 
-    fn is_repaint_boundary(&self) -> bool {
-        true
+    fn name(&self) -> &'static str {
+        "RenderText"
     }
 }

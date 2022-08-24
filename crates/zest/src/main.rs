@@ -1,13 +1,19 @@
 #[macro_use]
 mod macros;
+mod diagnostics;
 mod render_object;
 mod rendering;
 mod widget;
 
 use druid_shell::{
-    piet::Piet, Application, HotKey, Menu, SysMods, WinHandler, WindowBuilder, WindowHandle,
+    piet::Piet, Application, HotKey, Menu, MouseEvent, SysMods, WinHandler, WindowBuilder,
+    WindowHandle,
 };
-use render_object::{pipeline_owner::PipelineOwner, render_box::Size, render_object::RenderObject};
+use render_object::{
+    pipeline_owner::PipelineOwner,
+    render_box::{HitTestResult, Size},
+    render_object::{HitTestEntry, Offset, PointerEvent, RenderObject},
+};
 use tracing::metadata::LevelFilter;
 use widget::text::RenderText;
 
@@ -36,12 +42,33 @@ impl MainState {
         self.root_view.as_ref().unwrap()
     }
 
-    fn begin_frame(&mut self) {}
+    fn begin_frame(&mut self) {
+        tracing::debug!("--------------- begin frame --------------");
+    }
 
     fn draw_frame(&mut self, piet: &mut Piet) {
+        tracing::debug!("--------------- draw frame --------------");
         self.pipeline_owner().flush_layout();
         self.pipeline_owner().flush_paint(piet);
         self.root_view().render_view().composite_frame(piet);
+    }
+
+    fn handle_pointer_event_immediately(&self, event: &PointerEvent) {
+        tracing::debug!("--------------- hit test --------------");
+        let mut hit_test_result = HitTestResult::new();
+        let position = event.pos.into();
+        self.root_view().hit_test(&mut hit_test_result, position);
+        self.dispatch_event(event, &hit_test_result);
+        self.handle.invalidate();
+    }
+
+    fn dispatch_event(&self, event: &PointerEvent, hit_test_result: &HitTestResult) {
+        tracing::debug!("--------------- dispatch event --------------");
+        for entry in hit_test_result.entries() {
+            tracing::debug!("hit test entry: {:?}", entry.target());
+            entry.target().handle_event(event.clone(), entry.clone());
+        }
+        // todo!("clean current");
     }
 }
 
@@ -66,7 +93,9 @@ impl WinHandler for MainState {
         self.draw_frame(piet);
     }
 
-    fn mouse_up(&mut self, _event: &druid_shell::MouseEvent) {}
+    fn mouse_up(&mut self, event: &PointerEvent) {
+        self.handle_pointer_event_immediately(event);
+    }
 
     fn command(&mut self, id: u32) {
         match id {
