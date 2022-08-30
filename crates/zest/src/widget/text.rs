@@ -1,5 +1,5 @@
 use druid_shell::piet::{
-    PietText, PietTextLayout, Text, TextAttribute, TextLayout, TextLayoutBuilder,
+    PietText, PietTextLayout, Text as _, TextAttribute, TextLayout, TextLayoutBuilder,
 };
 
 use crate::render_object::{
@@ -8,10 +8,34 @@ use crate::render_object::{
 };
 
 #[derive(Default)]
-pub struct RenderTextProps {
+pub struct Text {
     text: String,
     font_size: f64,
     max_width: Option<f64>,
+}
+
+impl Text {
+    pub fn new(text: impl Into<String>) -> Self {
+        Text {
+            text: text.into(),
+            font_size: 16.,
+            max_width: None,
+        }
+    }
+
+    pub fn font_size(mut self, font_size: f64) -> Self {
+        self.font_size = font_size;
+        self
+    }
+
+    pub fn max_width(mut self, max_width: f64) -> Self {
+        self.max_width = Some(max_width);
+        self
+    }
+
+    pub fn build(self) -> RenderObject {
+        RenderObject::new_render_box(Box::new(RenderText::create(self)))
+    }
 }
 
 pub struct RenderText {
@@ -31,21 +55,13 @@ impl RenderText {
         }
     }
 
-    pub fn set_text(&mut self, new_text: String) {
-        self.text = new_text;
-        self.layout = None;
-    }
-
-    pub fn set_font_size(&mut self, font_size: f64) {
-        self.font_size = font_size;
-        self.layout = None;
-    }
-
     pub fn rebuild_if_needed(&mut self, factory: &mut PietText) {
         if self.layout.is_none() {
             let builder = factory
                 .new_text_layout(self.text.clone())
-                .default_attribute(TextAttribute::FontSize(self.font_size));
+                .default_attribute(TextAttribute::FontSize(self.font_size))
+                .max_width(self.max_width.unwrap_or_default());
+
             self.layout = Some(builder.build().unwrap());
         }
     }
@@ -56,7 +72,7 @@ impl RenderText {
 }
 
 impl RenderBoxProps for RenderText {
-    type Props = RenderTextProps;
+    type Props = Text;
 
     fn create(props: Self::Props) -> Self {
         RenderText {
@@ -85,17 +101,18 @@ impl RenderBoxWidget for RenderText {
         paint_context: &mut crate::render_object::render_object::PaintContext,
         offset: crate::render_object::render_object::Offset,
     ) {
+        tracing::debug!("paint text: {}, offset: {:?}", self.text, offset);
         paint_context.draw_text(self.layout.as_ref().unwrap(), offset);
     }
 
     fn handle_event(
         &mut self,
         this: &crate::render_object::render_object::RenderObject,
-        event: crate::render_object::render_object::PointerEvent,
-        entry: crate::render_object::render_box::BoxHitTestEntry,
+        _event: crate::render_object::render_object::PointerEvent,
+        _entry: crate::render_object::render_box::BoxHitTestEntry,
     ) {
         tracing::debug!("text handle event");
-        self.font_size += 1.;
+        self.font_size += 2.;
         self.layout = None;
         this.mark_needs_layout();
     }
@@ -108,38 +125,6 @@ impl RenderBoxWidget for RenderText {
         false
     }
 
-    fn compute_min_instrinsic_width(
-        &self,
-        _this: &crate::render_object::render_object::RenderObject,
-        _height: f64,
-    ) -> f64 {
-        0.
-    }
-
-    fn compute_max_instrinsic_width(
-        &self,
-        _this: &crate::render_object::render_object::RenderObject,
-        _height: f64,
-    ) -> f64 {
-        0.0
-    }
-
-    fn compute_min_instrinsic_height(
-        &self,
-        _this: &crate::render_object::render_object::RenderObject,
-        _width: f64,
-    ) -> f64 {
-        0.0
-    }
-
-    fn compute_max_instrinsic_height(
-        &self,
-        _this: &crate::render_object::render_object::RenderObject,
-        _width: f64,
-    ) -> f64 {
-        0.0
-    }
-
     fn compute_dry_layout(
         &mut self,
         this: &crate::render_object::render_object::RenderObject,
@@ -149,8 +134,6 @@ impl RenderBoxWidget for RenderText {
         self.layout().size().into()
     }
 
-    fn perform_resize(&mut self, _this: &crate::render_object::render_object::RenderObject) {}
-
     fn perform_layout(&mut self, this: &crate::render_object::render_object::RenderObject) {
         self.rebuild_if_needed(&mut this.owner().text());
         let size: Size = self.layout().size().into();
@@ -158,24 +141,16 @@ impl RenderBoxWidget for RenderText {
         this.render_box().set_size(size)
     }
 
-    fn hit_test_self(
-        self: &mut RenderText,
-        _this: &crate::render_object::render_object::RenderObject,
-        _position: crate::render_object::render_object::Offset,
-    ) -> bool {
-        true
-    }
-
     fn hit_test_children(
         self: &mut RenderText,
-        this: &crate::render_object::render_object::RenderObject,
-        result: &mut crate::render_object::render_box::HitTestResult,
-        position: crate::render_object::render_object::Offset,
+        _this: &crate::render_object::render_object::RenderObject,
+        _result: &mut crate::render_object::render_box::HitTestResult,
+        _position: crate::render_object::render_object::Offset,
     ) -> bool {
         false
     }
 
-    fn name(&self) -> &'static str {
-        "RenderText"
+    fn name(&self) -> String {
+        format!("Text: {}", self.text)
     }
 }

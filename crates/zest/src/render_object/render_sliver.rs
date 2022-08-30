@@ -5,7 +5,7 @@ use std::{
 };
 
 use super::{
-    render_box::HitTestResult,
+    render_box::{HitTestResult, Size},
     render_object::{
         HitTestEntry, Matrix4, Offset, PaintContext, PointerEvent, RenderObject, WeakRenderObject,
     },
@@ -105,7 +105,7 @@ impl RenderSliver {
         todo!()
     }
 
-    pub(crate) fn hit_test(&self, result: &mut HitTestResult, position: Offset) -> bool {
+    pub(crate) fn hit_test(&self, _result: &mut HitTestResult, _position: Offset) -> bool {
         todo!()
     }
 }
@@ -119,6 +119,10 @@ impl_method! {
             assert!(!self.needs_paint());
         }
 
+        pub(crate) fn get_dry_layout(&self, _constraints: Constraints) -> Size {
+            todo!()
+        }
+
         delegate::delegate! {
             // region: delegate to immutable inner
             to self.inner.borrow() {
@@ -126,6 +130,10 @@ impl_method! {
 
                 pub(crate) fn try_parent(&self) -> Option<RenderObject>;
 
+                pub(crate) fn parent_data(&self) -> ParentData;
+
+                pub(crate) fn try_parent_data(&self) -> Option<ParentData>;
+                pub(crate) fn with_parent_data<T: 'static, R>(&self, f: impl FnOnce(&T) -> R) -> Option<R>;
                 pub(crate) fn first_child(&self) -> RenderObject;
 
                 pub(crate) fn try_first_child(&self) -> Option<RenderObject>;
@@ -141,8 +149,6 @@ impl_method! {
                 pub(crate) fn try_next_sibling(&self) -> Option<RenderObject>;
 
                 pub(crate) fn try_prev_sibling(&self) -> Option<RenderObject>;
-
-                pub(crate) fn redepth_child(&self, child: &RenderObject);
 
                 pub(crate) fn child_count(&self) -> usize;
 

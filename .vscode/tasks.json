@@ -5,7 +5,7 @@
 			"type": "cargo",
 			"command": "run",
 			"args": [
-				"--bin",
+				"-p",
 				"zest"
 			],
 			"problemMatcher": [
@@ -15,7 +15,7 @@
 				"kind": "build",
 				"isDefault": true
 			},
-			"label": "rust: cargo run",
+			"label": "rust: cargo run -p zest",
 			"presentation": {
 				"focus": true,
 				"clear": true
@@ -44,11 +44,15 @@
 		{
 			"type": "cargo",
 			"command": "build",
+			"args": [
+				"-p",
+				"zest"
+			],
 			"problemMatcher": [
 				"$rustc"
 			],
 			"group": "build",
-			"label": "rust: cargo build",
+			"label": "rust: cargo build -p zest"
 		}
 	]
 }

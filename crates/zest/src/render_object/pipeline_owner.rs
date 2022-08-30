@@ -6,6 +6,8 @@ use std::{
 
 use druid_shell::piet::{Piet, PietText};
 
+use crate::render_object::render_object::Offset;
+
 use super::render_object::{PaintContext, RenderObject, WeakRenderObject};
 
 #[derive(Clone)]
@@ -107,8 +109,8 @@ impl PipelineOwner {
         for node in &*nodes {
             let node = node.upgrade();
             tracing::debug!("flush_layout node: {:?}", node);
-            if dbg!(node.needs_layout()) && dbg!(node.try_owner()) == Some(self.clone()) {
-                eprintln!("layout node");
+            if node.needs_layout() && node.try_owner() == Some(self.clone()) {
+                tracing::debug!("layout node: {:?}", node);
                 node.layout_without_resize();
             }
         }
@@ -125,13 +127,17 @@ impl PipelineOwner {
         });
         for node in &*nodes {
             let node = node.upgrade();
-            tracing::debug!("paint node: {:?}", node);
 
             if node.needs_paint() && node.try_owner() == Some(self.clone()) {
                 // check whether layer is attached
-                eprintln!("paint node");
+                tracing::debug!("paint node: {:?}", node);
 
-                PaintContext::repaint_composited_child(&node, piet);
+                let offset = match &node {
+                    RenderObject::RenderBox(o) => o.offset(),
+                    RenderObject::RenderSliver(_) => todo!(),
+                    RenderObject::RenderView(_) => Offset::ZERO,
+                };
+                PaintContext::repaint_composited_child(&node, offset, piet);
             }
         }
         nodes.clear();

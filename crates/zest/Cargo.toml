@@ -15,3 +15,4 @@ style = { path = "../style" }
 mixin = { path = "../../third_party/mixin" }
 delegate = "0.7"
 debug-cell = "0.1"
+cgmath = "0.18"

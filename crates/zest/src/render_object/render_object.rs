@@ -1,12 +1,12 @@
 use std::{
     any::Any,
     cell::RefCell,
-    collections::btree_map::Entry,
     fmt::Debug,
-    ops::{Add, Mul, Sub},
+    ops::{Add, Mul, Neg, Sub},
     rc::{Rc, Weak},
 };
 
+use cgmath::{SquareMatrix, Transform};
 use druid_shell::{
     kurbo::{Circle, Point},
     piet::{Color, Piet, PietTextLayout, RenderContext},
@@ -38,7 +38,7 @@ pub(crate) fn try_ultimate_next_sibling(mut element: RenderObject) -> RenderObje
     element
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Constraints {
     BoxConstraints(BoxConstraints),
 }
@@ -95,20 +95,15 @@ impl Sub<Vector3> for Vector3 {
         }
     }
 }
-pub struct Matrix4([[f64; 4]; 4]);
+pub struct Matrix4(cgmath::Matrix4<f64>);
 
 impl Matrix4 {
     pub fn identity() -> Matrix4 {
-        Matrix4([
-            [1., 0., 0., 0.], // to preserve formatting
-            [0., 1., 0., 0.],
-            [0., 0., 1., 0.],
-            [0., 0., 0., 1.],
-        ])
+        Matrix4(cgmath::Matrix4::identity())
     }
 
-    pub(crate) fn translate(&self, _dx: f64, _dy: f64) {
-        todo!()
+    pub(crate) fn translate(&self, dx: f64, dy: f64) {
+        self.0.transform_point(cgmath::Point3::new(dx, dy, 0.));
     }
 
     pub(crate) fn invert(&self) -> f64 {
@@ -117,6 +112,12 @@ impl Matrix4 {
 
     pub(crate) fn perspective_transform(&mut self, _point: Vector3) -> Vector3 {
         todo!()
+    }
+
+    pub(crate) fn from_translation(dx: f64, dy: f64) -> Matrix4 {
+        Matrix4(cgmath::Matrix4::from_translation(cgmath::Vector3::new(
+            dx, dy, 0.,
+        )))
     }
 }
 pub struct Rect {
@@ -174,7 +175,7 @@ impl HitTestEntry {
     pub fn to_box_hit_test_entry(self) -> BoxHitTestEntry {
         match self {
             HitTestEntry::BoxHitTestEntry(entry) => entry,
-            HitTestEntry::SliverHitTestEntry(entry) => todo!(),
+            HitTestEntry::SliverHitTestEntry(_entry) => todo!(),
         }
     }
 
@@ -211,6 +212,17 @@ impl Offset {
 
     pub(crate) fn new(dx: f64, dy: f64) -> Offset {
         Offset { dx, dy }
+    }
+}
+
+impl Neg for Offset {
+    type Output = Offset;
+
+    fn neg(self) -> Offset {
+        Offset {
+            dx: -self.dx,
+            dy: -self.dy,
+        }
     }
 }
 
@@ -253,6 +265,22 @@ pub struct ParentData {
     inner: Rc<RefCell<dyn Any + 'static>>,
 }
 
+impl ParentData {
+    pub fn new<T: Any + 'static>(data: T) -> Self {
+        ParentData {
+            inner: Rc::new(RefCell::new(data)),
+        }
+    }
+
+    pub fn with<T: 'static, R>(&self, f: impl FnOnce(&T) -> R) -> R {
+        f(&*self.inner.borrow_mut().downcast_ref().unwrap())
+    }
+
+    pub fn with_mut<T: 'static, R>(&self, f: impl FnOnce(&mut T) -> R) -> R {
+        f(&mut *self.inner.borrow_mut().downcast_mut::<T>().unwrap())
+    }
+}
+
 #[derive(Clone)]
 struct WeakParentData {
     inner: Weak<RefCell<dyn Any + 'static>>,
@@ -266,6 +294,13 @@ pub enum RenderObject {
 }
 
 impl RenderObject {
+    pub(crate) fn redepth_child(&self, child: &RenderObject) {
+        if child.depth() <= self.depth() {
+            child.incr_depth();
+            child.redepth_children();
+        }
+    }
+
     delegate::delegate! {
         to match self {
             RenderObject::RenderBox(box_) => box_,
@@ -273,6 +308,12 @@ impl RenderObject {
             RenderObject::RenderView(view) => view,
         } {
             pub(crate) fn parent(&self) -> RenderObject;
+
+            pub(crate) fn parent_data(&self) -> ParentData;
+
+            pub(crate) fn try_parent_data(&self) -> Option<ParentData>;
+
+            pub(crate) fn with_parent_data<T: 'static, R>(&self, f: impl FnOnce(&T) -> R) -> Option<R>;
 
             pub(crate) fn try_parent(&self) -> Option<RenderObject>;
 
@@ -317,13 +358,6 @@ impl RenderObject {
             ///
             /// Subclasses should call this function when they lose a child.
             pub(crate) fn drop_child(&self, child: &RenderObject);
-
-            /// Adjust the [depth] of the given [child] to be greater than this node's own
-            /// [depth].
-            ///
-            /// Only call this method from overrides of [redepthChildren].
-
-            pub(crate) fn redepth_child(&self, child: &RenderObject);
 
             /// Insert child into this render object's child list after the given child.
             ///
@@ -406,6 +440,7 @@ impl RenderObject {
             pub(crate) fn handle_event(&self, event: PointerEvent, entry: HitTestEntry);
             pub(crate) fn layout_without_resize(&self);
             pub(crate) fn layout(&self, constraints: Constraints, parent_use_size: bool);
+            pub(crate) fn get_dry_layout(&self, constraints: Constraints) -> Size;
             pub(crate) fn paint_bounds(&self) -> Rect;
 
             pub(crate) fn apply_paint_transform(&self, child: &RenderObject, transform: &Matrix4);
@@ -588,7 +623,7 @@ impl PaintContext {
             .with_piet(|p| p.fill(Circle::new((10., 10.), 10.), &Color::BLACK));
     }
 
-    pub(crate) fn repaint_composited_child(child: &RenderObject, piet: &mut Piet) {
+    pub(crate) fn repaint_composited_child(child: &RenderObject, offset: Offset, piet: &mut Piet) {
         assert!(child.needs_paint());
         assert!(child.is_repaint_bondary());
         let child_bounds = child.paint_bounds();
@@ -596,6 +631,7 @@ impl PaintContext {
             Some(layer) if layer.size() == child_bounds.size() => {
                 layer.clear_children();
                 layer.clear();
+                layer.set_offset(offset);
                 layer
             }
             _ => {
@@ -605,24 +641,25 @@ impl PaintContext {
                     height: bounds.height(),
                 };
 
-                let child_layer = Layer::new(piet, dbg!(size));
+                let child_layer = Layer::new(piet, size, offset);
                 child.set_layer(Some(child_layer.clone()));
                 child_layer
             }
         };
 
-        eprintln!("repaint_composited_child");
         let mut paint_context = PaintContext::new(child_layer, child_bounds);
         child.paint_with_context(&mut paint_context, Offset::ZERO);
     }
 
-    fn composite_child(&mut self, child: &RenderObject, _offset: Offset) {
+    fn composite_child(&mut self, child: &RenderObject, offset: Offset) {
         assert!(child.is_repaint_bondary());
         if child.needs_paint() {
             self.layer.with_piet(|p| {
-                Self::repaint_composited_child(child, p);
+                Self::repaint_composited_child(child, offset, p);
             });
         }
-        self.layer.add_child(child.layer());
+        let child_layer = child.layer();
+        child_layer.set_offset(offset);
+        self.layer.add_child(child_layer);
     }
 }

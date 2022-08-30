@@ -44,7 +44,7 @@ impl CGLayer {
 
     pub fn create_layer_with_context(context: &CGContextRef, size: CGSize) -> Self {
         unsafe {
-            let result = CGLayerCreateWithContext(dbg!(context.as_ptr()), dbg!(size), ptr::null());
+            let result = CGLayerCreateWithContext(context.as_ptr(), size, ptr::null());
             assert!(!result.is_null());
 
             Self::from_ptr(result)

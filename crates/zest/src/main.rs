@@ -1,21 +1,21 @@
 #[macro_use]
 mod macros;
+mod arithmatic;
 mod diagnostics;
 mod render_object;
 mod rendering;
 mod widget;
 
 use druid_shell::{
-    piet::Piet, Application, HotKey, Menu, MouseEvent, SysMods, WinHandler, WindowBuilder,
-    WindowHandle,
+    piet::Piet, Application, HotKey, Menu, SysMods, WinHandler, WindowBuilder, WindowHandle,
 };
 use render_object::{
     pipeline_owner::PipelineOwner,
     render_box::{HitTestResult, Size},
-    render_object::{HitTestEntry, Offset, PointerEvent, RenderObject},
+    render_object::{PointerEvent, RenderObject},
 };
 use tracing::metadata::LevelFilter;
-use widget::text::RenderText;
+use widget::{flex::Flex, text::Text};
 
 const QUIT_MENU_ID: u32 = 0x100;
 
@@ -65,18 +65,34 @@ impl MainState {
     fn dispatch_event(&self, event: &PointerEvent, hit_test_result: &HitTestResult) {
         tracing::debug!("--------------- dispatch event --------------");
         for entry in hit_test_result.entries() {
-            tracing::debug!("hit test entry: {:?}", entry.target());
+            tracing::debug!("dispatch event to: {:?}", entry.target());
             entry.target().handle_event(event.clone(), entry.clone());
         }
+
         // todo!("clean current");
+    }
+
+    fn root_object(&self) -> RenderObject {
+        let flex = Flex::new(
+            style::axis::Axis::Vertical,
+            style::layout::MainAxisSize::Max,
+            style::layout::MainAxisAlignment::Center,
+            style::layout::CrossAxisAlignment::Center,
+            style::layout::TextDirection::Ltr,
+            style::layout::VerticalDirection::Down,
+        )
+        .build();
+        for i in 0..2 {
+            flex.add(Text::new(i.to_string()).build());
+        }
+        flex
     }
 }
 
 impl WinHandler for MainState {
     fn connect(&mut self, handle: &WindowHandle) {
         self.handle = handle.clone();
-        let root_node =
-            RenderObject::new_render_box(Box::new(RenderText::new("hello, world.".to_string())));
+        let root_node = self.root_object();
         let root_view = RenderObject::new_render_view(root_node, Size::from(handle.get_size()));
         let pipeline_owner = PipelineOwner::new(handle.text());
         pipeline_owner.set_render_view(&root_view);

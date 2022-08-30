@@ -7,7 +7,7 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Launch",
+            "name": "Debug counter",
             "program": "${workspaceFolder}/target/debug/examples/counter",
             "args": [],
             "cwd": "${workspaceFolder}",
@@ -15,6 +15,18 @@
                 "rust"
             ],
             "preLaunchTask": "rust: cargo build",
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug zest",
+            "program": "${workspaceFolder}/target/debug/zest",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "sourceLanguages": [
+                "rust"
+            ],
+            "preLaunchTask": "rust: cargo build -p zest",
         }
     ]
 }

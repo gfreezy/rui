@@ -55,6 +55,10 @@ impl_method! {
             self.parent_data.clone()
         }
 
+        pub(crate) fn with_parent_data<T: 'static, R>(&self, f: impl FnOnce(&T) -> R) -> Option<R> {
+            Some(self.try_parent_data()?.with(f))
+        }
+
         pub(crate) fn first_child(&self) -> RenderObject {
             self.try_first_child().unwrap()
         }

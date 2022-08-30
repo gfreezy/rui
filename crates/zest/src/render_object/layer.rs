@@ -20,7 +20,7 @@ struct InnerLayer {
 }
 
 impl Layer {
-    pub fn new(piet: &mut Piet, size: Size) -> Self {
+    pub fn new(piet: &mut Piet, size: Size, offset: Offset) -> Self {
         let layer = piet.create_layer(druid_shell::kurbo::Size {
             width: size.width,
             height: size.height,
@@ -29,7 +29,7 @@ impl Layer {
             inner: Rc::new(RefCell::new(InnerLayer {
                 layer,
                 size,
-                offset: Offset::ZERO,
+                offset,
                 children: vec![],
             })),
         }
@@ -41,6 +41,23 @@ impl Layer {
 
     pub fn clear_children(&self) {
         self.inner.borrow_mut().children.clear();
+    }
+
+    pub fn children(&self) -> Vec<Layer> {
+        self.inner.borrow().children.clone()
+    }
+
+    pub fn decendents(&self) -> Vec<Layer> {
+        self.inner
+            .borrow()
+            .children
+            .iter()
+            .flat_map(|child| {
+                let mut decendents = child.decendents();
+                decendents.insert(0, child.clone());
+                decendents
+            })
+            .collect()
     }
 
     pub fn size(&self) -> Size {
@@ -74,14 +91,12 @@ impl Layer {
         );
     }
 
-    pub fn draw_at_point(&self, piet: &mut Piet, point: Offset) {
+    pub fn draw_in(&self, piet: &mut Piet) {
         let ref_mut = self.inner.borrow_mut();
-        piet.draw_layer_at_point(
-            &ref_mut.layer,
-            druid_shell::kurbo::Point {
-                x: point.dx,
-                y: point.dy,
-            },
-        );
+        piet.draw_layer_at_point(&ref_mut.layer, ref_mut.offset.into());
+    }
+
+    pub(crate) fn set_offset(&self, offset: Offset) {
+        self.inner.borrow_mut().offset = offset;
     }
 }

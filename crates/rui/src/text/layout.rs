@@ -22,8 +22,8 @@ use crate::text::storage::TextStorage;
 use druid_shell::kurbo::{Line, Point, Rect, Size};
 use druid_shell::piet::util::DEFAULT_TEXT_COLOR;
 use druid_shell::piet::{
-    Color, PietText, PietTextLayout, RenderContext, Text as _, TextAlignment, TextAttribute,
-    TextLayout as _, TextLayoutBuilder as _,
+    Color, PietText, PietText as _, PietTextLayout, RenderContext, Text, TextAlignment,
+    TextAttribute, TextLayout as _, TextLayoutBuilder as _,
 };
 
 /// A component for displaying text on screen.

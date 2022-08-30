@@ -26,12 +26,15 @@ pub struct Size {
 }
 
 impl Size {
+    pub fn new(width: f64, height: f64) -> Self {
+        Self { width, height }
+    }
     pub const ZERO: Self = Size {
         width: 0.0,
         height: 0.0,
     };
 
-    fn contains(&self, position: Offset) -> bool {
+    pub fn contains(&self, position: Offset) -> bool {
         position.dx >= 0.0
             && position.dx < self.width
             && position.dy >= 0.0
@@ -88,7 +91,7 @@ pub trait RenderBoxProps: RenderBoxWidget {
 }
 
 pub trait RenderBoxWidget {
-    fn name(&self) -> &'static str;
+    fn name(&self) -> String;
 
     fn paint(&mut self, this: &RenderObject, paint_context: &mut PaintContext, offset: Offset) {
         let mut child = this.try_first_child();
@@ -99,7 +102,13 @@ pub trait RenderBoxWidget {
         }
     }
 
-    fn handle_event(&mut self, this: &RenderObject, event: PointerEvent, entry: BoxHitTestEntry) {}
+    fn handle_event(
+        &mut self,
+        _this: &RenderObject,
+        _event: PointerEvent,
+        _entry: BoxHitTestEntry,
+    ) {
+    }
 
     fn is_repaint_boundary(&self) -> bool {
         false
@@ -131,12 +140,10 @@ pub trait RenderBoxWidget {
 
     fn perform_resize(&mut self, _this: &RenderObject) {}
 
-    fn perform_layout(&mut self, _this: &RenderObject) {
-        eprintln!("widget: perform layout")
-    }
+    fn perform_layout(&mut self, _this: &RenderObject) {}
 
-    fn hit_test_self(&mut self, _this: &RenderObject, _position: Offset) -> bool {
-        false
+    fn hit_test_self(&mut self, ctx: &RenderObject, position: Offset) -> bool {
+        ctx.render_box().size().contains(position)
     }
 
     fn hit_test_children(
@@ -242,7 +249,7 @@ impl Default for InnerRenderBox {
 }
 
 impl RenderBox {
-    pub(crate) fn name(&self) -> &'static str {
+    pub(crate) fn name(&self) -> String {
         self.with_widget(|w, _| w.name())
     }
 
@@ -264,7 +271,11 @@ impl RenderBox {
     /// because draw operations before and after painting children might need to
     /// be recorded on separate compositing layers.
     pub(crate) fn paint(&self, context: &mut PaintContext, offset: Offset) {
-        self.with_widget(|w, this| w.paint(this, context, offset))
+        self.with_widget(|w, this| {
+            tracing::debug!("paint in {}", w.name());
+
+            w.paint(this, context, offset)
+        })
     }
 
     pub(crate) fn sized_by_parent(&self) -> bool {
@@ -280,7 +291,10 @@ impl RenderBox {
     }
 
     pub(crate) fn perform_layout(&self) {
-        self.with_widget(|w, this| w.perform_layout(this))
+        self.with_widget(|w, this| {
+            tracing::debug!("perform layout in {}", w.name());
+            w.perform_layout(this)
+        })
     }
 
     pub(crate) fn hit_test_self(&self, position: Offset) -> bool {
@@ -320,14 +334,20 @@ impl RenderBox {
         self.constraints().box_constraints()
     }
 
-    pub(crate) fn get_dry_layout(&self, constraints: BoxConstraints) -> Size {
+    pub(crate) fn get_dry_layout(&self, constraints: Constraints) -> Size {
+        let constraints = constraints.box_constraints();
         let should_cache = true;
         if should_cache {
+            {
+                let ref_mut = &mut self.inner.borrow_mut().cached_dry_layout_sizes;
+                if let Some(size) = ref_mut.get(&constraints) {
+                    return size.clone();
+                }
+            }
+            let size = self.compute_dry_layout(constraints.clone());
             let ref_mut = &mut self.inner.borrow_mut().cached_dry_layout_sizes;
-            ref_mut
-                .entry(constraints.clone())
-                .or_insert_with(|| self.compute_dry_layout(constraints))
-                .clone()
+            ref_mut.insert(constraints, size);
+            return size;
         } else {
             self.compute_dry_layout(constraints)
         }
@@ -343,6 +363,10 @@ impl RenderBox {
 
     pub(crate) fn offset(&self) -> Offset {
         self.inner.borrow().offset
+    }
+
+    pub(crate) fn set_offset(&self, offset: Offset) {
+        self.inner.borrow_mut().offset = offset;
     }
 
     pub(crate) fn mark_needs_layout(&self) {
@@ -434,12 +458,19 @@ impl RenderBox {
         } else {
             self.parent().relayout_boundary()
         };
-        if !self.needs_layout()
-            && Some(&constraints) == self.try_constraints().as_ref()
-            && Some(relayout_boundary.clone()) != self.try_relayout_boundary()
-        {
-            self.set_relayout_boundary(Some(relayout_boundary));
-            self.visit_children(|e| e.propagate_relayout_bondary());
+
+        tracing::debug!(
+            "layout: is_relayout_boundary: {}, constraints: {:?}",
+            is_relayout_boundary,
+            constraints
+        );
+
+        if !self.needs_layout() && Some(&constraints) == self.try_constraints().as_ref() {
+            if Some(relayout_boundary.clone()) != self.try_relayout_boundary() {
+                self.set_relayout_boundary(Some(relayout_boundary));
+                self.visit_children(|e| e.propagate_relayout_bondary());
+            }
+            tracing::debug!("skip layout");
             return;
         }
 
@@ -469,16 +500,21 @@ impl RenderBox {
 
 pub struct HitTestResult {
     entries: Vec<HitTestEntry>,
+    local_transforms: Vec<Matrix4>,
+    transforms: Vec<Matrix4>,
 }
 
 impl HitTestResult {
     pub fn new() -> Self {
         Self {
             entries: Vec::new(),
+            local_transforms: vec![],
+            transforms: vec![Matrix4::identity()],
         }
     }
 
     pub fn add(&mut self, entry: HitTestEntry) {
+        tracing::debug!("hit test add entry: {:?}", entry.target());
         self.entries.push(entry);
     }
 
@@ -487,16 +523,36 @@ impl HitTestResult {
     }
 
     pub fn add_with_paint_offset(
-        &self,
-        _offset: Offset,
-        _position: Offset,
-        _hit_test: impl FnOnce(&mut HitTestResult, Offset) -> bool,
+        &mut self,
+        offset: Offset,
+        position: Offset,
+        hit_test: impl FnOnce(&mut HitTestResult, Offset) -> bool,
     ) -> bool {
-        todo!()
+        let transformed = position - offset;
+        if transformed != Offset::ZERO {
+            self.push_offset(-offset);
+        }
+        let hit = hit_test(self, transformed);
+        if transformed != Offset::ZERO {
+            self.pop_transform();
+        }
+        hit
     }
 
     pub fn entries(&self) -> impl Iterator<Item = &HitTestEntry> {
         self.entries.iter()
+    }
+
+    fn push_offset(&mut self, offset: Offset) {
+        assert_ne!(offset, Offset::ZERO);
+        self.local_transforms
+            .push(Matrix4::from_translation(offset.dx, offset.dx));
+    }
+
+    fn pop_transform(&mut self) {
+        if self.local_transforms.pop().is_none() {
+            self.transforms.pop();
+        }
     }
 }
 
@@ -521,10 +577,10 @@ impl BoxHitTestEntry {
 
 #[derive(Clone, Debug)]
 pub struct BoxConstraints {
-    min_width: f64,
-    max_width: f64,
-    min_height: f64,
-    max_height: f64,
+    pub min_width: f64,
+    pub max_width: f64,
+    pub min_height: f64,
+    pub max_height: f64,
 }
 
 impl PartialEq for BoxConstraints {
@@ -554,6 +610,16 @@ impl From<BoxConstraints> for Constraints {
 }
 
 impl BoxConstraints {
+    /// An unbounded box constraints object.
+    ///
+    /// Can be satisfied by any nonnegative size.
+    pub const UNBOUNDED: BoxConstraints = BoxConstraints {
+        min_width: 0.,
+        min_height: 0.,
+        max_width: f64::INFINITY,
+        max_height: f64::INFINITY,
+    };
+
     pub fn has_tight_width(&self) -> bool {
         self.min_width >= self.max_width
     }
@@ -574,155 +640,207 @@ impl BoxConstraints {
             max_height: size.height,
         }
     }
+
+    /// Create a "tight" box constraints object for one or more dimensions.
+    ///
+    /// [rounded away from zero]: struct.Size.html#method.expand
+    pub fn tight_for(width: Option<f64>, height: Option<f64>) -> BoxConstraints {
+        match (width, height) {
+            (None, None) => BoxConstraints::UNBOUNDED,
+            (None, Some(h)) => BoxConstraints {
+                min_height: h,
+                max_height: h,
+                ..BoxConstraints::UNBOUNDED
+            },
+            (Some(w), None) => BoxConstraints {
+                min_width: w,
+                max_width: w,
+                ..BoxConstraints::UNBOUNDED
+            },
+            (Some(w), Some(h)) => BoxConstraints {
+                min_width: w,
+                max_width: w,
+                min_height: h,
+                max_height: h,
+            },
+        }
+    }
+
+    pub(crate) fn constrain(&self, cross_size: Size) -> Size {
+        Size::new(
+            self.constrain_width(cross_size.width),
+            self.constrain_height(cross_size.height),
+        )
+    }
+
+    fn constrain_width(&self, width: f64) -> f64 {
+        if width < self.min_width {
+            self.min_width
+        } else if width > self.max_width {
+            self.max_width
+        } else {
+            width
+        }
+    }
+
+    fn constrain_height(&self, height: f64) -> f64 {
+        if height < self.min_height {
+            self.min_height
+        } else if height > self.max_height {
+            self.max_height
+        } else {
+            height
+        }
+    }
 }
 
-impl_method! {
-    RenderBox {
-        pub(crate) fn paint_with_context(&self, context: &mut PaintContext, offset: Offset) {
-            self.clear_needs_paint();
-            self.paint(context, offset);
-            assert!(!self.needs_layout());
-            assert!(!self.needs_paint());
+impl RenderBox {
+    pub(crate) fn paint_with_context(&self, context: &mut PaintContext, offset: Offset) {
+        self.clear_needs_paint();
+        self.paint(context, offset);
+        assert!(!self.needs_layout());
+        assert!(!self.needs_paint());
+    }
+
+    delegate::delegate! {
+        // region: delegate to immutable inner
+        to self.inner.borrow() {
+            pub(crate) fn parent(&self) -> RenderObject;
+
+            pub(crate) fn try_parent(&self) -> Option<RenderObject>;
+
+            pub(crate) fn parent_data(&self) -> ParentData;
+
+            pub(crate) fn try_parent_data(&self) -> Option<ParentData>;
+            pub(crate) fn with_parent_data<T: 'static, R>(&self, f: impl FnOnce(&T) -> R) -> Option<R>;
+            pub(crate) fn first_child(&self) -> RenderObject;
+
+            pub(crate) fn try_first_child(&self) -> Option<RenderObject>;
+
+            pub(crate) fn last_child(&self) -> RenderObject;
+
+            pub(crate) fn try_last_child(&self) -> Option<RenderObject>;
+
+            pub(crate) fn next_sibling(&self) -> RenderObject;
+
+            pub(crate) fn prev_sibling(&self) -> RenderObject;
+
+            pub(crate) fn try_next_sibling(&self) -> Option<RenderObject>;
+
+            pub(crate) fn try_prev_sibling(&self) -> Option<RenderObject>;
+
+            pub(crate) fn child_count(&self) -> usize;
+
+            pub(crate) fn depth(&self) -> usize;
+
+            pub(crate) fn redepth_children(&self);
+
+            pub(crate) fn relayout_boundary(&self) -> RenderObject;
+
+            pub(crate) fn try_relayout_boundary(&self) -> Option<RenderObject> ;
+
+            pub(crate) fn owner(&self) -> PipelineOwner ;
+
+            pub(crate) fn try_owner(&self) -> Option<PipelineOwner> ;
+
+            pub(crate) fn needs_layout(&self) -> bool ;
+
+            pub(crate) fn needs_paint(&self) -> bool ;
+
+            pub(crate) fn try_constraints(&self) -> Option<Constraints> ;
+
+            pub(crate) fn constraints(&self) -> Constraints ;
+
+            pub(crate) fn doing_this_layout_with_callback(&self) -> bool ;
+
+            pub(crate) fn try_layer(&self) -> Option<Layer> ;
+
+            pub(crate) fn layer(&self) -> Layer ;
+            pub(crate)fn render_object(&self) -> RenderObject;
+
+            pub(crate) fn to_string_short(&self) -> String;
+            pub(crate) fn to_string_deep(&self) -> String;
         }
+        // endregion: delete to immutable inner
 
-        delegate::delegate! {
-            // region: delegate to immutable inner
-            to self.inner.borrow() {
-                pub(crate) fn parent(&self) -> RenderObject;
+        // region: delegate to mutable inner
+        to self.inner.borrow_mut() {
+            pub(crate) fn set_parent(&self, element: Option<RenderObject>);
 
-                pub(crate) fn try_parent(&self) -> Option<RenderObject>;
+            pub(crate) fn set_next_sibling(&self, element: Option<RenderObject>);
 
-                pub(crate) fn first_child(&self) -> RenderObject;
+            pub(crate) fn set_prev_sibling(&self, element: Option<RenderObject>);
 
-                pub(crate) fn try_first_child(&self) -> Option<RenderObject>;
+            pub(crate) fn set_first_child(&self, element: Option<RenderObject>);
 
-                pub(crate) fn last_child(&self) -> RenderObject;
+            pub(crate) fn set_last_child(&self, element: Option<RenderObject>);
 
-                pub(crate) fn try_last_child(&self) -> Option<RenderObject>;
+            pub(crate) fn set_last_child_if_none(&self, element: Option<RenderObject>);
 
-                pub(crate) fn next_sibling(&self) -> RenderObject;
+            pub(crate) fn attach(&self, owner: PipelineOwner);
 
-                pub(crate) fn prev_sibling(&self) -> RenderObject;
+            pub(crate) fn detach(&self);
 
-                pub(crate) fn try_next_sibling(&self) -> Option<RenderObject>;
+            /// Mark the given node as being a child of this node.
+            ///
+            /// Subclasses should call this function when they acquire a new child.
+            pub(crate) fn adopt_child(&self, child: &RenderObject);
 
-                pub(crate) fn try_prev_sibling(&self) -> Option<RenderObject>;
+            /// Disconnect the given node from this node.
+            ///
+            /// Subclasses should call this function when they lose a child.
+            pub(crate) fn drop_child(&self, child: &RenderObject);
 
-                pub(crate) fn redepth_child(&self, child: &RenderObject);
+            /// Insert child into this render object's child list after the given child.
+            ///
+            /// If `after` is null, then this inserts the child at the start of the list,
+            /// and the child becomes the new [firstChild].
+            pub(crate) fn insert(&self, child: RenderObject, after: Option<RenderObject>);
 
-                pub(crate) fn child_count(&self) -> usize;
+            pub(crate) fn add(&self, child: RenderObject);
 
-                pub(crate) fn depth(&self) -> usize;
+            pub(crate) fn remove(&self, child: &RenderObject);
 
-                pub(crate) fn redepth_children(&self);
+            pub(crate) fn remove_all(&self);
 
-                pub(crate) fn relayout_boundary(&self) -> RenderObject;
+            pub(crate) fn move_(&self, child: RenderObject, after: Option<RenderObject>);
+            pub(crate) fn visit_children(&self, visitor: impl FnMut(RenderObject));
 
-                pub(crate) fn try_relayout_boundary(&self) -> Option<RenderObject> ;
+            pub(crate) fn set_relayout_boundary(&self, relayout_boundary: Option<RenderObject>) ;
 
-                pub(crate) fn owner(&self) -> PipelineOwner ;
+            pub(crate) fn clean_relayout_boundary(&self) ;
 
-                pub(crate) fn try_owner(&self) -> Option<PipelineOwner> ;
-
-                pub(crate) fn needs_layout(&self) -> bool ;
-
-                pub(crate) fn needs_paint(&self) -> bool ;
-
-                pub(crate) fn try_constraints(&self) -> Option<Constraints> ;
-
-                pub(crate) fn constraints(&self) -> Constraints ;
-
-                pub(crate) fn doing_this_layout_with_callback(&self) -> bool ;
-
-                pub(crate) fn try_layer(&self) -> Option<Layer> ;
-
-                pub(crate) fn layer(&self) -> Layer ;
-                pub(crate)fn render_object(&self) -> RenderObject;
-
-                pub(crate) fn to_string_short(&self) -> String;
-                pub(crate) fn to_string_deep(&self) -> String;
-            }
-            // endregion: delete to immutable inner
-
-            // region: delegate to mutable inner
-            to self.inner.borrow_mut() {
-                pub(crate) fn set_parent(&self, element: Option<RenderObject>);
-
-                pub(crate) fn set_next_sibling(&self, element: Option<RenderObject>);
-
-                pub(crate) fn set_prev_sibling(&self, element: Option<RenderObject>);
-
-                pub(crate) fn set_first_child(&self, element: Option<RenderObject>);
-
-                pub(crate) fn set_last_child(&self, element: Option<RenderObject>);
-
-                pub(crate) fn set_last_child_if_none(&self, element: Option<RenderObject>);
-
-                pub(crate) fn attach(&self, owner: PipelineOwner);
-
-                pub(crate) fn detach(&self);
-
-                /// Mark the given node as being a child of this node.
-                ///
-                /// Subclasses should call this function when they acquire a new child.
-                pub(crate) fn adopt_child(&self, child: &RenderObject);
-
-                /// Disconnect the given node from this node.
-                ///
-                /// Subclasses should call this function when they lose a child.
-                pub(crate) fn drop_child(&self, child: &RenderObject);
-
-                /// Insert child into this render object's child list after the given child.
-                ///
-                /// If `after` is null, then this inserts the child at the start of the list,
-                /// and the child becomes the new [firstChild].
-                pub(crate) fn insert(&self, child: RenderObject, after: Option<RenderObject>);
-
-                pub(crate) fn add(&self, child: RenderObject);
-
-                pub(crate) fn remove(&self, child: &RenderObject);
-
-                pub(crate) fn remove_all(&self);
-
-                pub(crate) fn move_(&self, child: RenderObject, after: Option<RenderObject>);
-                pub(crate) fn visit_children(&self, visitor: impl FnMut(RenderObject));
-
-                pub(crate) fn set_relayout_boundary(&self, relayout_boundary: Option<RenderObject>) ;
-
-                pub(crate) fn clean_relayout_boundary(&self) ;
-
-                pub(crate) fn propagate_relayout_bondary(&self) ;
+            pub(crate) fn propagate_relayout_bondary(&self) ;
 
 
-                pub(crate) fn clear_needs_layout(&self) ;
+            pub(crate) fn clear_needs_layout(&self) ;
 
-                pub(crate) fn mark_parent_needs_layout(&self) ;
+            pub(crate) fn mark_parent_needs_layout(&self) ;
 
-                pub(crate) fn set_owner(&self, owner: Option<PipelineOwner>) ;
+            pub(crate) fn set_owner(&self, owner: Option<PipelineOwner>) ;
 
-                pub(crate) fn clear_needs_paint(&self) ;
+            pub(crate) fn clear_needs_paint(&self) ;
 
-                pub(crate) fn mark_needs_paint(&self) ;
+            pub(crate) fn mark_needs_paint(&self) ;
 
-                pub(crate) fn invoke_layout_callback(&self, callback: impl FnOnce(&Constraints)) ;
+            pub(crate) fn invoke_layout_callback(&self, callback: impl FnOnce(&Constraints)) ;
 
-                pub(crate) fn set_layer(&self, layer: Option<Layer>) ;
+            pub(crate) fn set_layer(&self, layer: Option<Layer>) ;
 
-                pub(crate) fn incr_depth(&self) ;
+            pub(crate) fn incr_depth(&self) ;
 
-                pub(crate) fn clear_child_count(&self) ;
+            pub(crate) fn clear_child_count(&self) ;
 
-                pub(crate) fn incr_child_count(&self) ;
+            pub(crate) fn incr_child_count(&self) ;
 
-                pub(crate) fn decr_child_count(&self) ;
+            pub(crate) fn decr_child_count(&self) ;
 
-                pub(crate) fn set_constraints(&self, c: Constraints);
+            pub(crate) fn set_constraints(&self, c: Constraints);
 
-                pub(crate) fn set_render_object(&self, render_object: &RenderObject);
-
-            }
-            // endregion: delegate to mutable inner
+            pub(crate) fn set_render_object(&self, render_object: &RenderObject);
 
         }
+        // endregion: delegate to mutable inner
+
     }
 }
