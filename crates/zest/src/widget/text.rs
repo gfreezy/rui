@@ -128,15 +128,19 @@ impl RenderBoxWidget for RenderText {
     fn compute_dry_layout(
         &mut self,
         this: &crate::render_object::render_object::RenderObject,
-        _constraints: crate::render_object::render_box::BoxConstraints,
+        constraints: crate::render_object::render_box::BoxConstraints,
     ) -> crate::render_object::render_box::Size {
         self.rebuild_if_needed(&mut this.owner().text());
-        self.layout().size().into()
+        constraints.constrain(self.layout().size().into())
     }
 
     fn perform_layout(&mut self, this: &crate::render_object::render_object::RenderObject) {
         self.rebuild_if_needed(&mut this.owner().text());
-        let size: Size = self.layout().size().into();
+        let size: Size = this
+            .constraints()
+            .box_constraints()
+            .constrain(self.layout().size().into());
+
         tracing::debug!("text perform layout: {:?}", size);
         this.render_box().set_size(size)
     }

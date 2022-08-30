@@ -82,7 +82,7 @@ impl MainState {
             style::layout::VerticalDirection::Down,
         )
         .build();
-        for i in 0..2 {
+        for i in 0..12 {
             flex.add(Text::new(i.to_string()).build());
         }
         flex
