@@ -4,5 +4,8 @@
         "**/Cargo.lock": true,
         "**/target": true
     },
-    "explorer.sortOrder": "mixed"
+    "explorer.sortOrder": "mixed",
+    // "lldb.launch.preRunCommands": [
+    //     "command script import .vscode/init_lldb.py"
+    // ]
 }

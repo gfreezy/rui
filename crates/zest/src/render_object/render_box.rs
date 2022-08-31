@@ -1,14 +1,15 @@
-use debug_cell::RefCell;
+use decorum::R64;
+use std::cell::RefCell;
+
 use std::{
+    any::Any,
     collections::HashMap,
     fmt::Debug,
     hash::Hash,
     rc::{Rc, Weak},
 };
 
-use decorum::R64;
-
-use crate::render_object::render_object::RenderObject;
+use crate::{arithmatic::Tolerance, render_object::render_object::RenderObject};
 
 use super::{
     layer::Layer,
@@ -84,17 +85,13 @@ impl PartialEq for RenderBox {
     }
 }
 
-pub trait RenderBoxProps: RenderBoxWidget {
-    type Props: Default;
-    fn create(props: Self::Props) -> Self;
-    fn update(&mut self, this: &RenderObject, props: Self::Props);
-}
-
-pub trait RenderBoxWidget {
+pub trait RenderBoxWidget: Any {
     fn name(&self) -> String;
 
-    fn paint(&mut self, this: &RenderObject, paint_context: &mut PaintContext, offset: Offset) {
-        let mut child = this.try_first_child();
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
+
+    fn paint(&mut self, ctx: &RenderObject, paint_context: &mut PaintContext, offset: Offset) {
+        let mut child = ctx.try_first_child();
         while let Some(c) = child {
             let offset_in_parent = c.render_box().offset();
             paint_context.paint_child(&c, offset_in_parent + offset);
@@ -102,13 +99,7 @@ pub trait RenderBoxWidget {
         }
     }
 
-    fn handle_event(
-        &mut self,
-        _this: &RenderObject,
-        _event: PointerEvent,
-        _entry: BoxHitTestEntry,
-    ) {
-    }
+    fn handle_event(&mut self, ctx: &RenderObject, event: PointerEvent, entry: BoxHitTestEntry) {}
 
     fn is_repaint_boundary(&self) -> bool {
         false
@@ -118,29 +109,77 @@ pub trait RenderBoxWidget {
         false
     }
 
-    fn compute_min_instrinsic_width(&self, _this: &RenderObject, _height: f64) -> f64 {
+    fn compute_min_instrinsic_width(&self, ctx: &RenderObject, height: f64) -> f64 {
+        if ctx.child_count() == 1 {
+            return ctx
+                .first_child()
+                .render_box()
+                .get_min_instrinsic_width(height);
+        }
         0.0
     }
 
-    fn compute_max_instrinsic_width(&self, _this: &RenderObject, _height: f64) -> f64 {
+    fn compute_max_instrinsic_width(&self, ctx: &RenderObject, height: f64) -> f64 {
+        if ctx.child_count() == 1 {
+            return ctx
+                .first_child()
+                .render_box()
+                .get_max_instrinsic_width(height);
+        }
         0.0
     }
 
-    fn compute_min_instrinsic_height(&self, _this: &RenderObject, _width: f64) -> f64 {
+    fn compute_min_instrinsic_height(&self, ctx: &RenderObject, width: f64) -> f64 {
+        if ctx.child_count() == 1 {
+            return ctx
+                .first_child()
+                .render_box()
+                .get_min_instrinsic_height(width);
+        }
         0.0
     }
 
-    fn compute_max_instrinsic_height(&self, _this: &RenderObject, _width: f64) -> f64 {
+    fn compute_max_instrinsic_height(&self, ctx: &RenderObject, width: f64) -> f64 {
+        if ctx.child_count() == 1 {
+            return ctx
+                .first_child()
+                .render_box()
+                .get_max_instrinsic_height(width);
+        }
         0.0
     }
 
-    fn compute_dry_layout(&mut self, _this: &RenderObject, _constraints: BoxConstraints) -> Size {
+    fn compute_dry_layout(&mut self, ctx: &RenderObject, constraints: BoxConstraints) -> Size {
+        if ctx.child_count() == 1 {
+            return ctx
+                .first_child()
+                .render_box()
+                .get_dry_layout(constraints.into());
+        }
         Size::ZERO
     }
 
-    fn perform_resize(&mut self, _this: &RenderObject) {}
+    fn perform_layout(&mut self, ctx: &RenderObject) {
+        if ctx.child_count() == 1 {
+            let child = ctx.first_child();
+            child.layout(ctx.constraints(), true);
+            ctx.render_box().set_size(child.size());
+        }
+    }
 
-    fn perform_layout(&mut self, _this: &RenderObject) {}
+    fn hit_test(
+        &mut self,
+        ctx: &RenderObject,
+        result: &mut HitTestResult,
+        position: Offset,
+    ) -> bool {
+        if ctx.size().contains(position) {
+            if self.hit_test_children(ctx, result, position) || self.hit_test_self(ctx, position) {
+                result.add(HitTestEntry::new_box_hit_test_entry(ctx, position));
+            }
+        }
+        return false;
+    }
 
     fn hit_test_self(&mut self, ctx: &RenderObject, position: Offset) -> bool {
         ctx.render_box().size().contains(position)
@@ -148,11 +187,11 @@ pub trait RenderBoxWidget {
 
     fn hit_test_children(
         &mut self,
-        this: &RenderObject,
+        ctx: &RenderObject,
         result: &mut HitTestResult,
         position: Offset,
     ) -> bool {
-        let mut child = this.try_last_child();
+        let mut child = ctx.try_last_child();
         while let Some(c) = child {
             let offset = c.render_box().offset();
             let is_hit = result.add_with_paint_offset(offset, position, |result, transformed| {
@@ -174,11 +213,12 @@ impl RenderBox {
     }
 
     pub(crate) fn new_render_object(widget: Box<dyn RenderBoxWidget>) -> RenderObject {
-        let render_box = Self {
-            inner: Rc::new(RefCell::new(InnerRenderBox {
-                object: Some(widget),
-                ..Default::default()
-            })),
+        let inner = RefCell::new(InnerRenderBox {
+            object: Some(widget),
+            ..Default::default()
+        });
+        let render_box = RenderBox {
+            inner: Rc::new(inner),
         };
 
         let render_object = render_box.to_render_object();
@@ -253,6 +293,10 @@ impl RenderBox {
         self.with_widget(|w, _| w.name())
     }
 
+    pub(crate) fn update<T: 'static>(&self, update: impl FnOnce(&mut T)) {
+        self.with_widget(|w, _| update(w.as_any_mut().downcast_mut::<T>().unwrap()))
+    }
+
     /// Paint this render object into the given context at the given offset.
     ///
     /// Subclasses should override this method to provide a visual appearance
@@ -271,11 +315,8 @@ impl RenderBox {
     /// because draw operations before and after painting children might need to
     /// be recorded on separate compositing layers.
     pub(crate) fn paint(&self, context: &mut PaintContext, offset: Offset) {
-        self.with_widget(|w, this| {
-            tracing::debug!("paint in {}", w.name());
-
-            w.paint(this, context, offset)
-        })
+        tracing::debug!("painting in {}, offset: {:?}", self.name(), offset);
+        self.with_widget(|w, this| w.paint(this, context, offset))
     }
 
     pub(crate) fn sized_by_parent(&self) -> bool {
@@ -286,15 +327,8 @@ impl RenderBox {
         self.with_widget(|w, this| w.compute_dry_layout(this, constraints))
     }
 
-    pub(crate) fn perform_resize(&self) {
-        self.with_widget(|w, this| w.perform_resize(this))
-    }
-
     pub(crate) fn perform_layout(&self) {
-        self.with_widget(|w, this| {
-            tracing::debug!("perform layout in {}", w.name());
-            w.perform_layout(this)
-        })
+        self.with_widget(|w, this| w.perform_layout(this))
     }
 
     pub(crate) fn hit_test_self(&self, position: Offset) -> bool {
@@ -304,9 +338,7 @@ impl RenderBox {
     pub(crate) fn hit_test_children(&self, result: &mut HitTestResult, position: Offset) -> bool {
         self.with_widget(|w, this| w.hit_test_children(this, result, position))
     }
-}
 
-impl RenderBox {
     pub(crate) fn get_min_instrinsic_width(&self, height: f64) -> f64 {
         self.compute_intrinsic_dimensions(InstrinsicDimension::MinWidth, height, |_width| {
             self.with_widget(|w, this| w.compute_min_instrinsic_width(this, height))
@@ -334,8 +366,7 @@ impl RenderBox {
         self.constraints().box_constraints()
     }
 
-    pub(crate) fn get_dry_layout(&self, constraints: Constraints) -> Size {
-        let constraints = constraints.box_constraints();
+    pub(crate) fn get_dry_layout(&self, constraints: BoxConstraints) -> Size {
         let should_cache = true;
         if should_cache {
             {
@@ -380,18 +411,6 @@ impl RenderBox {
         }
     }
 
-    pub(crate) fn hit_test(&self, result: &mut HitTestResult, position: Offset) -> bool {
-        if self.size().contains(position) {
-            if self.hit_test_children(result, position) || self.hit_test_self(position) {
-                result.add(HitTestEntry::new_box_hit_test_entry(
-                    self.to_render_object().downgrade(),
-                    position,
-                ));
-            }
-        }
-        return false;
-    }
-
     // private methods
     fn with_widget<T>(&self, f: impl FnOnce(&mut dyn RenderBoxWidget, &RenderObject) -> T) -> T {
         let mut widget = self.inner.borrow_mut().object.take().unwrap();
@@ -426,6 +445,11 @@ impl RenderBox {
 }
 
 impl RenderBox {
+    pub(crate) fn hit_test(&self, result: &mut HitTestResult, position: Offset) -> bool {
+        tracing::debug!("hit test in {}, position: {:?}", self.name(), position);
+        self.with_widget(|w, _| w.hit_test(&self.render_object(), result, position))
+    }
+
     pub(crate) fn is_repaint_bondary(&self) -> bool {
         self.with_widget(|w, _| w.is_repaint_boundary())
     }
@@ -435,6 +459,8 @@ impl RenderBox {
     }
 
     pub(crate) fn handle_event(&self, event: PointerEvent, entry: HitTestEntry) {
+        tracing::debug!("handle event in {}, event: {:?}", self.name(), event);
+
         self.with_widget(|w, _| {
             w.handle_event(&self.render_object(), event, entry.to_box_hit_test_entry())
         })
@@ -459,18 +485,11 @@ impl RenderBox {
             self.parent().relayout_boundary()
         };
 
-        tracing::debug!(
-            "layout: is_relayout_boundary: {}, constraints: {:?}",
-            is_relayout_boundary,
-            constraints
-        );
-
         if !self.needs_layout() && Some(&constraints) == self.try_constraints().as_ref() {
             if Some(relayout_boundary.clone()) != self.try_relayout_boundary() {
                 self.set_relayout_boundary(Some(relayout_boundary));
                 self.visit_children(|e| e.propagate_relayout_bondary());
             }
-            tracing::debug!("skip layout");
             return;
         }
 
@@ -481,13 +500,17 @@ impl RenderBox {
         self.set_relayout_boundary(Some(relayout_boundary));
         assert!(!self.doing_this_layout_with_callback());
 
-        if self.sized_by_parent() {
-            self.perform_resize();
-        }
-
         self.perform_layout();
         self.clear_needs_layout();
         self.mark_needs_paint();
+
+        tracing::debug!(
+            "layout in {}: size: {:?}, is_relayout_boundary: {}, constraints: {:?}",
+            self.name(),
+            self.size(),
+            is_relayout_boundary,
+            self.box_constraints(),
+        );
     }
 
     pub(crate) fn apply_paint_transform(&self, child: &RenderObject, transform: &Matrix4) {
@@ -514,7 +537,6 @@ impl HitTestResult {
     }
 
     pub fn add(&mut self, entry: HitTestEntry) {
-        tracing::debug!("hit test add entry: {:?}", entry.target());
         self.entries.push(entry);
     }
 
@@ -529,11 +551,11 @@ impl HitTestResult {
         hit_test: impl FnOnce(&mut HitTestResult, Offset) -> bool,
     ) -> bool {
         let transformed = position - offset;
-        if transformed != Offset::ZERO {
+        if offset != Offset::ZERO {
             self.push_offset(-offset);
         }
         let hit = hit_test(self, transformed);
-        if transformed != Offset::ZERO {
+        if offset != Offset::ZERO {
             self.pop_transform();
         }
         hit
@@ -563,15 +585,21 @@ pub struct BoxHitTestEntry {
 }
 
 impl BoxHitTestEntry {
-    pub(crate) fn new(render_object: WeakRenderObject, position: Offset) -> Self {
+    pub(crate) fn new(render_object: &RenderObject, position: Offset) -> Self {
         Self {
-            render_object,
+            render_object: render_object.downgrade(),
             position,
         }
     }
 
     pub fn target(&self) -> RenderObject {
         self.render_object.upgrade()
+    }
+}
+
+impl From<BoxHitTestEntry> for HitTestEntry {
+    fn from(entry: BoxHitTestEntry) -> Self {
+        HitTestEntry::BoxHitTestEntry(entry)
     }
 }
 
@@ -842,5 +870,65 @@ impl RenderBox {
         }
         // endregion: delegate to mutable inner
 
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::any::Any;
+
+    use super::*;
+
+    // #[mixin::insert(RenderObjectState)]
+    // pub(crate) struct InnerRenderBox {
+    //     object: Option<Box<dyn RenderBoxWidget + 'static>>,
+    //     size: Option<Size>,
+    //     offset: Offset,
+    //     cached_instrinsic_dimensions: HashMap<InstrinsicDimensionsCacheEntry, f64>,
+    //     cached_dry_layout_sizes: HashMap<BoxConstraints, Size>,
+    // }
+
+    // impl Default for InnerRenderBox {
+    //     fn default() -> Self {
+    //         Self {
+    //             first_child: Default::default(),
+    //             last_child: Default::default(),
+    //             next_sibling: Default::default(),
+    //             prev_sibling: Default::default(),
+    //             child_count: Default::default(),
+    //             depth: Default::default(),
+    //             self_render_object: Default::default(),
+    //             parent: Default::default(),
+    //             owner: Default::default(),
+    //             parent_data: Default::default(),
+    //             needs_layout: true,
+    //             needs_paint: true,
+    //             relayout_boundary: Default::default(),
+    //             doing_this_layout_with_callback: Default::default(),
+    //             constraints: Default::default(),
+    //             layer: Default::default(),
+    //             object: Default::default(),
+    //             size: Default::default(),
+    //             offset: Default::default(),
+    //             cached_instrinsic_dimensions: Default::default(),
+    //             cached_dry_layout_sizes: Default::default(),
+    //         }
+    //     }
+    // }
+
+    pub struct RenderBox2 {
+        pub(crate) inner: Rc<RefCell<InnerRenderBox>>,
+    }
+
+    #[test]
+    fn test_name() {
+        let inner = RefCell::new(InnerRenderBox {
+            object: None,
+            ..Default::default()
+        });
+
+        let r = Rc::new(inner);
+        // let render_box = RenderBox2 { inner: r };
+        print!("hello");
     }
 }

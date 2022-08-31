@@ -13,6 +13,8 @@ use druid_shell::{
     MouseEvent,
 };
 
+use crate::arithmatic::{default_near_equal, near_equal};
+
 use super::{
     layer::Layer,
     pipeline_owner::PipelineOwner,
@@ -152,7 +154,24 @@ impl Rect {
         }
     }
 }
-pub type PointerEvent = MouseEvent;
+
+#[derive(Debug, Clone)]
+pub enum PointerEvent {
+    MouseUp(MouseEvent),
+    MouseDown(MouseEvent),
+    MouseMove(MouseEvent),
+}
+
+impl PointerEvent {
+    pub fn position(&self) -> Offset {
+        match self {
+            PointerEvent::MouseUp(event) => event.pos,
+            PointerEvent::MouseDown(event) => event.pos,
+            PointerEvent::MouseMove(event) => event.pos,
+        }
+        .into()
+    }
+}
 
 #[derive(Clone)]
 pub enum HitTestEntry {
@@ -179,10 +198,7 @@ impl HitTestEntry {
         }
     }
 
-    pub(crate) fn new_box_hit_test_entry(
-        render_object: WeakRenderObject,
-        position: Offset,
-    ) -> Self {
+    pub(crate) fn new_box_hit_test_entry(render_object: &RenderObject, position: Offset) -> Self {
         HitTestEntry::BoxHitTestEntry(BoxHitTestEntry::new(render_object, position))
     }
 
@@ -201,10 +217,16 @@ pub struct PaintContext {
     layer: Layer,
 }
 
-#[derive(Clone, Copy, PartialEq, PartialOrd, Debug, Default)]
+#[derive(Clone, Copy, PartialOrd, Debug, Default)]
 pub struct Offset {
     pub dx: f64,
     pub dy: f64,
+}
+
+impl PartialEq for Offset {
+    fn eq(&self, other: &Self) -> bool {
+        default_near_equal(self.dx, other.dx) && default_near_equal(self.dy, other.dy)
+    }
 }
 
 impl Offset {
@@ -268,7 +290,7 @@ pub struct ParentData {
 impl ParentData {
     pub fn new<T: Any + 'static>(data: T) -> Self {
         ParentData {
-            inner: Rc::new(RefCell::new(data)),
+            inner: Rc::new(RefCell::new(data)) as Rc<RefCell<dyn Any>>,
         }
     }
 
@@ -440,7 +462,6 @@ impl RenderObject {
             pub(crate) fn handle_event(&self, event: PointerEvent, entry: HitTestEntry);
             pub(crate) fn layout_without_resize(&self);
             pub(crate) fn layout(&self, constraints: Constraints, parent_use_size: bool);
-            pub(crate) fn get_dry_layout(&self, constraints: Constraints) -> Size;
             pub(crate) fn paint_bounds(&self) -> Rect;
 
             pub(crate) fn apply_paint_transform(&self, child: &RenderObject, transform: &Matrix4);
@@ -459,6 +480,24 @@ impl RenderObject {
             RenderObject::RenderView(o) => o.hit_test(result, position),
         }
     }
+
+    pub(crate) fn update<T: 'static>(&self, update: impl FnOnce(&mut T)) {
+        match self {
+            RenderObject::RenderBox(o) => o.update(update),
+            _ => unreachable!(),
+        }
+    }
+
+    pub(crate) fn size(&self) -> Size {
+        match self {
+            RenderObject::RenderBox(o) => o.size(),
+            _ => unreachable!(),
+        }
+    }
+
+    pub(crate) fn box_constraints(&self) -> BoxConstraints {
+        self.constraints().box_constraints()
+    }
 }
 
 impl Debug for RenderObject {
@@ -474,8 +513,8 @@ impl Debug for RenderObject {
 }
 
 impl RenderObject {
-    pub fn new_render_box(widget: Box<dyn RenderBoxWidget>) -> RenderObject {
-        RenderBox::new_render_object(widget)
+    pub fn new_render_box(widget: impl RenderBoxWidget) -> RenderObject {
+        RenderBox::new_render_object(Box::new(widget))
     }
 
     pub(crate) fn new_render_view(child: RenderObject, size: Size) -> RenderObject {

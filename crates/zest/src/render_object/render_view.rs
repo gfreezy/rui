@@ -164,7 +164,7 @@ impl RenderView {
             child.hit_test(result, position);
         }
         result.add(HitTestEntry::new_box_hit_test_entry(
-            self.render_object().downgrade(),
+            &self.render_object(),
             position,
         ));
         true
