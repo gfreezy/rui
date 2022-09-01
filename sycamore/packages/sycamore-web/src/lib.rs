@@ -17,7 +17,6 @@ pub mod hydrate;
 mod hydrate_node;
 #[cfg(feature = "ssr")]
 mod ssr_node;
-#[cfg(feature = "zest")]
 mod zest_node;
 
 use std::any::{Any, TypeId};

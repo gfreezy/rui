@@ -126,6 +126,7 @@ impl_method! {
         delegate::delegate! {
             // region: delegate to immutable inner
             to self.inner.borrow() {
+                pub(crate) fn id(&self) -> usize;
                 pub(crate) fn parent(&self) -> RenderObject;
 
                 pub(crate) fn try_parent(&self) -> Option<RenderObject>;
@@ -188,6 +189,7 @@ impl_method! {
 
             // region: delegate to mutable inner
             to self.inner.borrow_mut() {
+                pub(crate) fn set_id(&self, id: usize);
                 pub(crate) fn set_parent(&self, element: Option<RenderObject>);
 
                 pub(crate) fn set_next_sibling(&self, element: Option<RenderObject>);

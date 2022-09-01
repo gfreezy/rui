@@ -11,6 +11,7 @@ use super::{
 
 #[mixin::declare]
 struct RenderObjectState {
+    pub(crate) id: usize,
     pub(crate) first_child: Option<RenderObject>,
     pub(crate) last_child: Option<WeakRenderObject>,
     pub(crate) next_sibling: Option<RenderObject>,
@@ -89,6 +90,14 @@ impl_method! {
 
         pub(crate) fn try_prev_sibling(&self) -> Option<RenderObject> {
             Some(self.prev_sibling.as_ref()?.upgrade())
+        }
+
+        pub(crate) fn set_id(&mut self, id: usize) {
+            self.id = id;
+        }
+
+        pub(crate) fn id(&self) -> usize {
+            self.id
         }
 
         pub(crate) fn set_parent(&mut self, element: Option<RenderObject>) {

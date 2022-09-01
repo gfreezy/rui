@@ -2,8 +2,8 @@
 mod macros;
 mod arithmatic;
 mod diagnostics;
-mod render_object;
-mod rendering;
+pub mod render_object;
+pub mod rendering;
 
 use druid_shell::{
     piet::Piet, Application, HotKey, Menu, MouseEvent, SysMods, WinHandler, WindowBuilder,
