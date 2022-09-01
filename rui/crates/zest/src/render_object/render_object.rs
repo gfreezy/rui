@@ -405,9 +405,9 @@ impl RenderObject {
 
             pub fn try_relayout_boundary(&self) -> Option<RenderObject>;
 
-            pub fn owner(&self) -> PipelineOwner;
+            pub(crate) fn owner(&self) -> PipelineOwner;
 
-            pub fn try_owner(&self) -> Option<PipelineOwner>;
+            pub(crate) fn try_owner(&self) -> Option<PipelineOwner>;
 
             pub fn needs_layout(&self) -> bool;
 
@@ -419,9 +419,9 @@ impl RenderObject {
 
             pub fn doing_this_layout_with_callback(&self) -> bool;
 
-            pub fn try_layer(&self) -> Option<Layer>;
+            pub(crate) fn try_layer(&self) -> Option<Layer>;
 
-            pub fn layer(&self) -> Layer;
+            pub(crate) fn layer(&self) -> Layer;
 
             pub fn set_relayout_boundary(&self, relayout_boundary: Option<RenderObject>);
 
@@ -435,7 +435,7 @@ impl RenderObject {
 
             pub fn mark_parent_needs_layout(&self);
 
-            pub fn set_owner(&self, owner: Option<PipelineOwner>);
+            pub(crate) fn set_owner(&self, owner: Option<PipelineOwner>);
 
             pub fn clear_needs_paint(&self);
 
@@ -443,7 +443,7 @@ impl RenderObject {
 
             pub fn invoke_layout_callback(&self, callback: impl FnOnce(&Constraints));
 
-            pub fn set_layer(&self, layer: Option<Layer>);
+            pub(crate) fn set_layer(&self, layer: Option<Layer>);
 
             pub fn incr_depth(&self);
 
