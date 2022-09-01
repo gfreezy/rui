@@ -6,9 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-druid-shell = { git = "https://github.com/linebender/druid", rev = "f63ab10" }
-tracing = "0.1"
-nom = "7"
-anymap2 = "0.13"
+druid-shell = { git = "https://github.com/linebender/druid", rev = "bc1877b" }
+tracing = "0.1.35"
+nom = "7.1.1"
+anymap2 = "0.13.0"
 convert_case = "0.5.0"
-thiserror = "1.0.30"
+thiserror = "1.0.31"
