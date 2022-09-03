@@ -50,7 +50,7 @@ pub mod utils;
 #[cfg(feature = "web")]
 pub mod web;
 
-#[cfg(feature = "zest")]
+#[cfg(all(feature = "zest", not(feature = "web")))]
 pub mod zest;
 
 /* Re-export modules from sycamore-core */
@@ -65,7 +65,7 @@ pub mod reactive {
     pub use sycamore_reactive::*;
 }
 
-#[cfg(feature = "zest")]
+#[cfg(all(feature = "zest", not(feature = "web")))]
 pub use sycamore_zest::{render_get_scope, render_to, run};
 #[cfg(feature = "ssr")]
 pub use web::render_to_string;
@@ -73,7 +73,7 @@ pub use web::render_to_string;
 pub use web::render_to_string_await_suspense;
 #[cfg(all(feature = "web", feature = "hydrate"))]
 pub use web::{hydrate, hydrate_get_scope, hydrate_to};
-#[cfg(all(feature = "web", not(feature = "zest")))]
+#[cfg(feature = "web")]
 pub use web::{render, render_get_scope, render_to};
 
 /// The sycamore prelude.
@@ -101,7 +101,7 @@ pub mod prelude {
     pub use crate::web::SsrNode;
     #[cfg(feature = "web")]
     pub use crate::web::{DomNode, Html};
-    #[cfg(feature = "zest")]
+    #[cfg(all(feature = "zest", not(feature = "web")))]
     pub use sycamore_zest::ZestNode;
 }
 
@@ -111,7 +111,7 @@ pub mod rt {
     #[cfg(feature = "web")]
     pub use js_sys::Reflect;
 
-    #[cfg(feature = "zest")]
+    #[cfg(all(feature = "zest", not(feature = "web")))]
     pub use sycamore_zest::intern;
 
     #[cfg(feature = "web")]
@@ -123,6 +123,6 @@ pub mod rt {
 pub mod element {
     #[cfg(feature = "web")]
     pub use crate::web::html::*;
-    #[cfg(feature = "zest")]
+    #[cfg(all(feature = "zest", not(feature = "web")))]
     pub use crate::zest::*;
 }
