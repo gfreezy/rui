@@ -1,16 +1,21 @@
 use sycamore::prelude::*;
 
 #[component]
-fn App<G: Html>(cx: Scope) -> View<G> {
+fn App(cx: Scope) -> View<ZestNode> {
     view! { cx,
-        p {
-            "Hello World!"
+        text(text="Hello World!") {
+
         }
     }
 }
 
 fn main() {
-    sycamore::render(|cx| {
-        view! { cx, App {} }
+    sycamore::run(|root| {
+        sycamore::render_to(
+            |cx| {
+                view! { cx, App {} }
+            },
+            root,
+        );
     });
 }

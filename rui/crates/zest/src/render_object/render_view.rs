@@ -39,7 +39,7 @@ impl Debug for RenderView {
 }
 
 impl RenderView {
-    pub(crate) fn new_render_object(child: RenderObject, size: Size) -> RenderObject {
+    pub(crate) fn new_render_object(size: Size) -> RenderObject {
         let v = Self {
             inner: Rc::new(RefCell::new(InnerRenderView {
                 size,
@@ -49,7 +49,6 @@ impl RenderView {
 
         let root_view = RenderObject::RenderView(v.clone());
         v.set_render_object(&root_view);
-        root_view.add(child);
         root_view.mark_needs_layout();
         root_view
     }
@@ -92,6 +91,7 @@ impl Default for InnerRenderView {
     fn default() -> Self {
         Self {
             id: 0,
+            name: "".to_string(),
             size: Size::ZERO,
             first_child: Default::default(),
             last_child: Default::default(),

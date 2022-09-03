@@ -12,6 +12,7 @@ use super::{
 #[mixin::declare]
 struct RenderObjectState {
     pub(crate) id: usize,
+    pub(crate) name: String,
     pub(crate) first_child: Option<RenderObject>,
     pub(crate) last_child: Option<WeakRenderObject>,
     pub(crate) next_sibling: Option<RenderObject>,
@@ -180,7 +181,9 @@ impl_method! {
             self.mark_needs_layout();
             // self.mark_needs_composition_bits_update();
 
+
             // attach the child to the owner
+            child.attach(self.owner());
             self.redepth_child(child);
         }
 
@@ -212,6 +215,7 @@ impl_method! {
         /// If `after` is null, then this inserts the child at the start of the list,
         /// and the child becomes the new [firstChild].
         pub(crate) fn insert(&mut self, child: RenderObject, after: Option<RenderObject>) {
+            assert!(self.try_owner().is_some());
             assert_ne!(&child, &self.render_object());
             assert_ne!(after.as_ref(), Some(&self.render_object()));
             assert_ne!(Some(&child), after.as_ref());
@@ -257,8 +261,8 @@ impl_method! {
         }
 
         fn insert_into_child_list(&mut self, child: RenderObject, after: Option<RenderObject>) {
-            assert!(self.try_next_sibling().is_none());
-            assert!(self.try_prev_sibling().is_none());
+            assert!(child.try_next_sibling().is_none());
+            assert!(child.try_prev_sibling().is_none());
             self.child_count += 1;
             assert!(self.child_count > 0);
             match after {
@@ -414,6 +418,7 @@ impl_method! {
         }
 
         pub(crate) fn owner(&self) -> PipelineOwner {
+            tracing::debug!("node name: {}", &self.name);
             self.try_owner().unwrap()
         }
 

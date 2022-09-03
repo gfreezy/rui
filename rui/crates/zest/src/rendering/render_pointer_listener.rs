@@ -33,6 +33,18 @@ pub struct RenderPointerListener {
     hit_test_behavior: HitTestBehavior,
 }
 
+impl Default for RenderPointerListener {
+    fn default() -> Self {
+        Self {
+            on_pointer_down: Box::new(|_, _| {}),
+            on_pointer_move: Box::new(|_, _| {}),
+            on_pointer_up: Box::new(|_, _| {}),
+            on_pointer_hover: Box::new(|_, _| {}),
+            hit_test_behavior: HitTestBehavior::default(),
+        }
+    }
+}
+
 impl RenderPointerListener {
     pub fn new(
         on_pointer_down: Option<PointerEventListener>,
@@ -52,10 +64,6 @@ impl RenderPointerListener {
 }
 
 impl RenderBoxWidget for RenderPointerListener {
-    fn name(&self) -> String {
-        "RenderPointerListener".to_string()
-    }
-
     fn handle_event(&mut self, ctx: &RenderObject, event: PointerEvent, _entry: BoxHitTestEntry) {
         match event {
             PointerEvent::MouseUp(_) => (self.on_pointer_up)(ctx, event),

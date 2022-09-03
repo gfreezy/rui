@@ -9,6 +9,7 @@ members = [
   "packages/sycamore-router",
   "packages/sycamore-router-macro",
   "packages/sycamore-web",
+  "packages/sycamore-zest",
 
   # Examples
   "examples/components",

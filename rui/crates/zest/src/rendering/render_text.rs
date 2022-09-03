@@ -14,6 +14,17 @@ pub struct RenderText {
     layout: Option<PietTextLayout>,
 }
 
+impl Default for RenderText {
+    fn default() -> Self {
+        Self {
+            text: "".to_string(),
+            font_size: 16.0,
+            max_width: None,
+            layout: None,
+        }
+    }
+}
+
 impl RenderText {
     pub fn new(text: String, font_size: f64, max_width: Option<f64>) -> Self {
         RenderText {
@@ -37,6 +48,12 @@ impl RenderText {
 
     fn layout(&self) -> &PietTextLayout {
         self.layout.as_ref().unwrap()
+    }
+
+    pub fn set_text(&mut self, ctx: &RenderObject, text: String) {
+        self.text = text;
+        self.layout = None;
+        ctx.mark_needs_layout();
     }
 
     pub fn set_font_size(&mut self, ctx: &RenderObject, font_size: f64) {
@@ -93,10 +110,6 @@ impl RenderBoxWidget for RenderText {
         _position: crate::render_object::render_object::Offset,
     ) -> bool {
         false
-    }
-
-    fn name(&self) -> String {
-        format!("Text: {}", self.text)
     }
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {

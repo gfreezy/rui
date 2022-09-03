@@ -23,6 +23,7 @@ sycamore-futures = { path = "../sycamore-futures", version = "0.8.0", optional =
 sycamore-macro = { path = "../sycamore-macro", version = "0.8.0" }
 sycamore-reactive = { path = "../sycamore-reactive", version = "0.8.0" }
 sycamore-web = { path = "../sycamore-web", version = "0.8.0", optional = true }
+sycamore-zest = { path = "../sycamore-zest", version = "0.8.0", optional = true }
 wasm-bindgen = { version = "0.2.79", optional = true }
 wasm-bindgen-futures = { version = "0.4.29", optional = true }
 
@@ -72,6 +73,7 @@ suspense = ["futures", "wasm-bindgen-futures", "sycamore-futures"]
 serde = ["sycamore-reactive/serde"]
 wasm-bindgen-interning = ["web", "wasm-bindgen/enable-interning"]
 web = ["wasm-bindgen", "web-sys", "js-sys", "sycamore-web"]
+zest = ["sycamore-zest"]
 
 [[bench]]
 harness = false

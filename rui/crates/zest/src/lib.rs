@@ -25,14 +25,16 @@ const QUIT_MENU_ID: u32 = 0x100;
 
 struct MainState {
     handle: WindowHandle,
+    render: Box<dyn Fn(&RenderObject)>,
     root_view: Option<RenderObject>,
     pipeline_owner: Option<PipelineOwner>,
 }
 
 impl MainState {
-    fn new() -> Self {
+    fn new(render: impl Fn(&RenderObject) + 'static) -> Self {
         MainState {
             handle: WindowHandle::default(),
+            render: Box::new(render),
             root_view: None,
             pipeline_owner: None,
         }
@@ -77,32 +79,35 @@ impl MainState {
     }
 
     fn root_object(&self) -> RenderObject {
-        let flex = RenderObject::new_render_box(RenderFlex::new(
-            style::axis::Axis::Vertical,
-            style::layout::MainAxisSize::Max,
-            style::layout::MainAxisAlignment::Center,
-            style::layout::CrossAxisAlignment::Center,
-            style::layout::TextDirection::Ltr,
-            style::layout::VerticalDirection::Down,
-        ));
-        for i in 0..12 {
-            let text = RenderObject::new_render_box(RenderText::new(i.to_string(), 16., None));
-            let listener = RenderObject::new_render_box(RenderPointerListener::new(
-                Some(Box::new(|ctx, e| {
-                    let txt = ctx.first_child();
-                    txt.update::<RenderText>(|r| {
-                        r.set_font_size(&txt, r.font_size() + 4.);
-                    });
-                    tracing::debug!("pointer listener: {:?}", e);
-                })),
-                None,
-                None,
-                None,
-                Some(HitTestBehavior::Opaque),
-            ));
-            listener.add(text);
-            flex.add(listener);
-        }
+        let flex = RenderObject::new_render_box(
+            "flex:root".to_string(),
+            RenderFlex::new(
+                style::axis::Axis::Vertical,
+                style::layout::MainAxisSize::Max,
+                style::layout::MainAxisAlignment::Center,
+                style::layout::CrossAxisAlignment::Center,
+                style::layout::TextDirection::Ltr,
+                style::layout::VerticalDirection::Down,
+            ),
+        );
+        // for i in 0..12 {
+        //     let text = RenderObject::new_render_box(RenderText::new(i.to_string(), 16., None));
+        //     let listener = RenderObject::new_render_box(RenderPointerListener::new(
+        //         Some(Box::new(|ctx, e| {
+        //             let txt = ctx.first_child();
+        //             txt.update::<RenderText>(|r| {
+        //                 r.set_font_size(&txt, r.font_size() + 4.);
+        //             });
+        //             tracing::debug!("pointer listener: {:?}", e);
+        //         })),
+        //         None,
+        //         None,
+        //         None,
+        //         Some(HitTestBehavior::Opaque),
+        //     ));
+        //     listener.add(text);
+        //     flex.add(listener);
+        // }
         flex
     }
 }
@@ -110,13 +115,16 @@ impl MainState {
 impl WinHandler for MainState {
     fn connect(&mut self, handle: &WindowHandle) {
         self.handle = handle.clone();
-        let root_node = self.root_object();
-        let root_view = RenderObject::new_render_view(root_node, Size::from(handle.get_size()));
+        let root_view = RenderObject::new_render_view(Size::from(handle.get_size()));
         let pipeline_owner = PipelineOwner::new(handle.text());
         pipeline_owner.set_render_view(&root_view);
         self.pipeline_owner = Some(pipeline_owner);
+        // let root_node = self.root_object();
+        // root_view.add(root_node);
         self.root_view = Some(root_view);
         self.root_view().prepare_initial_frame();
+        tracing::debug!("--------------- render sycamore --------------");
+        (self.render)(&self.root_view());
     }
 
     fn prepare_paint(&mut self) {
@@ -158,7 +166,7 @@ impl WinHandler for MainState {
     }
 }
 
-pub fn run() {
+pub fn run(f: impl Fn(&RenderObject) + 'static) {
     tracing_subscriber::fmt()
         .with_max_level(LevelFilter::DEBUG)
         .init();
@@ -176,7 +184,7 @@ pub fn run() {
 
     let app = Application::new().unwrap();
     let mut builder = WindowBuilder::new(app.clone());
-    builder.set_handler(Box::new(MainState::new()));
+    builder.set_handler(Box::new(MainState::new(f)));
     builder.set_title("App");
     builder.set_menu(menubar);
     let window = builder.build().unwrap();

@@ -11,7 +11,7 @@ use crate::render_object::render_object::Offset;
 use super::render_object::{PaintContext, RenderObject, WeakRenderObject};
 
 #[derive(Clone)]
-pub(crate) struct PipelineOwner {
+pub struct PipelineOwner {
     inner: Rc<InnerOwner>,
 }
 
@@ -28,7 +28,7 @@ impl PartialEq<PipelineOwner> for PipelineOwner {
 }
 
 #[derive(Clone)]
-pub(crate) struct WeakOwner {
+pub struct WeakOwner {
     inner: Weak<InnerOwner>,
 }
 
@@ -109,7 +109,7 @@ impl PipelineOwner {
         for node in &*nodes {
             let node = node.upgrade();
             tracing::debug!("flush_layout node: {:?}", node);
-            if node.needs_layout() && node.try_owner() == Some(self.clone()) {
+            if node.needs_layout() && dbg!(node.try_owner()) == Some(self.clone()) {
                 tracing::debug!("layout node: {:?}", node);
                 node.layout_without_resize();
             }

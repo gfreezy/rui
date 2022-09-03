@@ -64,6 +64,19 @@ pub struct RenderFlex {
     vertical_direction: VerticalDirection,
 }
 
+impl Default for RenderFlex {
+    fn default() -> Self {
+        Self::new(
+            Axis::Vertical,
+            MainAxisSize::Max,
+            MainAxisAlignment::Start,
+            CrossAxisAlignment::Start,
+            TextDirection::Ltr,
+            VerticalDirection::Down,
+        )
+    }
+}
+
 impl RenderFlex {
     pub fn new(
         direction: Axis,
@@ -403,10 +416,6 @@ impl RenderBoxWidget for RenderFlex {
             next_child = child.try_next_sibling();
         }
         ctx.render_box().set_size(size);
-    }
-
-    fn name(&self) -> String {
-        format!("RenderFlex")
     }
 
     fn is_repaint_boundary(&self) -> bool {

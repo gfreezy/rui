@@ -86,8 +86,6 @@ impl PartialEq for RenderBox {
 }
 
 pub trait RenderBoxWidget: Any {
-    fn name(&self) -> String;
-
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
 
     fn paint(&mut self, ctx: &RenderObject, paint_context: &mut PaintContext, offset: Offset) {
@@ -212,9 +210,13 @@ impl RenderBox {
         RenderObject::RenderBox(self.clone())
     }
 
-    pub(crate) fn new_render_object(widget: Box<dyn RenderBoxWidget>) -> RenderObject {
+    pub(crate) fn new_render_object(
+        name: String,
+        widget: Box<dyn RenderBoxWidget>,
+    ) -> RenderObject {
         let inner = RefCell::new(InnerRenderBox {
             object: Some(widget),
+            name,
             ..Default::default()
         });
         let render_box = RenderBox {
@@ -264,6 +266,7 @@ impl Default for InnerRenderBox {
     fn default() -> Self {
         Self {
             id: 0,
+            name: "".to_string(),
             first_child: Default::default(),
             last_child: Default::default(),
             next_sibling: Default::default(),
@@ -291,7 +294,7 @@ impl Default for InnerRenderBox {
 
 impl RenderBox {
     pub(crate) fn name(&self) -> String {
-        self.with_widget(|w, _| w.name())
+        self.inner.borrow().name.clone()
     }
 
     pub(crate) fn update<T: 'static>(&self, update: impl FnOnce(&mut T)) {
@@ -501,17 +504,16 @@ impl RenderBox {
         self.set_relayout_boundary(Some(relayout_boundary));
         assert!(!self.doing_this_layout_with_callback());
 
-        self.perform_layout();
-        self.clear_needs_layout();
-        self.mark_needs_paint();
-
         tracing::debug!(
-            "layout in {}: size: {:?}, is_relayout_boundary: {}, constraints: {:?}",
+            "layout in {}: is_relayout_boundary: {}, constraints: {:?}",
             self.name(),
-            self.size(),
             is_relayout_boundary,
             self.box_constraints(),
         );
+
+        self.perform_layout();
+        self.clear_needs_layout();
+        self.mark_needs_paint();
     }
 
     pub(crate) fn apply_paint_transform(&self, child: &RenderObject, transform: &Matrix4) {

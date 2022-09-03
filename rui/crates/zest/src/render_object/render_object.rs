@@ -405,9 +405,9 @@ impl RenderObject {
 
             pub fn try_relayout_boundary(&self) -> Option<RenderObject>;
 
-            pub(crate) fn owner(&self) -> PipelineOwner;
+            pub fn owner(&self) -> PipelineOwner;
 
-            pub(crate) fn try_owner(&self) -> Option<PipelineOwner>;
+            pub fn try_owner(&self) -> Option<PipelineOwner>;
 
             pub fn needs_layout(&self) -> bool;
 
@@ -482,7 +482,7 @@ impl RenderObject {
         }
     }
 
-    pub(crate) fn update<T: 'static>(&self, update: impl FnOnce(&mut T)) {
+    pub fn update<T: 'static>(&self, update: impl FnOnce(&mut T)) {
         match self {
             RenderObject::RenderBox(o) => o.update(update),
             _ => unreachable!(),
@@ -514,12 +514,12 @@ impl Debug for RenderObject {
 }
 
 impl RenderObject {
-    pub fn new_render_box(widget: impl RenderBoxWidget) -> RenderObject {
-        RenderBox::new_render_object(Box::new(widget))
+    pub fn new_render_box(name: String, widget: impl RenderBoxWidget) -> RenderObject {
+        RenderBox::new_render_object(name, Box::new(widget))
     }
 
-    pub(crate) fn new_render_view(child: RenderObject, size: Size) -> RenderObject {
-        RenderView::new_render_object(child, size)
+    pub(crate) fn new_render_view(size: Size) -> RenderObject {
+        RenderView::new_render_object(size)
     }
 
     pub fn downgrade(&self) -> WeakRenderObject {
