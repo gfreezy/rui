@@ -1,0 +1,47 @@
+[workspace]
+members = [
+  # Packages
+  "packages/sycamore",
+  "packages/sycamore-core",
+  "packages/sycamore-futures",
+  "packages/sycamore-macro",
+  "packages/sycamore-reactive",
+  "packages/sycamore-router",
+  "packages/sycamore-router-macro",
+  "packages/sycamore-web",
+  "packages/sycamore-zest",
+
+  # Examples
+  "examples/components",
+  "examples/context",
+  "examples/counter",
+  "examples/http-request",
+  "examples/http-request-builder",
+  "examples/hydrate",
+  "examples/iteration",
+  "examples/js-framework-benchmark",
+  "examples/hello-builder",
+  "examples/hello-world",
+  "examples/higher-order-components",
+  "examples/motion",
+  "examples/ssr",
+  "examples/svg",
+  "examples/timer",
+  "examples/todomvc",
+  "examples/transitions",
+
+  # Website
+  "docs",
+  "website",
+
+  # Tools
+  "packages/tools/bench-diff",
+]
+
+[patch.crates-io]
+piet-common = { path = "../third_party/piet/piet-common" }
+cocoa = { path = "../third_party/core-foundation-rs/cocoa" }
+core-graphics = { path = "../third_party/core-foundation-rs/core-graphics" }
+core-foundation = { path = "../third_party/core-foundation-rs/core-foundation" }
+core-foundation-sys = { path = "../third_party/core-foundation-rs/core-foundation-sys" }
+delegate = { path = "../third_party/rust-delegate" }
