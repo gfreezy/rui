@@ -1,7 +1,6 @@
 use druid_shell::piet::{
     PietText, PietTextLayout, Text as _, TextAttribute, TextLayout, TextLayoutBuilder,
 };
-use style::{parse_rule, Style};
 
 use crate::render_object::{
     render_box::{RenderBoxWidget, Size},
@@ -113,8 +112,8 @@ impl RenderBoxWidget for RenderText {
 
     fn hit_test_self(
         &mut self,
-        ctx: &RenderObject,
-        position: crate::render_object::render_object::Offset,
+        _ctx: &RenderObject,
+        _position: crate::render_object::render_object::Offset,
     ) -> bool {
         true
     }

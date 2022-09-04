@@ -6,7 +6,7 @@ pub mod render_object;
 pub mod rendering;
 
 use druid_shell::{
-    piet::Piet, Application, HotKey, Menu, MouseEvent, SysMods, WinHandler, WindowBuilder,
+    piet::Piet, Application, HotKey, Menu, SysMods, WinHandler, WindowBuilder,
     WindowHandle,
 };
 use render_object::{
@@ -16,8 +16,6 @@ use render_object::{
 };
 use rendering::{
     render_flex::RenderFlex,
-    render_pointer_listener::{HitTestBehavior, RenderPointerListener},
-    render_text::RenderText,
 };
 use tracing::metadata::LevelFilter;
 
@@ -143,7 +141,7 @@ impl WinHandler for MainState {
         self.handle_pointer_event_immediately(PointerEvent::MouseDown(event.clone()));
     }
 
-    fn mouse_move(&mut self, event: &druid_shell::MouseEvent) {
+    fn mouse_move(&mut self, _event: &druid_shell::MouseEvent) {
         // self.handle_pointer_event_immediately(PointerEvent::MouseMove(event.clone()));
     }
 

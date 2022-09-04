@@ -13,7 +13,7 @@ use druid_shell::{
     MouseEvent,
 };
 
-use crate::arithmatic::{default_near_equal, near_equal};
+use crate::arithmatic::{default_near_equal};
 
 use super::{
     layer::Layer,

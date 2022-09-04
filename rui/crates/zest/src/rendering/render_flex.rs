@@ -1,4 +1,4 @@
-use std::fmt::format;
+
 
 use crate::{
     arithmatic::{near_equal, Tolerance},

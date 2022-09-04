@@ -1,4 +1,4 @@
-use std::default;
+
 
 use crate::render_object::{
     render_box::{BoxHitTestEntry, HitTestResult, RenderBoxWidget},
@@ -97,7 +97,7 @@ impl RenderBoxWidget for RenderPointerListener {
         self.hit_test_behavior == HitTestBehavior::Opaque
     }
 
-    fn set_attribute(&mut self, ctx: &RenderObject, key: &str, value: &str) {}
+    fn set_attribute(&mut self, _ctx: &RenderObject, _key: &str, _value: &str) {}
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self

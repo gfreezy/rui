@@ -10,7 +10,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::{arithmatic::Tolerance, render_object::render_object::RenderObject};
+use crate::render_object::render_object::RenderObject;
 
 use super::{
     layer::Layer,
@@ -87,7 +87,7 @@ impl PartialEq for RenderBox {
 }
 
 pub trait RenderBoxWidget: Any {
-    fn set_attribute(&mut self, ctx: &RenderObject, key: &str, value: &str) {}
+    fn set_attribute(&mut self, _ctx: &RenderObject, _key: &str, _value: &str) {}
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
 
     fn paint(&mut self, ctx: &RenderObject, paint_context: &mut PaintContext, offset: Offset) {
@@ -99,7 +99,8 @@ pub trait RenderBoxWidget: Any {
         }
     }
 
-    fn handle_event(&mut self, ctx: &RenderObject, event: PointerEvent, entry: BoxHitTestEntry) {}
+    fn handle_event(&mut self, _ctx: &RenderObject, _event: PointerEvent, _entry: BoxHitTestEntry) {
+    }
 
     fn is_repaint_boundary(&self) -> bool {
         false
@@ -182,7 +183,7 @@ pub trait RenderBoxWidget: Any {
         return false;
     }
 
-    fn hit_test_self(&mut self, ctx: &RenderObject, position: Offset) -> bool {
+    fn hit_test_self(&mut self, _ctx: &RenderObject, _position: Offset) -> bool {
         false
     }
 
@@ -902,50 +903,7 @@ impl RenderBox {
 
 #[cfg(test)]
 mod tests {
-    use std::any::Any;
-
     use super::*;
-
-    // #[mixin::insert(RenderObjectState)]
-    // pub(crate) struct InnerRenderBox {
-    //     object: Option<Box<dyn RenderBoxWidget + 'static>>,
-    //     size: Option<Size>,
-    //     offset: Offset,
-    //     cached_instrinsic_dimensions: HashMap<InstrinsicDimensionsCacheEntry, f64>,
-    //     cached_dry_layout_sizes: HashMap<BoxConstraints, Size>,
-    // }
-
-    // impl Default for InnerRenderBox {
-    //     fn default() -> Self {
-    //         Self {
-    //             first_child: Default::default(),
-    //             last_child: Default::default(),
-    //             next_sibling: Default::default(),
-    //             prev_sibling: Default::default(),
-    //             child_count: Default::default(),
-    //             depth: Default::default(),
-    //             self_render_object: Default::default(),
-    //             parent: Default::default(),
-    //             owner: Default::default(),
-    //             parent_data: Default::default(),
-    //             needs_layout: true,
-    //             needs_paint: true,
-    //             relayout_boundary: Default::default(),
-    //             doing_this_layout_with_callback: Default::default(),
-    //             constraints: Default::default(),
-    //             layer: Default::default(),
-    //             object: Default::default(),
-    //             size: Default::default(),
-    //             offset: Default::default(),
-    //             cached_instrinsic_dimensions: Default::default(),
-    //             cached_dry_layout_sizes: Default::default(),
-    //         }
-    //     }
-    // }
-
-    pub struct RenderBox2 {
-        pub(crate) inner: Rc<RefCell<InnerRenderBox>>,
-    }
 
     #[test]
     fn test_name() {
@@ -954,7 +912,7 @@ mod tests {
             ..Default::default()
         });
 
-        let r = Rc::new(inner);
+        let _r = Rc::new(inner);
         // let render_box = RenderBox2 { inner: r };
         print!("hello");
     }
