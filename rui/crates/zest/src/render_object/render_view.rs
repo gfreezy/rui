@@ -160,7 +160,6 @@ impl RenderView {
     }
 
     pub(crate) fn hit_test(&self, result: &mut HitTestResult, position: Offset) -> bool {
-        tracing::debug!("hit_test in render view");
         if let Some(child) = self.try_first_child() {
             child.hit_test(result, position);
         }

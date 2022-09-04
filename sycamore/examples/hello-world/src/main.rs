@@ -2,9 +2,18 @@ use sycamore::prelude::*;
 
 #[component]
 fn App(cx: Scope) -> View<ZestNode> {
+    let mut signal = create_signal(cx, 0);
     view! { cx,
-        text(text="Hello World!") {
-
+        flex {
+            listener(on:click=move |_| {
+                println!("clicked");
+                signal += 1;
+            }) {
+                text(text="click me") {}
+            }
+            text(text=format!("hello {signal}"), font-size=signal) { }
+            text(text="Hello World!") { }
+            text(text="Hello World!") { }
         }
     }
 }

@@ -5,7 +5,7 @@ use crate::render_object::{
     render_object::{HitTestEntry, Offset, PointerEvent, RenderObject},
 };
 
-pub type PointerEventListener = Box<dyn FnMut(&RenderObject, PointerEvent)>;
+pub type PointerEventListener = Box<dyn FnMut(&RenderObject, PointerEvent) + 'static>;
 
 /// How to behave during hit tests.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -26,11 +26,11 @@ pub enum HitTestBehavior {
 }
 
 pub struct RenderPointerListener {
-    on_pointer_down: PointerEventListener,
-    on_pointer_move: PointerEventListener,
-    on_pointer_up: PointerEventListener,
-    on_pointer_hover: PointerEventListener,
-    hit_test_behavior: HitTestBehavior,
+    pub on_pointer_down: PointerEventListener,
+    pub on_pointer_move: PointerEventListener,
+    pub on_pointer_up: PointerEventListener,
+    pub on_pointer_hover: PointerEventListener,
+    pub hit_test_behavior: HitTestBehavior,
 }
 
 impl Default for RenderPointerListener {
@@ -96,6 +96,8 @@ impl RenderBoxWidget for RenderPointerListener {
     ) -> bool {
         self.hit_test_behavior == HitTestBehavior::Opaque
     }
+
+    fn set_attribute(&mut self, ctx: &RenderObject, key: &str, value: &str) {}
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self

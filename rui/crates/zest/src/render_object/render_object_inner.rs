@@ -183,7 +183,9 @@ impl_method! {
 
 
             // attach the child to the owner
-            child.attach(self.owner());
+            if let Some(owner) = self.try_owner() {
+                child.attach(owner);
+            }
             self.redepth_child(child);
         }
 
@@ -215,7 +217,6 @@ impl_method! {
         /// If `after` is null, then this inserts the child at the start of the list,
         /// and the child becomes the new [firstChild].
         pub(crate) fn insert(&mut self, child: RenderObject, after: Option<RenderObject>) {
-            assert!(self.try_owner().is_some());
             assert_ne!(&child, &self.render_object());
             assert_ne!(after.as_ref(), Some(&self.render_object()));
             assert_ne!(Some(&child), after.as_ref());

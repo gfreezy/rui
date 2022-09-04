@@ -119,7 +119,8 @@ impl GenericNode for ZestNode {
     }
 
     fn set_attribute(&self, name: &str, value: &str) {
-        eprintln!("set_attriuibute: {} {}", name, value);
+        eprintln!("set_attribute: {} {}", name, value);
+        self.node().set_attribute(name, value);
     }
 
     fn remove_attribute(&self, name: &str) {}
@@ -189,7 +190,15 @@ impl GenericNode for ZestNode {
     }
 
     fn event<'a, F: FnMut(Self::EventType) + 'a>(&self, cx: Scope<'a>, name: &str, handler: F) {
-        todo!()
+        let boxed: Box<dyn FnMut(Self::EventType)> = Box::new(handler);
+        // SAFETY: extend lifetime because the closure is dropped when the cx is disposed,
+        // preventing the handler from ever being accessed after its lifetime.
+        let mut handler: Box<dyn FnMut(Self::EventType) + 'static> =
+            unsafe { std::mem::transmute(boxed) };
+        self.node()
+            .update::<RenderPointerListener>(move |render_listener| {
+                render_listener.on_pointer_up = Box::new(move |_, e| handler(e))
+            });
     }
 
     fn update_inner_text(&self, text: &str) {

@@ -71,7 +71,7 @@ impl MainState {
     fn dispatch_event(&self, event: PointerEvent, hit_test_result: &HitTestResult) {
         tracing::debug!("--------------- dispatch event --------------");
         for entry in hit_test_result.entries() {
-            tracing::debug!("dispatch event to: {:?}", entry.target());
+            tracing::debug!("hit test entry: {:?}", entry.target());
             entry.target().handle_event(event.clone(), entry.clone());
         }
 

@@ -316,13 +316,6 @@ pub enum RenderObject {
 }
 
 impl RenderObject {
-    pub(crate) fn redepth_child(&self, child: &RenderObject) {
-        if child.depth() <= self.depth() {
-            child.incr_depth();
-            child.redepth_children();
-        }
-    }
-
     delegate::delegate! {
         to match self {
             RenderObject::RenderBox(box_) => box_,
@@ -473,8 +466,14 @@ impl RenderObject {
         }
     }
 
+    pub(crate) fn redepth_child(&self, child: &RenderObject) {
+        if child.depth() <= self.depth() {
+            child.incr_depth();
+            child.redepth_children();
+        }
+    }
+
     pub(crate) fn hit_test(&self, result: &mut HitTestResult, position: Offset) -> bool {
-        tracing::debug!("hit_test in {:?}", self);
         match self {
             RenderObject::RenderBox(o) => o.hit_test(result, position),
             RenderObject::RenderSliver(o) => o.hit_test(result, position),
@@ -498,6 +497,20 @@ impl RenderObject {
 
     pub(crate) fn box_constraints(&self) -> BoxConstraints {
         self.constraints().box_constraints()
+    }
+
+    pub fn set_attribute(&self, key: &str, value: &str) {
+        match self {
+            RenderObject::RenderBox(o) => o.set_attribute(key, value),
+            _ => unreachable!(),
+        }
+    }
+
+    pub(crate) fn set_name(&self, name: String) {
+        match self {
+            RenderObject::RenderBox(o) => o.set_name(name),
+            _ => unreachable!(),
+        }
     }
 }
 

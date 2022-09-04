@@ -1,6 +1,7 @@
 use druid_shell::piet::{
     PietText, PietTextLayout, Text as _, TextAttribute, TextLayout, TextLayoutBuilder,
 };
+use style::{parse_rule, Style};
 
 use crate::render_object::{
     render_box::{RenderBoxWidget, Size},
@@ -51,6 +52,7 @@ impl RenderText {
     }
 
     pub fn set_text(&mut self, ctx: &RenderObject, text: String) {
+        ctx.set_name(format!("render_text: {text}"));
         self.text = text;
         self.layout = None;
         ctx.mark_needs_layout();
@@ -58,6 +60,12 @@ impl RenderText {
 
     pub fn set_font_size(&mut self, ctx: &RenderObject, font_size: f64) {
         self.font_size = font_size;
+        self.layout = None;
+        ctx.mark_needs_layout();
+    }
+
+    pub fn set_max_width(&mut self, ctx: &RenderObject, max_width: Option<f64>) {
+        self.max_width = max_width;
         self.layout = None;
         ctx.mark_needs_layout();
     }
@@ -103,6 +111,14 @@ impl RenderBoxWidget for RenderText {
         ctx.render_box().set_size(size)
     }
 
+    fn hit_test_self(
+        &mut self,
+        ctx: &RenderObject,
+        position: crate::render_object::render_object::Offset,
+    ) -> bool {
+        true
+    }
+
     fn hit_test_children(
         self: &mut RenderText,
         _ctx: &crate::render_object::render_object::RenderObject,
@@ -114,5 +130,14 @@ impl RenderBoxWidget for RenderText {
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
+    }
+
+    fn set_attribute(&mut self, ctx: &RenderObject, key: &str, value: &str) {
+        match key {
+            "text" => self.set_text(ctx, value.to_string()),
+            "font-size" => self.set_font_size(ctx, value.parse::<f64>().unwrap()),
+            "max-width" => self.set_max_width(ctx, value.parse::<f64>().ok()),
+            _ => {}
+        }
     }
 }

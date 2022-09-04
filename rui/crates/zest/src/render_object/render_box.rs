@@ -1,4 +1,5 @@
 use decorum::R64;
+use std::any::type_name;
 use std::cell::RefCell;
 
 use std::{
@@ -86,6 +87,7 @@ impl PartialEq for RenderBox {
 }
 
 pub trait RenderBoxWidget: Any {
+    fn set_attribute(&mut self, ctx: &RenderObject, key: &str, value: &str) {}
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
 
     fn paint(&mut self, ctx: &RenderObject, paint_context: &mut PaintContext, offset: Offset) {
@@ -174,13 +176,14 @@ pub trait RenderBoxWidget: Any {
         if ctx.size().contains(position) {
             if self.hit_test_children(ctx, result, position) || self.hit_test_self(ctx, position) {
                 result.add(HitTestEntry::new_box_hit_test_entry(ctx, position));
+                return true;
             }
         }
         return false;
     }
 
     fn hit_test_self(&mut self, ctx: &RenderObject, position: Offset) -> bool {
-        ctx.render_box().size().contains(position)
+        false
     }
 
     fn hit_test_children(
@@ -232,6 +235,10 @@ impl RenderBox {
         WeakRenderBox {
             inner: Rc::downgrade(&self.inner),
         }
+    }
+
+    pub(crate) fn set_name(&self, name: String) {
+        self.inner.borrow_mut().name = name;
     }
 }
 
@@ -298,9 +305,15 @@ impl RenderBox {
     }
 
     pub(crate) fn update<T: 'static>(&self, update: impl FnOnce(&mut T)) {
-        self.with_widget(|w, _| update(w.as_any_mut().downcast_mut::<T>().unwrap()))
+        let ret = self.with_widget(|w, _| w.as_any_mut().downcast_mut::<T>().map(update));
+        if ret.is_none() {
+            tracing::error!("update mismatched Type: {:?}", type_name::<T>());
+        }
     }
 
+    pub(crate) fn set_attribute(&self, key: &str, value: &str) {
+        self.with_widget(|w, this| w.set_attribute(this, key, value))
+    }
     /// Paint this render object into the given context at the given offset.
     ///
     /// Subclasses should override this method to provide a visual appearance
@@ -319,7 +332,12 @@ impl RenderBox {
     /// because draw operations before and after painting children might need to
     /// be recorded on separate compositing layers.
     pub(crate) fn paint(&self, context: &mut PaintContext, offset: Offset) {
-        tracing::debug!("painting in {}, offset: {:?}", self.name(), offset);
+        tracing::debug!(
+            "painting in {}, layout offset: {:?}, paint offset: {:?}",
+            self.name(),
+            self.offset(),
+            offset
+        );
         self.with_widget(|w, this| w.paint(this, context, offset))
     }
 
@@ -450,8 +468,11 @@ impl RenderBox {
 
 impl RenderBox {
     pub(crate) fn hit_test(&self, result: &mut HitTestResult, position: Offset) -> bool {
-        tracing::debug!("hit test in {}, position: {:?}", self.name(), position);
-        self.with_widget(|w, _| w.hit_test(&self.render_object(), result, position))
+        let ret = self.with_widget(|w, _| w.hit_test(&self.render_object(), result, position));
+        if ret {
+            tracing::debug!("hit in {}, position: {:?}", self.name(), position);
+        }
+        ret
     }
 
     pub(crate) fn is_repaint_bondary(&self) -> bool {
@@ -540,6 +561,7 @@ impl HitTestResult {
     }
 
     pub fn add(&mut self, entry: HitTestEntry) {
+        tracing::debug!("add hit test target: {:?}", &entry.target());
         self.entries.push(entry);
     }
 
