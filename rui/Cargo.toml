@@ -6,6 +6,7 @@ members = [
     "crates/memoize_attr",
     "crates/esplori",
     "crates/zest",
+    "crates/zest-app",
 ]
 
 [patch.crates-io]
