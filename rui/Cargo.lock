@@ -1653,7 +1653,7 @@ dependencies = [
 
 [[package]]
 name = "sycamore"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "ahash",
  "indexmap",
@@ -1674,7 +1674,7 @@ dependencies = [
 
 [[package]]
 name = "sycamore-macro"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "once_cell",
  "proc-macro2",
@@ -1684,7 +1684,7 @@ dependencies = [
 
 [[package]]
 name = "sycamore-reactive"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "ahash",
  "bumpalo",

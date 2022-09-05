@@ -2,9 +2,12 @@ use druid_shell::piet::{
     PietText, PietTextLayout, Text as _, TextAttribute, TextLayout, TextLayoutBuilder,
 };
 
-use crate::render_object::{
-    render_box::{RenderBoxWidget, Size},
-    render_object::RenderObject,
+use crate::{
+    constraints::BoxConstraints,
+    geometry::{Offset, Size},
+    hit_test::HitTestResult,
+    paint_context::PaintContext,
+    render_object::{render_box::RenderBoxWidget, render_object::RenderObject},
 };
 
 pub struct RenderText {
@@ -78,8 +81,8 @@ impl RenderBoxWidget for RenderText {
     fn paint(
         self: &mut RenderText,
         _ctx: &crate::render_object::render_object::RenderObject,
-        paint_context: &mut crate::render_object::render_object::PaintContext,
-        offset: crate::render_object::render_object::Offset,
+        paint_context: &mut PaintContext,
+        offset: Offset,
     ) {
         tracing::debug!("paint text: {}, offset: {:?}", self.text, offset);
         paint_context.draw_text(self.layout.as_ref().unwrap(), offset);
@@ -96,8 +99,8 @@ impl RenderBoxWidget for RenderText {
     fn compute_dry_layout(
         &mut self,
         this: &crate::render_object::render_object::RenderObject,
-        constraints: crate::render_object::render_box::BoxConstraints,
-    ) -> crate::render_object::render_box::Size {
+        constraints: BoxConstraints,
+    ) -> Size {
         self.rebuild_if_needed(&mut this.owner().text());
         constraints.constrain(self.layout().size().into())
     }
@@ -110,19 +113,15 @@ impl RenderBoxWidget for RenderText {
         ctx.render_box().set_size(size)
     }
 
-    fn hit_test_self(
-        &mut self,
-        _ctx: &RenderObject,
-        _position: crate::render_object::render_object::Offset,
-    ) -> bool {
+    fn hit_test_self(&mut self, _ctx: &RenderObject, _position: Offset) -> bool {
         true
     }
 
     fn hit_test_children(
         self: &mut RenderText,
         _ctx: &crate::render_object::render_object::RenderObject,
-        _result: &mut crate::render_object::render_box::HitTestResult,
-        _position: crate::render_object::render_object::Offset,
+        _result: &mut HitTestResult,
+        _position: Offset,
     ) -> bool {
         false
     }

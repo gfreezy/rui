@@ -1,15 +1,15 @@
 use sycamore::prelude::*;
 
 #[derive(Prop)]
-struct TextButtonProps<F> {
-    text: String,
+struct TextButtonProps<'a, F> {
+    text: &'a ReadSignal<String>,
     event: F,
 }
 
 #[component]
 fn TextButton<'a, G: GenericNode, F: FnMut(G::EventType) + 'a>(
     cx: Scope<'a>,
-    props: TextButtonProps<F>,
+    props: TextButtonProps<'a, F>,
 ) -> View<G> {
     view! { cx,
         listener(on:click=props.event) {
@@ -21,6 +21,7 @@ fn TextButton<'a, G: GenericNode, F: FnMut(G::EventType) + 'a>(
 #[component]
 fn App(cx: Scope) -> View<ZestNode> {
     let mut signal = create_signal(cx, 16);
+    let title = create_memo(cx, || format!("click to {}", signal.get()));
 
     view! { cx,
         flex {
@@ -32,7 +33,7 @@ fn App(cx: Scope) -> View<ZestNode> {
             }
 
 
-            TextButton(text=format!("click to {signal}"), event=move |_| {
+            TextButton(text=title, event=move |_| {
                 signal += 1;
             })
 

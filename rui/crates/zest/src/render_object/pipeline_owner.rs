@@ -6,9 +6,9 @@ use std::{
 
 use druid_shell::piet::{Piet, PietText};
 
-use crate::render_object::render_object::Offset;
+use crate::{geometry::Offset, paint_context::PaintContext};
 
-use super::render_object::{PaintContext, RenderObject, WeakRenderObject};
+use crate::render_object::render_object::{RenderObject, WeakRenderObject};
 
 #[derive(Clone)]
 pub struct PipelineOwner {

@@ -1,9 +1,13 @@
 use druid_shell::piet::Piet;
 use std::fmt::Debug;
 
-use super::{
-    render_box::{BoxConstraints, HitTestResult, Size},
-    render_object::{Rect, RenderObject},
+use crate::{
+    constraints::{BoxConstraints, Constraints},
+    geometry::{Matrix4, Offset, Rect, Size},
+    hit_test::{HitTestEntry, HitTestResult},
+    paint_context::PaintContext,
+    pointer_event::PointerEvent,
+    render_object::render_object::RenderObject,
 };
 
 use std::{
@@ -11,14 +15,11 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use super::render_object::{
-    HitTestEntry, Matrix4, Offset, PaintContext, PointerEvent, WeakRenderObject,
-};
+use super::{parent_data::ParentData, render_object::WeakRenderObject};
 
 use super::{
     layer::Layer,
     pipeline_owner::{PipelineOwner, WeakOwner},
-    render_object::{Constraints, ParentData},
 };
 
 #[derive(Clone)]

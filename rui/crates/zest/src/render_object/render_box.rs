@@ -1,7 +1,6 @@
 use decorum::R64;
 use std::any::type_name;
 use std::cell::RefCell;
-
 use std::{
     any::Any,
     collections::HashMap,
@@ -10,48 +9,19 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use crate::constraints::{BoxConstraints, Constraints};
+use crate::geometry::{Matrix4, Offset, Rect, Size};
+use crate::hit_test::{BoxHitTestEntry, HitTestEntry, HitTestResult};
+use crate::paint_context::PaintContext;
+use crate::pointer_event::PointerEvent;
 use crate::render_object::render_object::RenderObject;
-
-use super::{
+use crate::render_object::{
     layer::Layer,
     pipeline_owner::{PipelineOwner, WeakOwner},
-    render_object::{
-        Constraints, HitTestEntry, Matrix4, Offset, PaintContext, ParentData, PointerEvent, Rect,
-        WeakRenderObject,
-    },
+    render_object::WeakRenderObject,
 };
 
-#[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
-pub struct Size {
-    pub width: f64,
-    pub height: f64,
-}
-
-impl Size {
-    pub fn new(width: f64, height: f64) -> Self {
-        Self { width, height }
-    }
-    pub const ZERO: Self = Size {
-        width: 0.0,
-        height: 0.0,
-    };
-
-    pub fn contains(&self, position: Offset) -> bool {
-        position.dx >= 0.0
-            && position.dx < self.width
-            && position.dy >= 0.0
-            && position.dy < self.height
-    }
-}
-
-impl From<druid_shell::kurbo::Size> for Size {
-    fn from(size: druid_shell::kurbo::Size) -> Self {
-        Size {
-            width: size.width,
-            height: size.height,
-        }
-    }
-}
+use super::parent_data::ParentData;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 enum InstrinsicDimension {
@@ -209,40 +179,6 @@ pub trait RenderBoxWidget: Any {
     }
 }
 
-impl RenderBox {
-    fn to_render_object(&self) -> RenderObject {
-        RenderObject::RenderBox(self.clone())
-    }
-
-    pub(crate) fn new_render_object(
-        name: String,
-        widget: Box<dyn RenderBoxWidget>,
-    ) -> RenderObject {
-        let inner = RefCell::new(InnerRenderBox {
-            object: Some(widget),
-            name,
-            ..Default::default()
-        });
-        let render_box = RenderBox {
-            inner: Rc::new(inner),
-        };
-
-        let render_object = render_box.to_render_object();
-        render_box.set_render_object(&render_object);
-        render_object
-    }
-
-    pub fn downgrade(&self) -> WeakRenderBox {
-        WeakRenderBox {
-            inner: Rc::downgrade(&self.inner),
-        }
-    }
-
-    pub(crate) fn set_name(&self, name: String) {
-        self.inner.borrow_mut().name = name;
-    }
-}
-
 #[derive(Clone)]
 pub struct WeakRenderBox {
     inner: Weak<RefCell<InnerRenderBox>>,
@@ -301,6 +237,38 @@ impl Default for InnerRenderBox {
 }
 
 impl RenderBox {
+    fn to_render_object(&self) -> RenderObject {
+        RenderObject::RenderBox(self.clone())
+    }
+
+    pub(crate) fn new_render_object(
+        name: String,
+        widget: Box<dyn RenderBoxWidget>,
+    ) -> RenderObject {
+        let inner = RefCell::new(InnerRenderBox {
+            object: Some(widget),
+            name,
+            ..Default::default()
+        });
+        let render_box = RenderBox {
+            inner: Rc::new(inner),
+        };
+
+        let render_object = render_box.to_render_object();
+        render_box.set_render_object(&render_object);
+        render_object
+    }
+
+    pub fn downgrade(&self) -> WeakRenderBox {
+        WeakRenderBox {
+            inner: Rc::downgrade(&self.inner),
+        }
+    }
+
+    pub(crate) fn set_name(&self, name: String) {
+        self.inner.borrow_mut().name = name;
+    }
+
     pub(crate) fn name(&self) -> String {
         self.inner.borrow().name.clone()
     }
@@ -465,9 +433,7 @@ impl RenderBox {
     fn has_size(&self) -> bool {
         self.inner.borrow().size.is_some()
     }
-}
 
-impl RenderBox {
     pub(crate) fn hit_test(&self, result: &mut HitTestResult, position: Offset) -> bool {
         let ret = self.with_widget(|w, _| w.hit_test(&self.render_object(), result, position));
         if ret {
@@ -544,211 +510,7 @@ impl RenderBox {
         let offset = child.render_box().offset();
         transform.translate(offset.dx, offset.dy);
     }
-}
 
-pub struct HitTestResult {
-    entries: Vec<HitTestEntry>,
-    local_transforms: Vec<Matrix4>,
-    transforms: Vec<Matrix4>,
-}
-
-impl HitTestResult {
-    pub fn new() -> Self {
-        Self {
-            entries: Vec::new(),
-            local_transforms: vec![],
-            transforms: vec![Matrix4::identity()],
-        }
-    }
-
-    pub fn add(&mut self, entry: HitTestEntry) {
-        tracing::debug!("add hit test target: {:?}", &entry.target());
-        self.entries.push(entry);
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
-    }
-
-    pub fn add_with_paint_offset(
-        &mut self,
-        offset: Offset,
-        position: Offset,
-        hit_test: impl FnOnce(&mut HitTestResult, Offset) -> bool,
-    ) -> bool {
-        let transformed = position - offset;
-        if offset != Offset::ZERO {
-            self.push_offset(-offset);
-        }
-        let hit = hit_test(self, transformed);
-        if offset != Offset::ZERO {
-            self.pop_transform();
-        }
-        hit
-    }
-
-    pub fn entries(&self) -> impl Iterator<Item = &HitTestEntry> {
-        self.entries.iter()
-    }
-
-    fn push_offset(&mut self, offset: Offset) {
-        assert_ne!(offset, Offset::ZERO);
-        self.local_transforms
-            .push(Matrix4::from_translation(offset.dx, offset.dx));
-    }
-
-    fn pop_transform(&mut self) {
-        if self.local_transforms.pop().is_none() {
-            self.transforms.pop();
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct BoxHitTestEntry {
-    render_object: WeakRenderObject,
-    position: Offset,
-}
-
-impl BoxHitTestEntry {
-    pub(crate) fn new(render_object: &RenderObject, position: Offset) -> Self {
-        Self {
-            render_object: render_object.downgrade(),
-            position,
-        }
-    }
-
-    pub fn target(&self) -> RenderObject {
-        self.render_object.upgrade()
-    }
-}
-
-impl From<BoxHitTestEntry> for HitTestEntry {
-    fn from(entry: BoxHitTestEntry) -> Self {
-        HitTestEntry::BoxHitTestEntry(entry)
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct BoxConstraints {
-    pub min_width: f64,
-    pub max_width: f64,
-    pub min_height: f64,
-    pub max_height: f64,
-}
-
-impl PartialEq for BoxConstraints {
-    fn eq(&self, other: &Self) -> bool {
-        self.min_width == other.min_width
-            && self.max_width == other.max_width
-            && self.min_height == other.min_height
-            && self.max_height == other.max_height
-    }
-}
-
-impl Eq for BoxConstraints {}
-
-impl Hash for BoxConstraints {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        R64::from(self.min_width).hash(state);
-        R64::from(self.max_width).hash(state);
-        R64::from(self.min_height).hash(state);
-        R64::from(self.max_height).hash(state);
-    }
-}
-
-impl From<BoxConstraints> for Constraints {
-    fn from(bc: BoxConstraints) -> Self {
-        Constraints::BoxConstraints(bc)
-    }
-}
-
-impl BoxConstraints {
-    /// An unbounded box constraints object.
-    ///
-    /// Can be satisfied by any nonnegative size.
-    pub const UNBOUNDED: BoxConstraints = BoxConstraints {
-        min_width: 0.,
-        min_height: 0.,
-        max_width: f64::INFINITY,
-        max_height: f64::INFINITY,
-    };
-
-    pub fn has_tight_width(&self) -> bool {
-        self.min_width >= self.max_width
-    }
-
-    pub fn has_tight_height(&self) -> bool {
-        self.min_height >= self.max_height
-    }
-
-    pub(crate) fn is_tight(&self) -> bool {
-        self.has_tight_width() && self.has_tight_height()
-    }
-
-    pub(crate) fn tight(size: Size) -> Self {
-        BoxConstraints {
-            min_width: size.width,
-            max_width: size.width,
-            min_height: size.height,
-            max_height: size.height,
-        }
-    }
-
-    /// Create a "tight" box constraints object for one or more dimensions.
-    ///
-    /// [rounded away from zero]: struct.Size.html#method.expand
-    pub fn tight_for(width: Option<f64>, height: Option<f64>) -> BoxConstraints {
-        match (width, height) {
-            (None, None) => BoxConstraints::UNBOUNDED,
-            (None, Some(h)) => BoxConstraints {
-                min_height: h,
-                max_height: h,
-                ..BoxConstraints::UNBOUNDED
-            },
-            (Some(w), None) => BoxConstraints {
-                min_width: w,
-                max_width: w,
-                ..BoxConstraints::UNBOUNDED
-            },
-            (Some(w), Some(h)) => BoxConstraints {
-                min_width: w,
-                max_width: w,
-                min_height: h,
-                max_height: h,
-            },
-        }
-    }
-
-    pub(crate) fn constrain(&self, cross_size: Size) -> Size {
-        Size::new(
-            self.constrain_width(cross_size.width),
-            self.constrain_height(cross_size.height),
-        )
-    }
-
-    fn constrain_width(&self, width: f64) -> f64 {
-        if width < self.min_width {
-            self.min_width
-        } else if width > self.max_width {
-            self.max_width
-        } else {
-            width
-        }
-    }
-
-    fn constrain_height(&self, height: f64) -> f64 {
-        if height < self.min_height {
-            self.min_height
-        } else if height > self.max_height {
-            self.max_height
-        } else {
-            height
-        }
-    }
-}
-
-impl RenderBox {
     pub(crate) fn paint_with_context(&self, context: &mut PaintContext, offset: Offset) {
         self.clear_needs_paint();
         self.paint(context, offset);

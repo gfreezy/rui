@@ -1,23 +1,24 @@
 #[macro_use]
 mod macros;
 mod arithmatic;
+pub mod constraints;
 mod diagnostics;
+pub mod geometry;
+pub mod hit_test;
+pub mod paint_context;
+pub mod pointer_event;
 pub mod render_object;
 pub mod rendering;
 
 use druid_shell::{
-    piet::Piet, Application, HotKey, Menu, SysMods, WinHandler, WindowBuilder,
-    WindowHandle,
+    piet::Piet, Application, HotKey, Menu, SysMods, WinHandler, WindowBuilder, WindowHandle,
 };
-use render_object::{
-    pipeline_owner::PipelineOwner,
-    render_box::{HitTestResult, Size},
-    render_object::{PointerEvent, RenderObject},
-};
-use rendering::{
-    render_flex::RenderFlex,
-};
+use pointer_event::PointerEvent;
+use render_object::{pipeline_owner::PipelineOwner, render_object::RenderObject};
+use rendering::render_flex::RenderFlex;
 use tracing::metadata::LevelFilter;
+
+use crate::{geometry::Size, hit_test::HitTestResult};
 
 const QUIT_MENU_ID: u32 = 0x100;
 

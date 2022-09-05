@@ -1,8 +1,8 @@
-
-
-use crate::render_object::{
-    render_box::{BoxHitTestEntry, HitTestResult, RenderBoxWidget},
-    render_object::{HitTestEntry, Offset, PointerEvent, RenderObject},
+use crate::{
+    geometry::Offset,
+    hit_test::{BoxHitTestEntry, HitTestEntry, HitTestResult},
+    pointer_event::PointerEvent,
+    render_object::{render_box::RenderBoxWidget, render_object::RenderObject},
 };
 
 pub type PointerEventListener = Box<dyn FnMut(&RenderObject, PointerEvent) + 'static>;
@@ -89,11 +89,7 @@ impl RenderBoxWidget for RenderPointerListener {
         return hit_target;
     }
 
-    fn hit_test_self(
-        &mut self,
-        _ctx: &RenderObject,
-        _position: crate::render_object::render_object::Offset,
-    ) -> bool {
+    fn hit_test_self(&mut self, _ctx: &RenderObject, _position: Offset) -> bool {
         self.hit_test_behavior == HitTestBehavior::Opaque
     }
 

@@ -93,7 +93,7 @@ impl Hash for ZestNode {
 }
 
 impl GenericNode for ZestNode {
-    type EventType = zest::render_object::render_object::PointerEvent;
+    type EventType = zest::pointer_event::PointerEvent;
     type PropertyType = ();
 
     fn element<T: SycamoreElement>() -> Self {

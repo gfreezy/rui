@@ -1,11 +1,8 @@
-
-
 use crate::{
     arithmatic::{near_equal, Tolerance},
-    render_object::{
-        render_box::{BoxConstraints, RenderBoxWidget, Size},
-        render_object::{Offset, RenderObject},
-    },
+    constraints::BoxConstraints,
+    geometry::{Offset, Size},
+    render_object::{render_box::RenderBoxWidget, render_object::RenderObject},
 };
 use style::{
     axis::Axis,

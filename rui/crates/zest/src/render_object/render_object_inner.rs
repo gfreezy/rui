@@ -1,13 +1,28 @@
-use crate::render_object::render_object::{try_ultimate_next_sibling, try_ultimate_prev_sibling};
+use crate::constraints::Constraints;
 
 use super::{
     layer::Layer,
+    parent_data::ParentData,
     pipeline_owner::{PipelineOwner, WeakOwner},
     render_box::InnerRenderBox,
-    render_object::{Constraints, ParentData, RenderObject, WeakRenderObject},
+    render_object::{RenderObject, WeakRenderObject},
     render_sliver::InnerRenderSliver,
     render_view::InnerRenderView,
 };
+
+pub(crate) fn try_ultimate_prev_sibling(mut element: RenderObject) -> RenderObject {
+    while let Some(prev) = element.try_prev_sibling() {
+        element = prev;
+    }
+    element
+}
+
+pub(crate) fn try_ultimate_next_sibling(mut element: RenderObject) -> RenderObject {
+    while let Some(next) = element.try_next_sibling() {
+        element = next;
+    }
+    element
+}
 
 #[mixin::declare]
 struct RenderObjectState {

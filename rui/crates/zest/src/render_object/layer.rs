@@ -1,11 +1,7 @@
+use crate::geometry::{Offset, Rect, Size};
 use std::{cell::RefCell, rc::Rc};
 
 use druid_shell::piet::{Piet, PietLayer};
-
-use super::{
-    render_box::Size,
-    render_object::{Offset, Rect},
-};
 
 #[derive(Clone)]
 pub(crate) struct Layer {
