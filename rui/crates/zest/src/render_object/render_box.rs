@@ -9,6 +9,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use super::parent_data::ParentData;
 use crate::constraints::{BoxConstraints, Constraints};
 use crate::geometry::{Matrix4, Offset, Rect, Size};
 use crate::hit_test::{BoxHitTestEntry, HitTestEntry, HitTestResult};
@@ -20,8 +21,6 @@ use crate::render_object::{
     pipeline_owner::{PipelineOwner, WeakOwner},
     render_object::WeakRenderObject,
 };
-
-use super::parent_data::ParentData;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 enum InstrinsicDimension {

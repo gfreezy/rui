@@ -39,50 +39,6 @@ impl Debug for RenderView {
     }
 }
 
-impl RenderView {
-    pub(crate) fn new_render_object(size: Size) -> RenderObject {
-        let v = Self {
-            inner: Rc::new(RefCell::new(InnerRenderView {
-                size,
-                ..Default::default()
-            })),
-        };
-
-        let root_view = RenderObject::RenderView(v.clone());
-        v.set_render_object(&root_view);
-        root_view.mark_needs_layout();
-        root_view
-    }
-
-    pub fn downgrade(&self) -> WeakRenderView {
-        WeakRenderView {
-            inner: Rc::downgrade(&self.inner),
-        }
-    }
-
-    pub(crate) fn composite_frame(&self, piet: &mut Piet) {
-        let root_layer = self.layer();
-        root_layer.draw_in(piet);
-        for layer in root_layer.decendents() {
-            layer.draw_in(piet);
-        }
-    }
-
-    fn size(&self) -> Size {
-        self.inner.borrow().size
-    }
-
-    pub(crate) fn perform_layout(&self) {
-        let size = self.size();
-        self.first_child()
-            .layout(BoxConstraints::tight(size).into(), true);
-    }
-
-    pub(crate) fn paint(&self, context: &mut PaintContext, offset: Offset) {
-        context.paint_child(&self.first_child(), offset);
-    }
-}
-
 #[mixin::insert(RenderObjectState)]
 pub(crate) struct InnerRenderView {
     size: Size,
@@ -133,6 +89,48 @@ impl WeakRenderView {
 }
 
 impl RenderView {
+    pub(crate) fn new_render_object(size: Size) -> RenderObject {
+        let v = Self {
+            inner: Rc::new(RefCell::new(InnerRenderView {
+                size,
+                ..Default::default()
+            })),
+        };
+
+        let root_view = RenderObject::RenderView(v.clone());
+        v.set_render_object(&root_view);
+        root_view.mark_needs_layout();
+        root_view
+    }
+
+    pub fn downgrade(&self) -> WeakRenderView {
+        WeakRenderView {
+            inner: Rc::downgrade(&self.inner),
+        }
+    }
+
+    pub(crate) fn composite_frame(&self, piet: &mut Piet) {
+        let root_layer = self.layer();
+        root_layer.draw_in(piet);
+        for layer in root_layer.decendents() {
+            layer.draw_in(piet);
+        }
+    }
+
+    fn size(&self) -> Size {
+        self.inner.borrow().size
+    }
+
+    pub(crate) fn perform_layout(&self) {
+        let size = self.size();
+        self.first_child()
+            .layout(BoxConstraints::tight(size).into(), true);
+    }
+
+    pub(crate) fn paint(&self, context: &mut PaintContext, offset: Offset) {
+        context.paint_child(&self.first_child(), offset);
+    }
+
     pub(crate) fn is_repaint_bondary(&self) -> bool {
         true
     }
@@ -170,9 +168,7 @@ impl RenderView {
         ));
         true
     }
-}
 
-impl RenderView {
     pub(crate) fn paint_with_context(&self, context: &mut PaintContext, offset: Offset) {
         self.clear_needs_paint();
         self.paint(context, offset);
@@ -182,7 +178,9 @@ impl RenderView {
     pub(crate) fn get_dry_layout(&self, _constraints: Constraints) -> Size {
         todo!()
     }
+}
 
+impl RenderView {
     delegate::delegate! {
         // region: delegate to immutable inner
         to self.inner.borrow() {
