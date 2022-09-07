@@ -13,6 +13,6 @@ decorum = "0.3.1"
 core-graphics = "0.22"
 style = { path = "../style" }
 mixin = { path = "../../../third_party/mixin" }
-delegate = "0.7"
+delegate = "0.8"
 debug-cell = "0.1"
 cgmath = "0.18.0"

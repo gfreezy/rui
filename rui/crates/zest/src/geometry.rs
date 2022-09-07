@@ -198,4 +198,13 @@ impl Rect {
             height: self.height(),
         }
     }
+
+    pub(crate) fn fromLTWH(left: f64, top: f64, width: f64, height: f64) -> Rect {
+        Rect {
+            x0: left,
+            y0: top,
+            x1: left + width,
+            y1: top + height,
+        }
+    }
 }

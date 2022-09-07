@@ -160,7 +160,7 @@ impl RenderView {
 
     pub(crate) fn hit_test(&self, result: &mut HitTestResult, position: Offset) -> bool {
         if let Some(child) = self.try_first_child() {
-            child.hit_test(result, position);
+            child.hit_test_box(result, position);
         }
         result.add(HitTestEntry::new_box_hit_test_entry(
             &self.render_object(),

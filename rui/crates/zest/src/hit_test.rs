@@ -3,6 +3,15 @@ use crate::{
     render_object::render_object::{RenderObject, WeakRenderObject},
 };
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum HitTestPosition {
+    Box(Offset),
+    Sliver {
+        main_axis_position: f64,
+        cross_axis_position: f64,
+    },
+}
+
 #[derive(Clone)]
 pub enum HitTestEntry {
     BoxHitTestEntry(BoxHitTestEntry),
@@ -12,6 +21,8 @@ pub enum HitTestEntry {
 #[derive(Clone)]
 pub struct SliverHitTestEntry {
     render_object: WeakRenderObject,
+    main_axis_position: f64,
+    cross_axis_position: f64,
 }
 
 impl SliverHitTestEntry {
@@ -30,6 +41,18 @@ impl HitTestEntry {
 
     pub(crate) fn new_box_hit_test_entry(render_object: &RenderObject, position: Offset) -> Self {
         HitTestEntry::BoxHitTestEntry(BoxHitTestEntry::new(render_object, position))
+    }
+
+    pub(crate) fn new_sliver_hit_test_entry(
+        render_object: &RenderObject,
+        main_axis_position: f64,
+        cross_axis_position: f64,
+    ) -> Self {
+        HitTestEntry::SliverHitTestEntry(SliverHitTestEntry {
+            render_object: render_object.downgrade(),
+            main_axis_position,
+            cross_axis_position,
+        })
     }
 
     delegate::delegate! {

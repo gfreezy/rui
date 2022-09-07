@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+use crate::hit_test::HitTestPosition;
 use crate::{
     constraints::{BoxConstraints, Constraints},
     geometry::{Matrix4, Offset, Rect, Size, Vector3},
@@ -143,11 +144,18 @@ impl RenderObject {
         }
     }
 
-    pub(crate) fn hit_test(&self, result: &mut HitTestResult, position: Offset) -> bool {
-        match self {
-            RenderObject::RenderBox(o) => o.hit_test(result, position),
-            RenderObject::RenderSliver(o) => o.hit_test(result, position),
-            RenderObject::RenderView(o) => o.hit_test(result, position),
+    pub(crate) fn hit_test(&self, result: &mut HitTestResult, position: HitTestPosition) -> bool {
+        match (self, position) {
+            (RenderObject::RenderBox(o), HitTestPosition::Box(pos)) => o.hit_test(result, pos),
+            (RenderObject::RenderView(o), HitTestPosition::Box(pos)) => o.hit_test(result, pos),
+            (
+                RenderObject::RenderSliver(o),
+                HitTestPosition::Sliver {
+                    main_axis_position,
+                    cross_axis_position,
+                },
+            ) => o.hit_test(result, main_axis_position, cross_axis_position),
+            _ => unreachable!("Hit test position does not match render object type"),
         }
     }
 

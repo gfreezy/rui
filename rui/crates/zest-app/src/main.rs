@@ -32,11 +32,9 @@ fn App(cx: Scope) -> View<ZestNode> {
                 text(text="click me") {}
             }
 
-
             TextButton(text=title, event=move |_| {
                 signal += 1;
             })
-
 
             text(text=format!("hello {signal}"), font-size=signal) { }
             text(text="Hello World!") { }

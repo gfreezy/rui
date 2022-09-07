@@ -18,6 +18,7 @@ use render_object::{pipeline_owner::PipelineOwner, render_object::RenderObject};
 use rendering::render_flex::RenderFlex;
 use tracing::metadata::LevelFilter;
 
+use crate::hit_test::HitTestPosition;
 use crate::{geometry::Size, hit_test::HitTestResult};
 
 const QUIT_MENU_ID: u32 = 0x100;
@@ -62,7 +63,8 @@ impl MainState {
         tracing::debug!("--------------- hit test --------------");
         let mut hit_test_result = HitTestResult::new();
         let position = event.position();
-        self.root_view().hit_test(&mut hit_test_result, position);
+        self.root_view()
+            .hit_test(&mut hit_test_result, HitTestPosition::Box(position));
         self.dispatch_event(event, &hit_test_result);
         self.handle.invalidate();
     }

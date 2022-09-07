@@ -44,4 +44,3 @@ cocoa = { path = "../third_party/core-foundation-rs/cocoa" }
 core-graphics = { path = "../third_party/core-foundation-rs/core-graphics" }
 core-foundation = { path = "../third_party/core-foundation-rs/core-foundation" }
 core-foundation-sys = { path = "../third_party/core-foundation-rs/core-foundation-sys" }
-delegate = { path = "../third_party/rust-delegate" }

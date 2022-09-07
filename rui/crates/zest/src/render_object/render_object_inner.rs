@@ -10,14 +10,14 @@ use super::{
     render_view::InnerRenderView,
 };
 
-pub(crate) fn try_ultimate_prev_sibling(mut element: RenderObject) -> RenderObject {
+fn try_ultimate_prev_sibling(mut element: RenderObject) -> RenderObject {
     while let Some(prev) = element.try_prev_sibling() {
         element = prev;
     }
     element
 }
 
-pub(crate) fn try_ultimate_next_sibling(mut element: RenderObject) -> RenderObject {
+fn try_ultimate_next_sibling(mut element: RenderObject) -> RenderObject {
     while let Some(next) = element.try_next_sibling() {
         element = next;
     }
