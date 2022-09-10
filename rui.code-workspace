@@ -2,12 +2,6 @@
 	"folders": [
 		{
 			"path": "rui"
-		},
-		{
-			"path": "sycamore"
-		},
-		{
-			"path": "."
 		}
 	],
 	"settings": {

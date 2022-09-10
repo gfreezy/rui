@@ -199,7 +199,7 @@ impl Rect {
         }
     }
 
-    pub(crate) fn fromLTWH(left: f64, top: f64, width: f64, height: f64) -> Rect {
+    pub(crate) fn from_ltwh(left: f64, top: f64, width: f64, height: f64) -> Rect {
         Rect {
             x0: left,
             y0: top,
