@@ -1,14 +1,10 @@
-use std::{
-    cell::{Cell, RefCell},
-    fmt::Debug,
-    rc::{Rc, Weak},
-};
-
-use druid_shell::piet::{Piet, PietText};
-
-use crate::{geometry::Offset, paint_context::PaintContext};
-
+use crate::geometry::Offset;
+use crate::paint_context::PaintContext;
 use crate::render_object::render_object::{RenderObject, WeakRenderObject};
+use druid_shell::piet::{Piet, PietText};
+use std::cell::{Cell, RefCell};
+use std::fmt::Debug;
+use std::rc::{Rc, Weak};
 
 #[derive(Clone)]
 pub struct PipelineOwner {

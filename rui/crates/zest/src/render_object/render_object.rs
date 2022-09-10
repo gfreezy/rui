@@ -1,24 +1,17 @@
-use std::fmt::Debug;
-
+use crate::constraints::{BoxConstraints, Constraints};
 use crate::constraints::{SliverConstraints, SliverGeometry};
+use crate::geometry::{Matrix4, Offset, Rect, Size, Vector3};
 use crate::hit_test::HitTestPosition;
-use crate::{
-    constraints::{BoxConstraints, Constraints},
-    geometry::{Matrix4, Offset, Rect, Size, Vector3},
-    hit_test::{HitTestEntry, HitTestResult},
-    paint_context::PaintContext,
-    pointer_event::PointerEvent,
-};
-
-use crate::render_object::{
-    layer::Layer,
-    pipeline_owner::PipelineOwner,
-    render_box::{RenderBox, RenderBoxWidget, WeakRenderBox},
-    render_sliver::{RenderSliver, WeakRenderSliver},
-    render_view::{RenderView, WeakRenderView},
-};
-
-use super::parent_data::ParentData;
+use crate::hit_test::{HitTestEntry, HitTestResult};
+use crate::paint_context::PaintContext;
+use crate::pointer_event::PointerEvent;
+use crate::render_object::layer::Layer;
+use crate::render_object::parent_data::ParentData;
+use crate::render_object::pipeline_owner::PipelineOwner;
+use crate::render_object::render_box::{RenderBox, RenderBoxWidget, WeakRenderBox};
+use crate::render_object::render_sliver::{RenderSliver, WeakRenderSliver};
+use crate::render_object::render_view::{RenderView, WeakRenderView};
+use std::fmt::Debug;
 
 #[derive(Clone, PartialEq)]
 pub enum RenderObject {
