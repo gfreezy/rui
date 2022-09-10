@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+use crate::constraints::{SliverConstraints, SliverGeometry};
 use crate::hit_test::HitTestPosition;
 use crate::{
     constraints::{BoxConstraints, Constraints},
@@ -137,14 +138,7 @@ impl RenderObject {
         transform
     }
 
-    pub(crate) fn redepth_child(&self, child: &RenderObject) {
-        if child.depth() <= self.depth() {
-            child.incr_depth();
-            child.redepth_children();
-        }
-    }
-
-    pub(crate) fn hit_test(&self, result: &mut HitTestResult, position: HitTestPosition) -> bool {
+    pub fn hit_test(&self, result: &mut HitTestResult, position: HitTestPosition) -> bool {
         match (self, position) {
             (RenderObject::RenderBox(o), HitTestPosition::Box(pos)) => o.hit_test(result, pos),
             (RenderObject::RenderView(o), HitTestPosition::Box(pos)) => o.hit_test(result, pos),
@@ -166,15 +160,26 @@ impl RenderObject {
         }
     }
 
-    pub(crate) fn size(&self) -> Size {
+    pub fn size(&self) -> Size {
         match self {
             RenderObject::RenderBox(o) => o.size(),
             _ => unreachable!(),
         }
     }
 
-    pub(crate) fn box_constraints(&self) -> BoxConstraints {
+    pub fn geometry(&self) -> SliverGeometry {
+        match self {
+            RenderObject::RenderSliver(o) => o.geometry(),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn box_constraints(&self) -> BoxConstraints {
         self.constraints().box_constraints()
+    }
+
+    pub fn sliver_constraints(&self) -> SliverConstraints {
+        self.constraints().sliver_constraints()
     }
 
     pub fn set_attribute(&self, key: &str, value: &str) {
@@ -190,7 +195,35 @@ impl RenderObject {
             _ => unreachable!(),
         }
     }
+}
 
+#[derive(Clone)]
+pub enum WeakRenderObject {
+    RenderBox(WeakRenderBox),
+    RenderSliver(WeakRenderSliver),
+    RenderView(WeakRenderView),
+}
+
+impl WeakRenderObject {
+    pub fn upgrade(&self) -> RenderObject {
+        match self {
+            WeakRenderObject::RenderBox(o) => RenderObject::RenderBox(o.upgrade()),
+            WeakRenderObject::RenderSliver(o) => RenderObject::RenderSliver(o.upgrade()),
+            WeakRenderObject::RenderView(o) => RenderObject::RenderView(o.upgrade()),
+        }
+    }
+
+    delegate::delegate!(to match self {
+        WeakRenderObject::RenderBox(o) => o,
+        WeakRenderObject::RenderSliver(o) => o,
+        WeakRenderObject::RenderView(o) => o,
+    } {
+        pub fn is_alive(&self) -> bool;
+    });
+}
+
+// delegate to inner enum
+impl RenderObject {
     delegate::delegate! {
         to match self {
             RenderObject::RenderBox(box_) => box_,
@@ -219,7 +252,6 @@ impl RenderObject {
             pub fn remove(&self, child: &RenderObject);
             pub fn remove_all(&self);
             pub fn move_(&self, child: RenderObject, after: Option<RenderObject>);
-            pub fn redepth_children(&self);
             pub fn relayout_boundary(&self) -> RenderObject;
             pub fn try_relayout_boundary(&self) -> Option<RenderObject>;
             pub fn owner(&self) -> PipelineOwner;
@@ -230,7 +262,6 @@ impl RenderObject {
             pub fn constraints(&self) -> Constraints;
             pub fn doing_this_layout_with_callback(&self) -> bool;
             pub fn mark_needs_layout(&self);
-            pub fn clear_needs_layout(&self);
             pub fn mark_parent_needs_layout(&self);
             pub fn set_constraints(&self, c: Constraints);
             pub fn paint_with_context(&self, context: &mut PaintContext, offset: Offset);
@@ -246,11 +277,10 @@ impl RenderObject {
             pub fn set_id(&self, id: usize);
             pub fn mark_needs_paint(&self);
             pub fn invoke_layout_callback(&self, callback: impl FnOnce(&Constraints));
+            pub(crate) fn redepth_children(&self);
+            pub(crate) fn redepth_child(&self, child: &RenderObject);
             pub(crate) fn set_next_sibling(&self, element: Option<RenderObject>);
             pub(crate) fn set_prev_sibling(&self, element: Option<RenderObject>);
-            pub(crate) fn set_first_child(&self, element: Option<RenderObject>);
-            pub(crate) fn set_last_child(&self, element: Option<RenderObject>);
-            pub(crate) fn set_last_child_if_none(&self, element: Option<RenderObject>);
             pub(crate) fn depth(&self) -> usize;
             pub(crate) fn child_count(&self) -> usize;
             pub(crate) fn attach(&self, owner: PipelineOwner);
@@ -260,7 +290,6 @@ impl RenderObject {
             pub(crate) fn clean_relayout_boundary(&self);
             pub(crate) fn propagate_relayout_bondary(&self);
             pub(crate) fn set_owner(&self, owner: Option<PipelineOwner>);
-            pub(crate) fn clear_needs_paint(&self);
             pub(crate) fn set_layer(&self, layer: Option<Layer>);
             pub(crate) fn incr_depth(&self);
             pub(crate) fn clear_child_count(&self);
@@ -269,29 +298,4 @@ impl RenderObject {
             pub(crate) fn is_repaint_bondary(&self) -> bool;
         }
     }
-}
-
-#[derive(Clone)]
-pub enum WeakRenderObject {
-    RenderBox(WeakRenderBox),
-    RenderSliver(WeakRenderSliver),
-    RenderView(WeakRenderView),
-}
-
-impl WeakRenderObject {
-    pub fn upgrade(&self) -> RenderObject {
-        match self {
-            WeakRenderObject::RenderBox(o) => RenderObject::RenderBox(o.upgrade()),
-            WeakRenderObject::RenderSliver(o) => RenderObject::RenderSliver(o.upgrade()),
-            WeakRenderObject::RenderView(o) => RenderObject::RenderView(o.upgrade()),
-        }
-    }
-
-    delegate::delegate!(to match self {
-        WeakRenderObject::RenderBox(o) => o,
-        WeakRenderObject::RenderSliver(o) => o,
-        WeakRenderObject::RenderView(o) => o,
-    } {
-        pub fn is_alive(&self) -> bool;
-    });
 }

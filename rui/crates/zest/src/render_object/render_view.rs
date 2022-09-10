@@ -141,7 +141,7 @@ impl RenderView {
 
     pub(crate) fn layout_without_resize(&self) {
         self.perform_layout();
-        self.clear_needs_layout();
+        self.set_needs_layout(false);
         self.mark_needs_paint();
     }
 
@@ -152,7 +152,7 @@ impl RenderView {
     pub(crate) fn layout(&self, constraints: Constraints, _parent_use_size: bool) {
         self.set_constraints(constraints);
         self.perform_layout();
-        self.clear_needs_layout();
+        self.set_needs_layout(false);
         self.mark_needs_paint();
     }
 
@@ -173,7 +173,7 @@ impl RenderView {
     }
 
     pub(crate) fn paint_with_context(&self, context: &mut PaintContext, offset: Offset) {
-        self.clear_needs_paint();
+        self.set_needs_paint(false);
         self.paint(context, offset);
         assert!(!self.needs_layout());
         assert!(!self.needs_paint());
@@ -213,72 +213,5 @@ impl RenderView {
     }
     pub(crate) fn mark_needs_paint(&self) {
         self._mark_needs_paint()
-    }
-}
-
-impl RenderView {
-    delegate::delegate! {
-        // region: delegate to immutable inner
-        to self.inner.borrow() {
-            pub(crate) fn id(&self) -> usize;
-            pub(crate) fn parent(&self) -> RenderObject;
-            pub(crate) fn try_parent(&self) -> Option<RenderObject>;
-            pub(crate) fn parent_data(&self) -> ParentData;
-            pub(crate) fn try_parent_data(&self) -> Option<ParentData>;
-            pub(crate) fn with_parent_data<T: 'static, R>(&self, f: impl FnOnce(&T) -> R) -> Option<R>;
-            pub(crate) fn first_child(&self) -> RenderObject;
-            pub(crate) fn try_first_child(&self) -> Option<RenderObject>;
-            pub(crate) fn last_child(&self) -> RenderObject;
-            pub(crate) fn try_last_child(&self) -> Option<RenderObject>;
-            pub(crate) fn next_sibling(&self) -> RenderObject;
-            pub(crate) fn prev_sibling(&self) -> RenderObject;
-            pub(crate) fn try_next_sibling(&self) -> Option<RenderObject>;
-            pub(crate) fn try_prev_sibling(&self) -> Option<RenderObject>;
-            pub(crate) fn child_count(&self) -> usize;
-            pub(crate) fn visit_children(&self, visitor: impl FnMut(RenderObject));
-            pub(crate) fn depth(&self) -> usize;
-            pub(crate) fn redepth_children(&self);
-            pub(crate) fn redepth_child(&self, child: &RenderObject);
-            pub(crate) fn relayout_boundary(&self) -> RenderObject;
-            pub(crate) fn try_relayout_boundary(&self) -> Option<RenderObject>;
-            pub(crate) fn owner(&self) -> PipelineOwner;
-            pub(crate) fn try_owner(&self) -> Option<PipelineOwner>;
-            pub(crate) fn needs_layout(&self) -> bool;
-            pub(crate) fn needs_paint(&self) -> bool;
-            pub(crate) fn try_constraints(&self) -> Option<Constraints>;
-            pub(crate) fn constraints(&self) -> Constraints;
-            pub(crate) fn doing_this_layout_with_callback(&self) -> bool;
-            pub(crate) fn try_layer(&self) -> Option<Layer>;
-            pub(crate) fn layer(&self) -> Layer;
-            pub(crate) fn to_string_short(&self) -> String;
-            pub(crate) fn to_string_deep(&self) -> String;
-        }
-        // endregion: delete to immutable inner
-
-        // region: delegate to mutable inner
-        to self.inner.borrow_mut() {
-            pub(crate) fn set_id(&self, id: usize);
-            pub(crate) fn set_parent(&self, element: Option<RenderObject>);
-            pub(crate) fn set_next_sibling(&self, element: Option<RenderObject>);
-            pub(crate) fn set_prev_sibling(&self, element: Option<RenderObject>);
-            pub(crate) fn set_first_child(&self, element: Option<RenderObject>);
-            pub(crate) fn set_last_child(&self, element: Option<RenderObject>);
-            pub(crate) fn set_last_child_if_none(&self, element: Option<RenderObject>);
-            pub(crate) fn set_relayout_boundary(&self, relayout_boundary: Option<RenderObject>);
-            pub(crate) fn set_needs_paint(&self, needs_paint: bool);
-            pub(crate) fn set_needs_layout(&self, needs_layout: bool);
-            pub(crate) fn clear_needs_layout(&self);
-            pub(crate) fn set_owner(&self, owner: Option<PipelineOwner>);
-            pub(crate) fn clear_needs_paint(&self);
-            pub(crate) fn invoke_layout_callback(&self, callback: impl FnOnce(&Constraints));
-            pub(crate) fn set_layer(&self, layer: Option<Layer>);
-            pub(crate) fn incr_depth(&self);
-            pub(crate) fn clear_child_count(&self);
-            pub(crate) fn incr_child_count(&self);
-            pub(crate) fn decr_child_count(&self);
-            pub(crate) fn set_constraints(&self, c: Constraints);
-        }
-        // endregion: delegate to mutable inner
-
     }
 }
