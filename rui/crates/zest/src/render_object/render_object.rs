@@ -211,32 +211,14 @@ impl RenderObject {
             pub fn set_parent(&self, element: Option<RenderObject>);
             pub fn try_next_sibling(&self) -> Option<RenderObject>;
             pub fn try_prev_sibling(&self) -> Option<RenderObject>;
-            pub fn set_next_sibling(&self, element: Option<RenderObject>);
-            pub fn set_prev_sibling(&self, element: Option<RenderObject>);
-            pub fn set_first_child(&self, element: Option<RenderObject>);
-            pub fn set_last_child(&self, element: Option<RenderObject>);
-            pub fn set_last_child_if_none(&self, element: Option<RenderObject>);
-            pub(crate) fn attach(&self, owner: PipelineOwner);
             pub fn detach(&self);
-            /// Mark the given node as being a child of this node.
-            ///
-            /// Subclasses should call this function when they acquire a new child.
             pub fn adopt_child(&self, child: &RenderObject);
-            /// Disconnect the given node from this node.
-            ///
-            /// Subclasses should call this function when they lose a child.
             pub fn drop_child(&self, child: &RenderObject);
-            /// Insert child into this render object's child list after the given child.
-            ///
-            /// If `after` is null, then this inserts the child at the start of the list,
-            /// and the child becomes the new [firstChild].
             pub fn insert(&self, child: RenderObject, after: Option<RenderObject>);
             pub fn add(&self, child: RenderObject);
             pub fn remove(&self, child: &RenderObject);
             pub fn remove_all(&self);
             pub fn move_(&self, child: RenderObject, after: Option<RenderObject>);
-            pub fn depth(&self) -> usize;
-            pub fn child_count(&self) -> usize;
             pub fn redepth_children(&self);
             pub fn relayout_boundary(&self) -> RenderObject;
             pub fn try_relayout_boundary(&self) -> Option<RenderObject>;
@@ -247,27 +229,12 @@ impl RenderObject {
             pub fn try_constraints(&self) -> Option<Constraints>;
             pub fn constraints(&self) -> Constraints;
             pub fn doing_this_layout_with_callback(&self) -> bool;
-            pub(crate) fn try_layer(&self) -> Option<Layer>;
-            pub(crate) fn layer(&self) -> Layer;
-            pub fn set_relayout_boundary(&self, relayout_boundary: Option<RenderObject>);
-            pub fn clean_relayout_boundary(&self);
-            pub fn propagate_relayout_bondary(&self);
             pub fn mark_needs_layout(&self);
             pub fn clear_needs_layout(&self);
             pub fn mark_parent_needs_layout(&self);
-            pub(crate) fn set_owner(&self, owner: Option<PipelineOwner>);
-            pub fn clear_needs_paint(&self);
-            pub fn mark_needs_paint(&self);
-            pub fn invoke_layout_callback(&self, callback: impl FnOnce(&Constraints));
-            pub(crate) fn set_layer(&self, layer: Option<Layer>);
-            pub fn incr_depth(&self);
-            pub fn clear_child_count(&self);
-            pub fn incr_child_count(&self);
-            pub fn decr_child_count(&self);
             pub fn set_constraints(&self, c: Constraints);
             pub fn paint_with_context(&self, context: &mut PaintContext, offset: Offset);
             pub fn visit_children(&self, visitor: impl FnMut(RenderObject));
-            pub fn is_repaint_bondary(&self) -> bool;
             pub fn handle_event(&self, event: PointerEvent, entry: HitTestEntry);
             pub fn layout_without_resize(&self);
             pub fn layout(&self, constraints: Constraints, parent_use_size: bool);
@@ -277,6 +244,29 @@ impl RenderObject {
             pub fn to_string_deep(&self) -> String;
             pub fn id(&self) -> usize;
             pub fn set_id(&self, id: usize);
+            pub fn mark_needs_paint(&self);
+            pub fn invoke_layout_callback(&self, callback: impl FnOnce(&Constraints));
+            pub(crate) fn set_next_sibling(&self, element: Option<RenderObject>);
+            pub(crate) fn set_prev_sibling(&self, element: Option<RenderObject>);
+            pub(crate) fn set_first_child(&self, element: Option<RenderObject>);
+            pub(crate) fn set_last_child(&self, element: Option<RenderObject>);
+            pub(crate) fn set_last_child_if_none(&self, element: Option<RenderObject>);
+            pub(crate) fn depth(&self) -> usize;
+            pub(crate) fn child_count(&self) -> usize;
+            pub(crate) fn attach(&self, owner: PipelineOwner);
+            pub(crate) fn try_layer(&self) -> Option<Layer>;
+            pub(crate) fn layer(&self) -> Layer;
+            pub(crate) fn set_relayout_boundary(&self, relayout_boundary: Option<RenderObject>);
+            pub(crate) fn clean_relayout_boundary(&self);
+            pub(crate) fn propagate_relayout_bondary(&self);
+            pub(crate) fn set_owner(&self, owner: Option<PipelineOwner>);
+            pub(crate) fn clear_needs_paint(&self);
+            pub(crate) fn set_layer(&self, layer: Option<Layer>);
+            pub(crate) fn incr_depth(&self);
+            pub(crate) fn clear_child_count(&self);
+            pub(crate) fn incr_child_count(&self);
+            pub(crate) fn decr_child_count(&self);
+            pub(crate) fn is_repaint_bondary(&self) -> bool;
         }
     }
 }
