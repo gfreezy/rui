@@ -1,4 +1,5 @@
 use crate::constraints::Constraints;
+use crate::diagnostics::DiagnosticsNode;
 use crate::render_object::layer::Layer;
 use crate::render_object::parent_data::ParentData;
 use crate::render_object::pipeline_owner::{PipelineOwner, WeakOwner};
@@ -361,8 +362,6 @@ impl_method! {
                 pub(crate) fn doing_this_layout_with_callback(&self) -> bool;
                 pub(crate) fn try_layer(&self) -> Option<Layer>;
                 pub(crate) fn layer(&self) -> Layer;
-                pub(crate) fn to_string_short(&self) -> String;
-                pub(crate) fn to_string_deep(&self) -> String;
             }
             // endregion: delete to immutable inner
 
@@ -395,14 +394,6 @@ impl_method! {
 
 impl_method! {
      InnerRenderBox, InnerRenderSliver, InnerRenderView {
-        pub(crate) fn to_string_short(&self) -> String {
-            todo!()
-        }
-
-        pub(crate) fn to_string_deep(&self) -> String {
-            todo!()
-        }
-
         pub(crate) fn parent(&self) -> RenderObject {
             self.try_parent().unwrap()
         }

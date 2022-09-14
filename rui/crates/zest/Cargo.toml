@@ -16,3 +16,4 @@ mixin = { path = "../../../third_party/mixin" }
 delegate = "0.8"
 debug-cell = "0.1"
 cgmath = "0.18.0"
+flipper-client = { path = "../flipper-client" }

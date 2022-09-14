@@ -3,6 +3,7 @@ mod macros;
 mod arithmatic;
 pub mod constraints;
 mod diagnostics;
+pub mod flipper;
 pub mod geometry;
 pub mod hit_test;
 pub mod paint_context;
@@ -10,33 +11,43 @@ pub mod pointer_event;
 pub mod render_object;
 pub mod rendering;
 
+use std::thread;
+
+use druid_shell::IdleToken;
 use druid_shell::{
     piet::Piet, Application, HotKey, Menu, SysMods, WinHandler, WindowBuilder, WindowHandle,
 };
+use flipper_client::FlipperClient;
 use pointer_event::PointerEvent;
 use render_object::{pipeline_owner::PipelineOwner, render_object::RenderObject};
 use rendering::render_flex::RenderFlex;
 use tracing::metadata::LevelFilter;
 
+use crate::flipper::LayoutPlugin;
 use crate::hit_test::HitTestPosition;
 use crate::{geometry::Size, hit_test::HitTestResult};
 
 const QUIT_MENU_ID: u32 = 0x100;
+const SCHEDULE_FLIPPER_IDLE_TOKEN: IdleToken = IdleToken::new(1);
 
 struct MainState {
     handle: WindowHandle,
     render: Box<dyn Fn(&RenderObject)>,
     root_view: Option<RenderObject>,
     pipeline_owner: Option<PipelineOwner>,
+    flipper_client: FlipperClient,
 }
 
 impl MainState {
     fn new(render: impl Fn(&RenderObject) + 'static) -> Self {
+        let client = FlipperClient::connect("zest-app", "zest-app-1").unwrap();
+
         MainState {
             handle: WindowHandle::default(),
             render: Box::new(render),
             root_view: None,
             pipeline_owner: None,
+            flipper_client: client,
         }
     }
 
@@ -126,6 +137,13 @@ impl WinHandler for MainState {
         self.root_view().prepare_initial_frame();
         tracing::debug!("--------------- render sycamore --------------");
         (self.render)(&self.root_view());
+        let mut idle_handle = handle.get_idle_handle().unwrap();
+        self.flipper_client.spawn_recving_data_thread(move || {
+            idle_handle.schedule_idle(SCHEDULE_FLIPPER_IDLE_TOKEN)
+        });
+        self.flipper_client
+            .add_plugin(LayoutPlugin::new(self.root_view().clone()))
+            .unwrap();
     }
 
     fn prepare_paint(&mut self) {
@@ -160,6 +178,17 @@ impl WinHandler for MainState {
     fn request_close(&mut self) {
         self.handle.close();
         Application::global().quit();
+    }
+
+    fn idle(&mut self, token: IdleToken) {
+        if token == SCHEDULE_FLIPPER_IDLE_TOKEN {
+            match self.flipper_client.dispatch_event() {
+                Ok(_) => {}
+                Err(e) => {
+                    tracing::error!(?e);
+                }
+            }
+        }
     }
 
     fn as_any(&mut self) -> &mut dyn std::any::Any {

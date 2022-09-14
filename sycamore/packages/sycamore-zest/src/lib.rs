@@ -170,7 +170,6 @@ impl GenericNode for ZestNode {
     }
 
     fn insert_sibling_before(&self, child: &Self) {
-        eprintln!("insert_sibling_before");
         self.parent_node()
             .map(|p| p.insert_child_before(child, Some(self)));
         assert!(child.node().try_owner().is_some());
@@ -185,7 +184,6 @@ impl GenericNode for ZestNode {
     }
 
     fn remove_self(&self) {
-        eprintln!("remove_self");
         self.parent_node().map(|parent| parent.remove_child(self));
     }
 

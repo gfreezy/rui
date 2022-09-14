@@ -1,4 +1,5 @@
 use crate::constraints::{BoxConstraints, Constraints};
+use crate::diagnostics::DiagnosticsNode;
 use crate::geometry::{Matrix4, Offset, Rect, Size};
 use crate::hit_test::{BoxHitTestEntry, HitTestEntry, HitTestResult};
 use crate::paint_context::PaintContext;
@@ -7,10 +8,10 @@ use crate::render_object::layer::Layer;
 use crate::render_object::parent_data::ParentData;
 use crate::render_object::pipeline_owner::{PipelineOwner, WeakOwner};
 use crate::render_object::render_object::{RenderObject, WeakRenderObject};
-use debug_cell::RefCell;
 use decorum::R64;
 use std::any::type_name;
 use std::any::Any;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -247,6 +248,17 @@ impl RenderBox {
         };
 
         render_box.render_object()
+    }
+
+    pub fn diagnostics(&self) -> DiagnosticsNode {
+        let mut node = DiagnosticsNode::new(self.name());
+        node.add_number_property("id", self.id() as f64);
+        node.add_string_property("name", self.name());
+        node.add_number_property("child_count", self.child_count() as f64);
+        node.add_string_property("needs_layout", self.needs_layout().to_string());
+        node.add_string_property("needs_paint", self.needs_paint().to_string());
+        node.add_string_property("needs_paint", self.needs_paint().to_string());
+        node
     }
 
     pub fn downgrade(&self) -> WeakRenderBox {

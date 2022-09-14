@@ -4,6 +4,7 @@ use std::fmt::Debug;
 use std::rc::{Rc, Weak};
 
 use crate::constraints::{BoxConstraints, Constraints};
+use crate::diagnostics::DiagnosticsNode;
 use crate::geometry::{Matrix4, Offset, Rect, Size};
 use crate::hit_test::{HitTestEntry, HitTestResult};
 use crate::paint_context::PaintContext;

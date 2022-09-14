@@ -7,6 +7,7 @@ members = [
     "crates/esplori",
     "crates/zest",
     "crates/zest-app",
+    "crates/flipper-client",
 ]
 
 [patch.crates-io]

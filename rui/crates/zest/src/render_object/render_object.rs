@@ -1,5 +1,6 @@
 use crate::constraints::{BoxConstraints, Constraints};
 use crate::constraints::{SliverConstraints, SliverGeometry};
+use crate::diagnostics::DiagnosticsNode;
 use crate::geometry::{Matrix4, Offset, Rect, Size, Vector3};
 use crate::hit_test::HitTestPosition;
 use crate::hit_test::{HitTestEntry, HitTestResult};
@@ -264,8 +265,6 @@ impl RenderObject {
             pub fn layout(&self, constraints: Constraints, parent_use_size: bool);
             pub fn paint_bounds(&self) -> Rect;
             pub fn apply_paint_transform(&self, child: &RenderObject, transform: &Matrix4);
-            pub fn to_string_short(&self) -> String;
-            pub fn to_string_deep(&self) -> String;
             pub fn id(&self) -> usize;
             pub fn set_id(&self, id: usize);
             pub fn mark_needs_paint(&self);

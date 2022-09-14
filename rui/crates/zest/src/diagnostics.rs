@@ -1,4 +1,5 @@
-struct DiagnosticsNode {
+#[derive(Debug, Default, Clone)]
+pub struct DiagnosticsNode {
     pub name: String,
     pub properties: Vec<DiagnosticsProperty>,
     pub children: Vec<DiagnosticsNode>,
@@ -17,19 +18,23 @@ impl DiagnosticsNode {
         self.properties.push(property);
     }
 
-    pub fn add_string_property(&mut self, name: String, value: String) {
+    pub fn add_string_property(&mut self, name: impl Into<String>, value: impl Into<String>) {
         self.properties
-            .push(DiagnosticsProperty::new_string(name, value));
+            .push(DiagnosticsProperty::new_string(name.into(), value.into()));
     }
 
-    pub fn add_number_property(&mut self, name: String, value: f64) {
+    pub fn add_number_property(&mut self, name: impl Into<String>, value: f64) {
         self.properties
-            .push(DiagnosticsProperty::new_number(name, value));
+            .push(DiagnosticsProperty::new_number(name.into(), value));
     }
 
-    pub fn add_array_property(&mut self, name: String, value: Vec<DiagnosticsPropertyValue>) {
+    pub fn add_array_property(
+        &mut self,
+        name: impl Into<String>,
+        value: Vec<DiagnosticsPropertyValue>,
+    ) {
         self.properties
-            .push(DiagnosticsProperty::new_array(name, value));
+            .push(DiagnosticsProperty::new_array(name.into(), value));
     }
 
     pub fn add_child(&mut self, child: DiagnosticsNode) {
@@ -37,7 +42,8 @@ impl DiagnosticsNode {
     }
 }
 
-struct DiagnosticsProperty {
+#[derive(Debug, Clone)]
+pub struct DiagnosticsProperty {
     pub name: String,
     pub value: DiagnosticsPropertyValue,
 }
@@ -60,7 +66,8 @@ impl DiagnosticsProperty {
     }
 }
 
-enum DiagnosticsPropertyValue {
+#[derive(Debug, Clone)]
+pub enum DiagnosticsPropertyValue {
     String(String),
     Number(f64),
     Array(Vec<DiagnosticsPropertyValue>),
